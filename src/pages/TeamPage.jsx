@@ -1,45 +1,105 @@
 import React, { useState, useEffect } from 'react';
 import { Helmet } from 'react-helmet';
 import { motion } from 'framer-motion';
-import { Linkedin, Mail } from 'lucide-react';
+// --- MODIFICACIÓN 1: Importar nuevos iconos ---
+import { Linkedin, Mail, Instagram, Smartphone, Link as LinkIcon } from 'lucide-react';
+// --- FIN MODIFICACIÓN ---
 import { Button } from '@/components/ui/button';
-// Importamos la conexión a la base de datos
-import { db } from '@/firebase.jsx'; 
+import { db, storage } from '@/firebase.jsx'; 
 import { collection, getDocs, query, orderBy } from 'firebase/firestore';
+import { ref as storageRef, getDownloadURL } from 'firebase/storage';
 
 const TeamPage = () => {
-  // Estado para guardar los miembros del equipo y el estado de carga
   const [teamMembers, setTeamMembers] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // Este 'useEffect' se ejecuta una vez cuando la página carga
+  // Componente auxiliar para mostrar la imagen con fallback
+  const MemberAvatar = ({ member }) => {
+    // ... (Código del MemberAvatar sin cambios) ...
+    const [imgError, setImgError] = useState(false);
+    const [imgLoading, setImgLoading] = useState(true);
+
+    const initials = member.name
+      ? member.name.split(' ').map(n => n[0]).slice(0,2).join('').toUpperCase()
+      : '';
+
+    const imageSrc = member.resolvedImageUrl || member.imageUrl || null;
+    if (!imageSrc) {
+      return (
+        <div className="mb-6 overflow-hidden rounded-full w-40 h-40 mx-auto border-4 border-boreal-blue/50 flex items-center justify-center bg-white/5 text-white text-2xl font-bold">
+          {initials}
+        </div>
+      );
+    }
+
+    return (
+      <div className="mb-6 overflow-hidden rounded-full w-40 h-40 mx-auto border-4 border-boreal-blue/50 bg-white/5 flex items-center justify-center">
+        {imgLoading && (
+          <div className="animate-pulse w-full h-full flex items-center justify-center">
+            <div className="w-10 h-10 rounded-full bg-white/10" />
+          </div>
+        )}
+        {!imgError ? (
+          <img
+            alt={`${member.name} - ${member.role}`}
+            className={`w-full h-full object-cover ${imgLoading ? 'hidden' : 'block'}`}
+            src={imageSrc}
+            onLoad={() => setImgLoading(false)}
+            onError={() => { setImgError(true); setImgLoading(false); }}
+          />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center text-white text-2xl font-bold">
+            {initials}
+          </div>
+        )}
+      </div>
+    );
+  };
+
   useEffect(() => {
     const fetchTeam = async () => {
       try {
-        // 1. Prepara la consulta: "Obtener la colección 'teamMembers' y ordenarla por 'name'"
         const q = query(collection(db, "teamMembers"), orderBy("name", "asc"));
-        
-        // 2. Ejecuta la consulta
         const querySnapshot = await getDocs(q);
-        
-        // 3. Convierte los documentos de Firebase en un array que React entienda
-        const members = querySnapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data()
+        const rawMembers = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+        const members = await Promise.all(rawMembers.map(async (m) => {
+          const out = { ...m };
+          try {
+            if (Array.isArray(m.imageUrl) && m.imageUrl.length > 0) {
+              const first = m.imageUrl[0];
+              if (first.downloadURL) {
+                out.resolvedImageUrl = first.downloadURL;
+              } else if (first.ref) {
+                out.resolvedImageUrl = await getDownloadURL(storageRef(storage, first.ref));
+              }
+            } else if (m.imageUrl && typeof m.imageUrl === 'string') {
+              out.resolvedImageUrl = m.imageUrl;
+            } else if (m.imageUrl && m.imageUrl.ref) {
+              out.resolvedImageUrl = await getDownloadURL(storageRef(storage, m.imageUrl.ref));
+            }
+          } catch (e) {
+            console.warn('No se pudo resolver imageUrl para', m.id, e);
+            out.resolvedImageUrl = null;
+          }
+          return out;
         }));
         
-        // 4. Guarda los miembros en el estado
+        console.log("Miembros cargados desde Firestore (resueltas):", members);
         setTeamMembers(members);
       } catch (error) {
         console.error("Error al cargar miembros del equipo: ", error);
       } finally {
-        // 5. Quita el mensaje de "Cargando..."
         setLoading(false);
       }
     };
 
-    fetchTeam();
-  }, []); // El array vacío [] asegura que esto se ejecute solo una vez
+    const timer = setTimeout(() => {
+      fetchTeam();
+    }, 1000); 
+
+    return () => clearTimeout(timer);
+  }, []);
 
   return (
     <>
@@ -64,59 +124,108 @@ const TeamPage = () => {
             </p>
           </motion.div>
 
-          {/* Si está cargando, muestra un mensaje */}
           {loading ? (
             <div className="text-center text-boreal-aqua text-xl">
               Cargando equipo...
             </div>
           ) : (
-            // Si ya cargó, muestra la cuadrícula de miembros
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
               {teamMembers.map((member, index) => (
                 <motion.div
-                  key={member.id} // Usa el ID de Firestore
+                  key={member.id}
                   initial={{ opacity: 0, y: 20 }}
                   whileInView={{ opacity: 1, y: 0 }}
                   viewport={{ once: true }}
                   transition={{ duration: 0.6, delay: index * 0.1 }}
                   className="glass-effect rounded-2xl p-6 text-center hover:bg-white/10 transition-all group transform hover:-translate-y-2"
                 >
-                  <div className="mb-6 overflow-hidden rounded-full w-40 h-40 mx-auto border-4 border-boreal-blue/50">
-                    <img alt={`${member.name} - ${member.role}`} className="w-full h-full object-cover" src={member.imageUrl} />
-                  </div>
+                  <MemberAvatar member={member} />
 
                   <h3 className="text-2xl font-bold text-white mb-1">{member.name}</h3>
                   <div className="text-boreal-aqua font-semibold mb-3">{member.role}</div>
                   <p className="text-gray-400 mb-6 text-sm">{member.description}</p>
 
+                  {/* --- MODIFICACIÓN 2: Añadir iconos condicionales --- */}
                   <div className="flex space-x-3 justify-center">
-                    <motion.a
-                      href={member.linkedinUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      whileHover={{ scale: 1.1 }}
-                      whileTap={{ scale: 0.95 }}
-                      className="bg-white/10 hover:bg-white/20 p-2 rounded-lg transition-colors"
-                      aria-label="LinkedIn"
-                    >
-                      <Linkedin className="w-5 h-5 text-boreal-aqua" />
-                    </motion.a>
-                    <motion.a
-                      href={`mailto:${member.email}`}
-                      whileHover={{ scale: 1.1 }}
-                      whileTap={{ scale: 0.95 }}
-                      className="bg-white/10 hover:bg-white/20 p-2 rounded-lg transition-colors"
-                      aria-label="Email"
-                    >
-                      <Mail className="w-5 h-5 text-boreal-aqua" />
-                    </motion.a>
+                    {/* LinkedIn (si existe) */}
+                    {member.linkedinUrl && (
+                      <motion.a
+                        href={member.linkedinUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        whileHover={{ scale: 1.1 }}
+                        whileTap={{ scale: 0.95 }}
+                        className="bg-white/10 hover:bg-white/20 p-2 rounded-lg transition-colors"
+                        aria-label="LinkedIn"
+                      >
+                        <Linkedin className="w-5 h-5 text-boreal-aqua" />
+                      </motion.a>
+                    )}
+
+                    {/* Email (si existe) */}
+                    {member.email && (
+                      <motion.a
+                        href={`mailto:${member.email}`}
+                        whileHover={{ scale: 1.1 }}
+                        whileTap={{ scale: 0.95 }}
+                        className="bg-white/10 hover:bg-white/20 p-2 rounded-lg transition-colors"
+                        aria-label="Email"
+                      >
+                        <Mail className="w-5 h-5 text-boreal-aqua" />
+                      </motion.a>
+                    )}
+
+                    {/* Instagram (si existe) */}
+                    {member.instagramUrl && (
+                      <motion.a
+                        href={member.instagramUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        whileHover={{ scale: 1.1 }}
+                        whileTap={{ scale: 0.95 }}
+                        className="bg-white/10 hover:bg-white/20 p-2 rounded-lg transition-colors"
+                        aria-label="Instagram"
+                      >
+                        <Instagram className="w-5 h-5 text-boreal-aqua" />
+                      </motion.a>
+                    )}
+                    
+                    {/* WhatsApp (si existe) - Asume que whatsappUrl es una URL wa.me/... */}
+                    {member.whatsappUrl && (
+                      <motion.a
+                        href={member.whatsappUrl} // ej: "https://wa.me/50512345678"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        whileHover={{ scale: 1.1 }}
+                        whileTap={{ scale: 0.95 }}
+                        className="bg-white/10 hover:bg-white/20 p-2 rounded-lg transition-colors"
+                        aria-label="WhatsApp"
+                      >
+                        <Smartphone className="w-5 h-5 text-boreal-aqua" />
+                      </motion.a>
+                    )}
+
+                    {/* Enlace Externo Genérico (si existe) */}
+                    {member.externalUrl && (
+                      <motion.a
+                        href={member.externalUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        whileHover={{ scale: 1.1 }}
+                        whileTap={{ scale: 0.95 }}
+                        className="bg-white/10 hover:bg-white/20 p-2 rounded-lg transition-colors"
+                        aria-label="Enlace externo"
+                      >
+                        <LinkIcon className="w-5 h-5 text-boreal-aqua" />
+                      </motion.a>
+                    )}
                   </div>
+                  {/* --- FIN MODIFICACIÓN --- */}
                 </motion.div>
               ))}
             </div>
           )}
           
-          {/* Sección "Únete" (no cambia) */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
@@ -128,15 +237,16 @@ const TeamPage = () => {
               <span className="text-gradient">Únete a Nuestro Equipo</span>
             </h2>
             <p className="text-xl text-gray-300 max-w-2xl mx-auto mb-8">
-              Siempre estamos buscando personas apasionadas que quieran marcar la diferencia en la vida de los jóvenes de Nicaragua.
+              ¿Eres una persona apasionada que quiere marcar la diferencia? ¡Aplica para unirte a nuestro equipo!
             </p>
             <Button
               size="lg"
               asChild
               className="bg-gradient-to-r from-boreal-blue to-boreal-purple hover:opacity-90 text-white px-8 py-4 font-semibold text-lg"
             >
-              <a href="mailto:info@boreallabs.org">
-                Contáctanos
+              {/* ¡IMPORTANTE! Reemplaza '#' con el enlace a tu formulario de Rowy */}
+              <a href="#" target="_blank" rel="noopener noreferrer">
+                Aplicar Ahora
               </a>
             </Button>
           </motion.div>

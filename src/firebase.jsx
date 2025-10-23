@@ -1,6 +1,7 @@
 import { initializeApp } from "firebase/app";
 import { getAuth, signInAnonymously, signInWithCustomToken } from "firebase/auth";
 import { getFirestore, setLogLevel } from "firebase/firestore";
+import { getStorage } from 'firebase/storage';
 // getAnalytics es opcional, pero puedes mantenerlo si lo usas
 import { getAnalytics } from "firebase/analytics";
 
@@ -24,6 +25,7 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 const analytics = getAnalytics(app); // Analytics
+const storage = getStorage(app);
 
 // Habilitar logs de debug para Firestore (útil para desarrollo)
 setLogLevel('debug');
@@ -46,4 +48,5 @@ const authenticate = async () => {
 authenticate();
 
 // Exporta las instancias que usaremos en la app
-export { db, auth, analytics };
+// Exporta storage también para poder resolver download URLs desde Storage
+export { db, auth, analytics, storage };

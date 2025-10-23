@@ -26,7 +26,6 @@ const Navbar = () => {
           {/* Se reemplazó el cohete y el texto por una etiqueta <img> */}
           <Link to="/" className="flex items-center">
             {/* ¡IMPORTANTE! 
-              Cambia '/boreal-logo.svg' por la ruta a tu archivo de logo.
               Si está en la carpeta 'public', la ruta está bien.
               Si está en 'src/assets', deberás importarlo arriba:
               import logo from '@/assets/boreal-logo.svg';
