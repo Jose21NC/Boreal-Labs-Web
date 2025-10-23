@@ -16,21 +16,23 @@ jobs:
     - name: Setup Node.js
       uses: actions/setup-node@v4
       with:
-        node-version: '20' # Ajusta si usas otra version de Node.js
+        node-version: '20'
 
     - name: Install Dependencies
       run: npm install
 
     - name: Build Project
-      run: npm run build # Genera la carpeta 'dist'
+      run: npm run build
 
-    - name: Deploy to Hostinger via FTP
+    - name: Deploy to Hostinger via FTP (Corregido)
       uses: SamKirkland/FTP-Deploy-Action@v4.3.0
       with:
         server: ${{ secrets.FTP_SERVER }}
         username: ${{ secrets.FTP_USERNAME }}
         password: ${{ secrets.FTP_PASSWORD }}
-        server-directory: ${{ secrets.FTP_PATH }}/
-        # La carpeta 'dist' creada por Vite se sube al servidor
+        # PROPIEDAD CORREGIDA: Usar 'server-dir' en lugar de 'server-directory'
+        server-dir: ${{ secrets.FTP_PATH }}/
         local-dir: ./dist/
-        ftp-s: true # Habilita la limpieza de archivos antiguos en el servidor
+        # Ya no se usa 'ftp-s'. 'state-name' se usa para manejar el estado.
+        # Quitamos la línea 'ftp-s: true' que causaba el error.
+        
