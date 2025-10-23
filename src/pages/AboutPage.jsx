@@ -3,6 +3,17 @@ import { Helmet } from 'react-helmet';
 import { motion } from 'framer-motion';
 import { Heart, Target, Zap, Globe } from 'lucide-react';
 
+// --- MODIFICACIÓN 1: IMPORTS DE SWIPER ---
+import { Swiper, SwiperSlide } from 'swiper/react';
+import { Pagination, Navigation, Autoplay } from 'swiper/modules'; // Importa módulos necesarios
+
+// Import Swiper styles
+import 'swiper/css';
+import 'swiper/css/pagination';
+import 'swiper/css/navigation';
+// Puedes añadir tus estilos personalizados o sobrescribir los de Swiper aquí si es necesario
+// import './swiper-custom.css'; 
+
 const AboutPage = () => {
   const values = [
     {
@@ -28,11 +39,25 @@ const AboutPage = () => {
   ];
 
   const milestones = [
-    { year: '2020', event: 'Fundación de Boreal Labs', description: 'Iniciamos con la visión de empoderar a la juventud.' },
-    { year: '2021', event: 'Primera Serie de Talleres', description: 'Lanzamos el programa inaugural de emprendimiento.' },
-    { year: '2022', event: 'Alianzas Universitarias', description: 'Establecimos colaboraciones con 5 universidades.' },
-    { year: '2023', event: 'Impacto en +500 Jóvenes', description: 'Alcanzamos nuestro hito de servir a 500 jóvenes innovadores.' },
-    { year: '2024', event: 'Reconocimiento Nacional', description: 'Premiados por la excelencia en el desarrollo juvenil.' },
+    { year: '23 de Mayo 2025', event: 'Lanzamiento de Boreal Labs', description: 'Iniciamos con la visión de empoderar a la juventud.' },
+    { year: '27 de Mayo', event: 'Primera Serie de Talleres', description: 'Lanzamos el programa inaugural de emprendimiento y aperturamos la oficina en UAM.' },
+    { year: '9 de Junio', event: '1era Temporada de Workshops', description: 'Hicimos el lanzamiento del calendario de Workshops y Certificaciones.' },
+    { year: '9 de Julio', event: '1era Certificacion', description: 'Realizamos con exito la primera certificacion con ponentes invitados.' },
+    { year: '4 de Agosto', event: 'Lanzamiento del programa de Voluntariado', description: 'Alcanzamos la meta de apoyar a hospitales, medio ambiente y animales.' },
+    { year: '29 de Septiembre', event: 'Boreal Labs ¨Hack-Day¨', description: 'Culminamos con exito nuestro evento mas grande del año.' },
+  ];
+
+  // --- MODIFICACIÓN 2: DATOS PARA EL CARRUSEL ---
+  // ¡CAMBIA ESTAS RUTAS DE IMÁGENES Y ALT TEXTS!
+  const carouselImages = [
+    { src: 'src/images/carrusel/b.jpg', alt: 'Evento de Boreal Labs 1' },
+    { src: 'src/images/carrusel/c.webp', alt: 'Taller de innovación' },
+    { src: 'src/images/carrusel/d.webp', alt: 'Miembros del equipo colaborando' },
+    { src: 'src/images/carrusel/e.jpg', alt: 'Charla inspiradora con un ponente' },
+    { src: 'src/images/carrusel/f.webp', alt: 'Jóvenes participando en un hackathon' },
+    { src: 'src/images/carrusel/g.jpg', alt: 'Graduación de un programa de emprendimiento' },
+    { src: 'src/images/carrusel/h.jpg', alt: 'Sesión de networking' },
+    { src: 'src/images/carrusel/i.webp', alt: 'Jóvenes desarrollando proyectos' },
   ];
 
   return (
@@ -65,7 +90,7 @@ const AboutPage = () => {
               viewport={{ once: true }}
               transition={{ duration: 0.8 }}
             >
-              <img alt="Boreal Labs team in a strategic meeting" className="rounded-2xl shadow-2xl" src="https://images.unsplash.com/photo-1585913161203-695a3ac93b33" />
+              <img alt="Foto de miembros de Boreal Labs" className="rounded-2xl shadow-2xl" src="src/images/quienes.png" />
             </motion.div>
 
             <motion.div
@@ -118,6 +143,57 @@ const AboutPage = () => {
               ))}
             </div>
           </motion.div>
+
+          {/* --- MODIFICACIÓN 3: NUEVA SECCIÓN DE CARRUSEL DE IMÁGENES --- */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.8 }}
+            className="mb-20" // Margen inferior para separar de la siguiente sección
+          >
+            <h2 className="text-4xl md:text-5xl font-bold text-center mb-12">
+              Nuestros <span className="text-gradient">Momentos</span>
+            </h2>
+
+            <Swiper
+              spaceBetween={30} // Espacio entre slides
+              slidesPerView={1}
+              breakpoints={{
+                // cuando el ancho de la ventana es >= 640px
+                640: {
+                  slidesPerView: 2,
+                  spaceBetween: 20,
+                },
+                // cuando el ancho de la ventana es >= 1024px
+                1024: {
+                  slidesPerView: 3,
+                  spaceBetween: 30,
+                },
+              }}
+              autoplay={{
+                delay: 3500,
+                disableOnInteraction: false,
+              }}
+              pagination={{ clickable: true }} // Paginación con puntos
+              navigation={true} // Flechas de navegación
+              modules={[Pagination, Navigation, Autoplay]} // Habilita los módulos
+              loop={true} // Repetir el carrusel
+              className="mySwiper rounded-2xl shadow-xl p-4 bg-boreal-blue/10" // Clase para estilos y padding
+            >
+              {carouselImages.map((image, index) => (
+                <SwiperSlide key={index}>
+                  <img 
+                    src={image.src} 
+                    alt={image.alt} 
+                    className="w-full h-80 object-cover rounded-xl" // Ajusta h-80 a la altura deseada
+                  />
+                </SwiperSlide>
+              ))}
+            </Swiper>
+          </motion.div>
+          {/* --- FIN DE LA NUEVA SECCIÓN DE CARRUSEL --- */}
+
 
           <motion.div
             initial={{ opacity: 0, y: 20 }}

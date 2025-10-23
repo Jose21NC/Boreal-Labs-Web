@@ -2,7 +2,8 @@ import React from 'react';
 import { Helmet } from 'react-helmet';
 import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
-import { ArrowRight, Zap, Mic, Users, Heart, Award, School as University, Building } from 'lucide-react';
+// Se agregó el ícono de 'Instagram'
+import { ArrowRight, Zap, Mic, Heart, Award, School as University, Building, Instagram } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 const ScrollAnimatedSection = ({ children, className }) => {
@@ -20,59 +21,70 @@ const ScrollAnimatedSection = ({ children, className }) => {
 };
 
 const HomePage = () => {
+  
   const programs = [
     {
       icon: Zap,
-      title: 'Talleres de Innovación',
-      description: 'Sumérgete en el mundo de la tecnología y la creatividad con nuestros talleres prácticos.',
+      title: 'Talleres Formativos',
+      description: 'Sumérgete en la innovación, liderazgo, tecnología y más con nuestros talleres prácticos.',
     },
     {
       icon: Mic,
       title: 'Charlas Inspiradoras',
-      description: 'Conéctate con líderes y emprendedores que están cambiando el juego en Nicaragua.',
+      description: 'Conéctate con líderes, emprendedores y docentes que están cambiando el juego en Nicaragua.',
     },
     {
-      icon: Users,
-      title: 'Eventos de Networking',
-      description: 'Expande tu red de contactos y colabora con otros jóvenes apasionados por la innovación.',
+      icon: Building,
+      title: 'Espacios de Conexión',
+      description: 'Contamos con oficina presencial y eventos para colaborar con otros jóvenes apasionados.',
     },
   ];
 
   const impacts = [
     {
       icon: Heart,
-      metric: '+1,500',
+      metric: '+650',
       description: 'Jóvenes impactados a nivel nacional.',
     },
     {
       icon: Award,
-      metric: '50+',
+      metric: '12',
       description: 'Eventos y talleres realizados con éxito.',
     },
     {
       icon: University,
-      metric: '10+',
+      metric: '7',
       description: 'Alianzas con universidades y centros de innovación.',
+    },
+    {
+      icon: Zap,
+      metric: '8',
+      description: 'Proyectos de emprendimiento en desarrollo.',
     },
   ];
 
   const partners = [
-    { name: 'Universidad Nacional de Ingeniería', alt: 'Logo UNI' },
-    { name: 'Universidad Centroamericana', alt: 'Logo UCA' },
-    { name: 'Impact Hub Managua', alt: 'Logo Impact Hub' },
-    { name: 'Agora Partnerships', alt: 'Logo Agora' },
-    { name: 'Startup Nicaragua', alt: 'Logo Startup Nicaragua' },
-    { name: 'Centro de Innovación - UNAN', alt: 'Logo UNAN' },
+    { name: 'Universidad Americana (UAM)', alt: 'Logo UAM', imgSrc: 'https://logosnicas.com/wp-content/uploads/2022/08/universidad_americana_2020.png' },
+    { name: 'Universidad Nacional de Ingeniería', alt: 'Logo UNI', imgSrc: 'https://www.ualn.edu.ni/wp-content/uploads/2023/02/UNI.png' },
+    { name: 'Tecnologico Nacional (INATEC)', alt: 'Logo INATEC', imgSrc: 'https://www.tecnacional.edu.ni/media/uploads/2016/11/18/logo-inatec-2016.png' },
+    { name: 'Universidad Nacional Autonoma de Nicaragua, Managua - UNAN', alt: 'Logo UNAN', imgSrc: 'https://www.ualn.edu.ni/wp-content/uploads/2023/02/UNAN-MANAGUA.png' },
+    { name: 'Aspire Institute Inc.', alt: 'Logo Aspire', imgSrc: 'https://www.aspireleaders.org/wp-content/uploads/2025/04/Aspire-logotype_red_lg_transparent-1.png' },
   ];
+
 
   return (
     <>
       <Helmet>
-        <title>Home - Boreal Labs</title>
-        <meta name="description" content="Boreal Labs: Juventud que Innova Transforma crea Nicaragua. Únete al movimiento." />
+        <title>Inicio - Boreal Labs</title>
+        <meta 
+          name="description" 
+          content="Somos una comunidad juvenil que busca transformar el futuro de Nicaragua y latinoamerica a través de la innovación y el emprendimiento." 
+        />
+        <script src="https://cdn.lightwidget.com/widgets/lightwidget.js"></script>
       </Helmet>
 
       <div>
+        {/* --- SECCIÓN HERO --- */}
         <section className="relative min-h-screen flex items-center justify-center text-center text-white overflow-hidden">
           <div className="absolute inset-0 bg-boreal-dark z-10 opacity-60"></div>
           <div className="absolute inset-0 z-0">
@@ -84,11 +96,6 @@ const HomePage = () => {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 1.0, delay: 0.2 }}
           >
-
-{/* --- MODIFICACIÓN DEL TÍTULO --- */}
-            {/* 1. 'innova': Relleno blanco y borde #da5def (con text-shadow para evitar artefactos). */}
-            {/* 2. 'crea': Se aplicó la clase 'text-gradient' para un efecto de color degradado. */}
-            {/* 3. 'transforma': Relleno blanco y borde #3162ed (con text-shadow). */}
             <h1 className="text-4xl md:text-6xl font-black tracking-tight">
               #Juventud{' '}
               <span>
@@ -101,7 +108,12 @@ const HomePage = () => {
                 innova
               </span>
               ,{' '}
-              <span className="text-gradient">
+              <span style={{
+                backgroundImage: 'linear-gradient(to right, #69e6af, #3162ed)',
+                WebkitBackgroundClip: 'text',
+                backgroundClip: 'text',
+                color: 'transparent'
+              }}>
                 crea
               </span>{' '}
               <span>
@@ -115,16 +127,16 @@ const HomePage = () => {
               </span>{' '}
               <span className="text-boreal-aqua">Nicaragua</span>
             </h1>
-            {/* --- FIN DE LA MODIFICACIÓN --- */}
             
             <motion.p 
-              className="mt-6 text-lg md:text-xl max-w-2xl mx-auto text-gray-200"
+              className="mt-6 text-lg md:text-xl max-w-2xl mx-auto text-white"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ duration: 1.0, delay: 0.8 }}
             >
-              Somos el punto de encuentro para jóvenes que buscan transformar el futuro de Nicaragua a través de la innovación y el emprendimiento.
+              Somos una comunidad juvenil apasionada que busca transformar activamente el futuro de Nicaragua y Latinoamérica a través de la innovación y el emprendimiento.
             </motion.p>
+
             <motion.div 
               className="mt-8 flex justify-center"
               initial={{ opacity: 0, y: 20 }}
@@ -141,6 +153,26 @@ const HomePage = () => {
           </motion.div>
         </section>
 
+        {/* --- SECCIÓN VIDEO --- */}
+        <ScrollAnimatedSection className="py-20 bg-boreal-dark">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+             <h2 className="text-3xl md:text-4xl font-bold text-center mb-12">
+               Conoce <span className="text-gradient">Nuestra Esencia</span>
+             </h2>
+             <div className="relative overflow-hidden rounded-2xl shadow-xl" style={{ paddingBottom: '56.25%' }}>
+               <iframe 
+                 className="absolute top-0 left-0 w-full h-full"
+                 src="https://www.youtube.com/embed/TU_ID_DEL_VIDEO"
+                 title="Video de Boreal Labs"
+                 frameBorder="0" 
+                 allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+                 allowFullScreen
+               ></iframe>
+             </div>
+          </div>
+        </ScrollAnimatedSection>
+
+        {/* --- SECCIÓN "UNIENDO MENTES" --- */}
         <ScrollAnimatedSection className="py-20 bg-boreal-dark">
           <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
             <h2 className="text-3xl md:text-4xl font-bold">
@@ -149,7 +181,14 @@ const HomePage = () => {
             <p className="mt-4 text-lg text-gray-400 max-w-3xl mx-auto">
               Boreal Labs es una organización sin fines de lucro, liderada por jóvenes, que articula esfuerzos y crea espacios para el desarrollo de habilidades en innovación y emprendimiento en la juventud nicaragüense.
             </p>
-            <div className="mt-8">
+            <div className="mt-12 flex justify-center">
+              <img 
+                src="src/images/taller.png"
+                alt="Jóvenes de Boreal Labs en un taller" 
+                className="rounded-2xl shadow-xl object-cover w-full max-w-3xl h-auto"
+              />
+            </div>
+            <div className="mt-12">
               <Link to="/about">
                 <Button variant="outline" className="border-2 border-boreal-aqua text-boreal-aqua hover:bg-boreal-aqua/10 hover:text-boreal-aqua px-8 py-4 text-base font-semibold">
                   Conoce Nuestra Historia
@@ -159,6 +198,7 @@ const HomePage = () => {
           </div>
         </ScrollAnimatedSection>
         
+        {/* --- SECCIÓN PILARES --- */}
         <ScrollAnimatedSection className="py-20 bg-boreal-blue/5">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="text-center mb-16">
@@ -179,6 +219,7 @@ const HomePage = () => {
           </div>
         </ScrollAnimatedSection>
 
+        {/* --- SECCIÓN IMPACTO --- */}
         <ScrollAnimatedSection className="py-20 bg-boreal-dark">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="text-center mb-16">
@@ -187,7 +228,7 @@ const HomePage = () => {
                 </h2>
                 <p className="text-lg text-gray-400 max-w-2xl mx-auto">Construyendo una comunidad, un joven a la vez.</p>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8 text-center">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 text-center">
               {impacts.map((impact, index) => (
                 <div key={index} className="glass-effect rounded-2xl p-8">
                   <impact.icon className="w-12 h-12 mx-auto mb-4 text-boreal-aqua" />
@@ -199,23 +240,62 @@ const HomePage = () => {
           </div>
         </ScrollAnimatedSection>
 
+        {/* --- SECCIÓN ALIADOS --- */}
         <ScrollAnimatedSection className="py-20 bg-boreal-blue/5">
           <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="text-center mb-12">
               <h2 className="text-3xl md:text-4xl font-bold mb-4">Nuestros Aliados Estratégicos</h2>
               <p className="text-lg text-gray-400">Colaborando con los mejores para potenciar el talento nicaragüense.</p>
             </div>
-            <div className="flex flex-wrap justify-center items-center gap-x-8 md:gap-x-12 gap-y-6">
+            <div className="flex flex-wrap justify-center items-start gap-x-12 md:gap-x-16 gap-y-8">
               {partners.map((partner, index) => (
-                <div key={index} className="grayscale hover:grayscale-0 transition-all duration-300 flex items-center gap-x-2">
-                   <Building className="w-8 h-8 text-gray-500" />
-                   <span className="text-gray-400 text-lg font-semibold">{partner.name}</span>
+                <div key={index} className="flex flex-col items-center text-center gap-y-3 w-32">
+                   <img 
+                     src={partner.imgSrc} 
+                     alt={partner.alt} 
+                     className="h-16 w-auto"
+                   />
+                   <span className="text-gray-400 text-sm font-semibold">{partner.name}</span>
                 </div>
               ))}
             </div>
           </div>
         </ScrollAnimatedSection>
 
+        {/* --- SECCIÓN DE INSTAGRAM --- */}
+        <ScrollAnimatedSection className="py-20 bg-boreal-dark">
+          <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="text-center mb-12">
+              <h2 className="text-3xl md:text-4xl font-bold mb-4">
+                Síguenos en <span className="text-gradient">Instagram</span>
+              </h2>
+              <p className="text-lg text-gray-400 max-w-2xl mx-auto mb-8">
+                Entérate de nuestros últimos eventos, talleres y noticias de la comunidad.
+              </p>
+              <Button
+                asChild
+                size="lg"
+                className="bg-gradient-to-r from-[#da5def] to-[#3162ed] text-white font-bold transition-transform hover:scale-105"
+              >
+                <a href="https://instagram.com/boreal.labs" target="_blank" rel="noopener noreferrer">
+                  <Instagram className="mr-2 w-5 h-5" />
+                  @boreallabsnic
+                </a>
+              </Button>
+            </div>
+            
+            <iframe 
+              src="//lightwidget.com/widgets/29916ec13e7b5c2e9522899c11286600.html" 
+              scrolling="no" 
+              allowTransparency="true" 
+              className="lightwidget-widget" 
+              style={{ width: '100%', border: 0, overflow: 'hidden' }}
+            ></iframe>
+
+          </div>
+        </ScrollAnimatedSection>
+
+        {/* --- SECCIÓN CALL TO ACTION --- */}
         <ScrollAnimatedSection className="text-center py-20 bg-boreal-dark">
           <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 glass-effect rounded-2xl p-12">
             <h2 className="text-3xl md:text-4xl font-bold mb-4">
