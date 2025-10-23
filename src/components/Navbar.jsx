@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Menu, X, Rocket } from 'lucide-react';
+import { Menu, X } from 'lucide-react'; // Se eliminó 'Rocket' porque ya no se usa
 import { Button } from '@/components/ui/button';
 
 const Navbar = () => {
@@ -9,10 +9,10 @@ const Navbar = () => {
   const location = useLocation();
 
   const navLinks = [
-    { name: 'Home', path: '/' },
-    { name: 'About', path: '/about' },
-    { name: 'Team', path: '/team' },
-    { name: 'Events', path: '/events' },
+    { name: 'Inicio', path: '/' },
+    { name: 'Acerca de', path: '/about' },
+    { name: 'Equipo', path: '/team' },
+    { name: 'Eventos', path: '/events' },
   ];
 
   const isActive = (path) => location.pathname === path;
@@ -21,16 +21,25 @@ const Navbar = () => {
     <nav className="fixed top-0 left-0 right-0 z-50 glass-effect">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-20">
-          <Link to="/" className="flex items-center space-x-3 group">
-            <motion.div
-              whileHover={{ rotate: 360 }}
-              transition={{ duration: 0.6 }}
-              className="bg-gradient-to-br from-boreal-blue to-boreal-purple p-2 rounded-xl"
-            >
-              <Rocket className="w-6 h-6 text-white" />
-            </motion.div>
-            <span className="text-2xl font-bold text-gradient">Boreal Labs</span>
+          
+          {/* --- MODIFICACIÓN 1: LOGO --- */}
+          {/* Se reemplazó el cohete y el texto por una etiqueta <img> */}
+          <Link to="/" className="flex items-center">
+            {/* ¡IMPORTANTE! 
+              Cambia '/boreal-logo.svg' por la ruta a tu archivo de logo.
+              Si está en la carpeta 'public', la ruta está bien.
+              Si está en 'src/assets', deberás importarlo arriba:
+              import logo from '@/assets/boreal-logo.svg';
+              y usar 'src={logo}' abajo.
+            */}
+            <img 
+              src="src/images/logoBoreal.svg" 
+              alt="Boreal Labs" 
+              className="h-12 w-auto" // Ajusta la altura (h-10) según necesites
+            />
           </Link>
+          {/* --- FIN MODIFICACIÓN 1 --- */}
+
 
           <div className="hidden md:flex items-center space-x-8">
             {navLinks.map((link) => (
@@ -52,6 +61,15 @@ const Navbar = () => {
                 )}
               </Link>
             ))}
+
+            {/* --- MODIFICACIÓN 2: BOTÓN COMUNIDAD (DESKTOP) --- */}
+            <Button
+              asChild
+              className="bg-gradient-to-r from-boreal-aqua to-boreal-blue text-white font-bold transition-transform hover:scale-105"
+            >
+              <Link to="https://chat.whatsapp.com/HAaxnHFYsuaBltQ812XhRW?mode=wwc">Comunidad</Link>
+            </Button>
+            {/* --- FIN MODIFICACIÓN 2 --- */}
           </div>
 
           <div className="md:hidden">
@@ -88,6 +106,16 @@ const Navbar = () => {
                   {link.name}
                 </Link>
               ))}
+
+              {/* --- MODIFICACIÓN 3: BOTÓN COMUNIDAD (MÓVIL) --- */}
+              <Link
+                to="https://chat.whatsapp.com/HAaxnHFYsuaBltQ812XhRW?mode=wwc"
+                onClick={() => setIsOpen(false)}
+                className="block text-center text-lg font-bold text-white bg-gradient-to-r from-boreal-aqua to-boreal-blue rounded-lg py-3 transition-transform hover:scale-105 active:scale-95"
+              >
+                Comunidad
+              </Link>
+              {/* --- FIN MODIFICACIÓN 3 --- */}
             </div>
           </motion.div>
         )}

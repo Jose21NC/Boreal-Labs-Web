@@ -76,7 +76,7 @@ const HomePage = () => {
         <section className="relative min-h-screen flex items-center justify-center text-center text-white overflow-hidden">
           <div className="absolute inset-0 bg-boreal-dark z-10 opacity-60"></div>
           <div className="absolute inset-0 z-0">
-             <img alt="Group of diverse young people collaborating at an event" className="w-full h-full object-cover" src="https://images.unsplash.com/photo-1597378611477-2b616fe8fb90" />
+             <img alt="Grupo de jovenes en evento de lanzamiento de Boreal Labs" className="w-full h-full object-cover" src="src/images/headear.jpg" />
           </div>
           <motion.div
             className="relative z-20 max-w-4xl mx-auto px-4"
@@ -84,10 +84,39 @@ const HomePage = () => {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 1.0, delay: 0.2 }}
           >
-            <h1 className="text-4xl md:text-6xl font-black tracking-tight uppercase">
-              #Juventud que Innova Transforma crea{' '}
+
+{/* --- MODIFICACIÓN DEL TÍTULO --- */}
+            {/* 1. 'innova': Relleno blanco y borde #da5def (con text-shadow para evitar artefactos). */}
+            {/* 2. 'crea': Se aplicó la clase 'text-gradient' para un efecto de color degradado. */}
+            {/* 3. 'transforma': Relleno blanco y borde #3162ed (con text-shadow). */}
+            <h1 className="text-4xl md:text-6xl font-black tracking-tight">
+              #Juventud{' '}
+              <span>
+                que
+              </span>{' '}
+              <span style={{ 
+                color: 'white',
+                textShadow: '2px 0 0 #da5def, -2px 0 0 #da5def, 0 2px 0 #da5def, 0 -2px 0 #da5def, 2px 2px 0 #da5def, -2px -2px 0 #da5def, 2px -2px 0 #da5def, -2px 2px 0 #da5def'
+              }}>
+                innova
+              </span>
+              ,{' '}
+              <span className="text-gradient">
+                crea
+              </span>{' '}
+              <span>
+                y
+              </span>{' '}
+              <span style={{ 
+                color: 'white',
+                textShadow: '2px 0 0 #3162ed, -2px 0 0 #3162ed, 0 2px 0 #3162ed, 0 -2px 0 #3162ed, 2px 2px 0 #3162ed, -2px -2px 0 #3162ed, 2px -2px 0 #3162ed, -2px 2px 0 #3162ed'
+              }}>
+                transforma
+              </span>{' '}
               <span className="text-boreal-aqua">Nicaragua</span>
             </h1>
+            {/* --- FIN DE LA MODIFICACIÓN --- */}
+            
             <motion.p 
               className="mt-6 text-lg md:text-xl max-w-2xl mx-auto text-gray-200"
               initial={{ opacity: 0 }}
