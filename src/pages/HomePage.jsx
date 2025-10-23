@@ -279,7 +279,7 @@ const HomePage = () => {
               >
                 <a href="https://instagram.com/boreal.labs" target="_blank" rel="noopener noreferrer">
                   <Instagram className="mr-2 w-5 h-5" />
-                  @boreallabsnic
+                  @boreal.labs
                 </a>
               </Button>
             </div>

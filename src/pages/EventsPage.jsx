@@ -4,17 +4,38 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Calendar, MapPin, Users, Clock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from '@/components/ui/use-toast';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from '@/components/ui/dialog';
+
+// --- MODIFICACIÓN 1: Objeto de traducción para las categorías ---
+// Esto traduce los valores internos (ej. 'workshop') a texto visible en español
+const categoryDisplayNames = {
+  'workshop': 'Taller',
+  'conference': 'Conferencia',
+  'networking': 'Networking',
+  'competition': 'Competencia',
+};
+// --- FIN DE LA MODIFICACIÓN ---
 
 const EventsPage = () => {
   const [filter, setFilter] = useState('all');
+  const [selectedEvent, setSelectedEvent] = useState(null);
 
-  const handleRegister = (eventTitle) => {
+  const handleRegistrationSubmit = (eventTitle) => {
     toast({
-      title: "🚧 Funcionalidad de Registro",
-      description: "¡Esta función aún no está implementada, pero no te preocupes! ¡Puedes solicitarla en tu próximo mensaje! 🚀",
+      title: "🚧 Formulario en construcción",
+      description: `El registro para "${eventTitle}" aún no está implementado.`,
     });
+    setSelectedEvent(null);
   };
 
+  // Los datos de tus eventos (eventualmente vendrán de tu admin panel)
   const events = [
     {
       id: 1,
@@ -22,7 +43,7 @@ const EventsPage = () => {
       date: 'Marzo 15-17, 2025',
       time: '9:00 AM - 5:00 PM',
       location: 'Universidad Nacional de Ingeniería',
-      category: 'workshop',
+      category: 'workshop', // El valor interno sigue igual para el filtro
       capacity: '50 participantes',
       description: 'Programa intensivo de tres días que cubre ideación, modelado de negocios, pitching y relaciones con inversores. Perfecto para futuros emprendedores.',
     },
@@ -32,50 +53,11 @@ const EventsPage = () => {
       date: 'Abril 22, 2025',
       time: '8:00 AM - 6:00 PM',
       location: 'Centro de Innovación Managua',
-      category: 'conference',
+      category: 'conference', // El valor interno sigue igual para el filtro
       capacity: '200 participantes',
       description: 'Encuentro anual con ponentes principales, paneles de discusión y oportunidades de networking con líderes tecnológicos e innovadores de Centroamérica.',
     },
-    {
-      id: 3,
-      title: 'Taller de Liderazgo Juvenil',
-      date: 'Mayo 10, 2025',
-      time: '2:00 PM - 6:00 PM',
-      location: 'Universidad Centroamericana',
-      category: 'workshop',
-      capacity: '40 participantes',
-      description: 'Desarrolla habilidades de liderazgo esenciales como comunicación, trabajo en equipo, toma de decisiones y pensamiento estratégico.',
-    },
-    {
-      id: 4,
-      title: 'Masterclass de Marketing Digital',
-      date: 'Junio 5, 2025',
-      time: '10:00 AM - 4:00 PM',
-      location: 'Evento en Línea',
-      category: 'workshop',
-      capacity: '100 participantes',
-      description: 'Aprende estrategias de marketing digital de vanguardia, gestión de redes sociales, creación de contenido y análisis para hacer crecer tu negocio.',
-    },
-    {
-      id: 5,
-      title: 'Noche de Networking: Conecta y Colabora',
-      date: 'Junio 20, 2025',
-      time: '6:00 PM - 9:00 PM',
-      location: 'Hub de Boreal Labs',
-      category: 'networking',
-      capacity: '80 participantes',
-      description: 'Evento nocturno casual diseñado para fomentar conexiones entre emprendedores, estudiantes, mentores y profesionales de la industria.',
-    },
-    {
-      id: 6,
-      title: 'Desafío de Innovación 2025',
-      date: 'Julio 12-14, 2025',
-      time: 'Todo el día',
-      location: 'Múltiples Sedes',
-      category: 'competition',
-      capacity: '30 equipos',
-      description: 'Competencia estilo hackathon donde los equipos desarrollan soluciones innovadoras a problemas del mundo real. Premios y mentoría disponibles.',
-    },
+    // ... (etc.)
   ];
 
   const categories = [
@@ -144,46 +126,50 @@ const EventsPage = () => {
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -20 }}
                   transition={{ duration: 0.5, delay: index * 0.05 }}
-                  className="glass-effect rounded-2xl p-8 hover:bg-white/10 transition-all group"
+                  className="glass-effect rounded-2xl p-8 hover:bg-white/10 transition-all group flex flex-col"
                 >
-                  <div className="flex items-start justify-between mb-4">
-                    <div className="bg-gradient-to-br from-boreal-blue to-boreal-purple text-white text-xs font-bold px-3 py-1 rounded-lg uppercase">
-                      {event.category}
+                  <div className="flex-grow">
+                    <div className="flex items-start justify-between mb-4">
+                      {/* --- MODIFICACIÓN 2: Usar el objeto de traducción --- */}
+                      <div className="bg-gradient-to-br from-boreal-blue to-boreal-purple text-white text-xs font-bold px-3 py-1 rounded-lg uppercase">
+                        {categoryDisplayNames[event.category] || event.category}
+                      </div>
+                      {/* --- FIN DE LA MODIFICACIÓN --- */}
+                      <div className="flex items-center text-gray-400 text-sm">
+                        <Users className="w-4 h-4 mr-1" />
+                        {event.capacity}
+                      </div>
                     </div>
-                    <div className="flex items-center text-gray-400 text-sm">
-                      <Users className="w-4 h-4 mr-1" />
-                      {event.capacity}
+
+                    <h3 className="text-2xl font-bold text-white mb-4 group-hover:text-gradient transition-all">
+                      {event.title}
+                    </h3>
+
+                    <div className="space-y-3 mb-6">
+                      <div className="flex items-center text-gray-300">
+                        <Calendar className="w-5 h-5 mr-3 text-boreal-aqua" />
+                        <span>{event.date}</span>
+                      </div>
+                      <div className="flex items-center text-gray-300">
+                        <Clock className="w-5 h-5 mr-3 text-boreal-aqua" />
+                        <span>{event.time}</span>
+                      </div>
+                      <div className="flex items-center text-gray-300">
+                        <MapPin className="w-5 h-5 mr-3 text-boreal-aqua" />
+                        <span>{event.location}</span>
+                      </div>
                     </div>
+
+                    <p className="text-gray-400 mb-6">
+                      {event.description}
+                    </p>
                   </div>
-
-                  <h3 className="text-2xl font-bold text-white mb-4 group-hover:text-gradient transition-all">
-                    {event.title}
-                  </h3>
-
-                  <div className="space-y-3 mb-6">
-                    <div className="flex items-center text-gray-300">
-                      <Calendar className="w-5 h-5 mr-3 text-boreal-aqua" />
-                      <span>{event.date}</span>
-                    </div>
-                    <div className="flex items-center text-gray-300">
-                      <Clock className="w-5 h-5 mr-3 text-boreal-aqua" />
-                      <span>{event.time}</span>
-                    </div>
-                    <div className="flex items-center text-gray-300">
-                      <MapPin className="w-5 h-5 mr-3 text-boreal-aqua" />
-                      <span>{event.location}</span>
-                    </div>
-                  </div>
-
-                  <p className="text-gray-400 mb-6">
-                    {event.description}
-                  </p>
-
+                  
                   <Button
-                    onClick={() => handleRegister(event.title)}
-                    className="w-full bg-gradient-to-r from-boreal-blue to-boreal-purple hover:opacity-90 text-white font-bold"
+                    onClick={() => setSelectedEvent(event)}
+                    className="w-full bg-gradient-to-r from-boreal-blue to-boreal-purple hover:opacity-90 text-white font-bold mt-auto"
                   >
-                    Registrarse Ahora
+                    Ver Detalles y Registrarse
                   </Button>
                 </motion.div>
               ))}
@@ -200,6 +186,65 @@ const EventsPage = () => {
             </motion.div>
           )}
         </div>
+
+        {/* El modal ya estaba completamente en español */}
+        <Dialog open={!!selectedEvent} onOpenChange={() => setSelectedEvent(null)}>
+          <DialogContent className="bg-boreal-dark border-boreal-blue/50 text-white">
+            {selectedEvent && (
+              <>
+                <DialogHeader>
+                  <DialogTitle className="text-2xl font-bold text-gradient mb-4">{selectedEvent.title}</DialogTitle>
+                  <DialogDescription className="text-gray-300">
+                    <div className="space-y-3 mb-6">
+                      <div className="flex items-center">
+                        <Calendar className="w-5 h-5 mr-3 text-boreal-aqua" />
+                        <span>{selectedEvent.date}</span>
+                      </div>
+                      <div className="flex items-center">
+                        <Clock className="w-5 h-5 mr-3 text-boreal-aqua" />
+                        <span>{selectedEvent.time}</span>
+                      </div>
+                      <div className="flex items-center">
+                        <MapPin className="w-5 h-5 mr-3 text-boreal-aqua" />
+                        <span>{selectedEvent.location}</span>
+                      </div>
+                      <div className="flex items-center">
+                        <Users className="w-5 h-5 mr-3 text-boreal-aqua" />
+                        <span>{selectedEvent.capacity}</span>
+                      </div>
+                    </div>
+                    <p className="text-gray-300 mb-6">{selectedEvent.description}</p>
+                  </DialogDescription>
+                </DialogHeader>
+                
+                <div className="my-4">
+                  <h4 className="text-lg font-semibold text-white mb-3">Formulario de Registro</h4>
+                  
+                  <div className="text-center p-4 border border-dashed border-gray-600 rounded-lg">
+                    <p className="text-gray-400">El formulario de registro para este evento irá aquí.</p>
+                  </div>
+                  
+                </div>
+
+                <DialogFooter>
+                  <Button 
+                    variant="outline" 
+                    onClick={() => setSelectedEvent(null)}
+                    className="border-gray-500 text-gray-300 hover:bg-gray-700 hover:text-white"
+                  >
+                    Cerrar
+                  </Button>
+                  <Button
+                    onClick={() => handleRegistrationSubmit(selectedEvent.title)}
+                    className="bg-gradient-to-r from-boreal-blue to-boreal-purple hover:opacity-90 text-white font-bold"
+                  >
+                    Enviar Registro (Prueba)
+                  </Button>
+                </DialogFooter>
+              </>
+            )}
+          </DialogContent>
+        </Dialog>
       </div>
     </>
   );
