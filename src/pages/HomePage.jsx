@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Helmet } from 'react-helmet';
 import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
@@ -71,6 +71,18 @@ const HomePage = () => {
     { name: 'Aspire Institute Inc.', alt: 'Logo Aspire', imgSrc: 'https://www.aspireleaders.org/wp-content/uploads/2025/04/Aspire-logotype_red_lg_transparent-1.png' },
   ];
 
+  useEffect(() => {
+    // Inyectar script de EmbedSocial si no existe
+    if (typeof document !== 'undefined') {
+      if (!document.getElementById('EmbedSocialHashtagScript')) {
+        const js = document.createElement('script');
+        js.id = 'EmbedSocialHashtagScript';
+        js.src = 'https://embedsocial.com/cdn/ht.js';
+        document.getElementsByTagName('head')[0].appendChild(js);
+      }
+    }
+  }, []);
+
 
   return (
     <>
@@ -80,7 +92,6 @@ const HomePage = () => {
           name="description" 
           content="Somos una comunidad juvenil que busca transformar el futuro de Nicaragua y latinoamerica a través de la innovación y el emprendimiento." 
         />
-        <script src="https://cdn.lightwidget.com/widgets/lightwidget.js"></script>
       </Helmet>
 
       <div>
@@ -284,13 +295,22 @@ const HomePage = () => {
               </Button>
             </div>
             
-            <iframe 
-              src="//lightwidget.com/widgets/29916ec13e7b5c2e9522899c11286600.html" 
-              scrolling="no" 
-              allowTransparency="true" 
-              className="lightwidget-widget" 
-              style={{ width: '100%', border: 0, overflow: 'hidden' }}
-            ></iframe>
+            <div
+              className="embedsocial-hashtag"
+              data-ref="25ea543c23c71d10a060d4c621620aaa5cd54958"
+            >
+              <a
+                className="feed-powered-by-es feed-powered-by-es-feed-img es-widget-branding"
+                href="https://embedsocial.com/social-media-aggregator/"
+                target="_blank"
+                rel="noopener noreferrer"
+                title="Instagram widget"
+              >
+                <img src="https://embedsocial.com/cdn/icon/embedsocial-logo.webp" alt="EmbedSocial" />
+                <div className="es-widget-branding-text">Instagram widget</div>
+              </a>
+            </div>
+
 
           </div>
         </ScrollAnimatedSection>
@@ -304,7 +324,7 @@ const HomePage = () => {
             <p className="text-lg text-gray-300 max-w-2xl mx-auto mb-8">
               Únete a nuestra comunidad de jóvenes innovadores. Participa en nuestros eventos, conecta con mentores y lleva tus ideas al siguiente nivel.
             </p>
-            <Link to="/events">
+            <Link to="https://chat.whatsapp.com/HAaxnHFYsuaBltQ812XhRW?mode=wwc">
               <Button size="lg" className="bg-gradient-to-r from-boreal-aqua to-boreal-blue text-boreal-dark px-8 py-6 text-lg font-bold">
                 ¡Únete a la Comunidad!
               </Button>

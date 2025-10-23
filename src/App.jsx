@@ -1,4 +1,5 @@
 import React from 'react';
+import ErrorBoundary from '@/components/ErrorBoundary';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { Helmet } from 'react-helmet';
 import { Toaster } from '@/components/ui/toaster';
@@ -22,12 +23,14 @@ function App() {
       <div className="min-h-screen flex flex-col bg-boreal-dark">
         <Navbar />
         <main className="flex-grow">
-          <Routes>
-            <Route path="/" element={<HomePage />} />
-            <Route path="/about" element={<AboutPage />} />
-            <Route path="/team" element={<TeamPage />} />
-            <Route path="/events" element={<EventsPage />} />
-          </Routes>
+          <ErrorBoundary>
+            <Routes>
+              <Route path="/" element={<HomePage />} />
+              <Route path="/about" element={<AboutPage />} />
+              <Route path="/team" element={<TeamPage />} />
+              <Route path="/events" element={<EventsPage />} />
+            </Routes>
+          </ErrorBoundary>
         </main>
         <Footer />
         <Toaster />

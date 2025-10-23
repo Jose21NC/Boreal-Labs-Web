@@ -245,7 +245,7 @@ const TeamPage = () => {
               className="bg-gradient-to-r from-boreal-blue to-boreal-purple hover:opacity-90 text-white px-8 py-4 font-semibold text-lg"
             >
               {/* ¡IMPORTANTE! Reemplaza '#' con el enlace a tu formulario de Rowy */}
-              <a href="#" target="_blank" rel="noopener noreferrer">
+              <a href="https://wa.me/50557200949/?text=Hola!%20Estoy!%20interesado/a%20en%20formar%20parte%20del%20STAFF%20de%20Boreal%20Labs" target="_blank" rel="noopener noreferrer">
                 Aplicar Ahora
               </a>
             </Button>

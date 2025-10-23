@@ -21,7 +21,8 @@ export const Dialog = ({ open, onOpenChange, children }) => {
 
 export const DialogContent = ({ children, className = '' }) => {
   return (
-    <div className={`mx-auto bg-boreal-dark rounded-2xl p-6 shadow-xl ${className}`}>
+    // max-h y overflow para que el contenido (formulario) no expanda todo el viewport
+    <div className={`mx-auto bg-boreal-dark rounded-2xl p-6 shadow-xl max-h-[90vh] overflow-auto ${className}`}>
       {children}
     </div>
   )
@@ -39,6 +40,16 @@ export const DialogDescription = ({ children, className = '' }) => (
 
 export const DialogFooter = ({ children }) => (
   <div className="mt-6 flex items-center justify-end space-x-3">{children}</div>
+)
+
+export const DialogClose = ({ children, onClick, className = '' }) => (
+  <button
+    type="button"
+    onClick={onClick}
+    className={`px-3 py-2 rounded-md hover:bg-white/5 ${className}`}
+  >
+    {children}
+  </button>
 )
 
 export default Dialog

@@ -40,7 +40,13 @@ const authenticate = async () => {
     await signInAnonymously(auth);
     console.log("Autenticación exitosa. User ID:", auth.currentUser?.uid);
   } catch (error) {
-    console.error("Error durante la autenticación anónima:", error);
+    // Firebase puede devolver 'auth/admin-restricted-operation' si el proyecto
+    // no permite anonymous sign-in. No queremos que esto rompa la app.
+    if (error?.code === 'auth/admin-restricted-operation') {
+      console.warn('Autenticación anónima no permitida en este proyecto (admin-restricted-operation). Continuando sin auth.');
+    } else {
+      console.error("Error durante la autenticación anónima:", error);
+    }
   }
 };
 
