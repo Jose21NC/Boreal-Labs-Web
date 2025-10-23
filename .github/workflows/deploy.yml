@@ -1,0 +1,36 @@
+name: Deploy a Hostinger via FTP
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  web_deploy:
+    name: Deploy
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20' # Ajusta si usas otra version de Node.js
+
+    - name: Install Dependencies
+      run: npm install
+
+    - name: Build Project
+      run: npm run build # Genera la carpeta 'dist'
+
+    - name: Deploy to Hostinger via FTP
+      uses: SamKirkland/FTP-Deploy-Action@v4.3.0
+      with:
+        server: ${{ secrets.FTP_SERVER }}
+        username: ${{ secrets.FTP_USERNAME }}
+        password: ${{ secrets.FTP_PASSWORD }}
+        server-directory: ${{ secrets.FTP_PATH }}/
+        # La carpeta 'dist' creada por Vite se sube al servidor
+        local-dir: ./dist/
+        ftp-s: true # Habilita la limpieza de archivos antiguos en el servidor
