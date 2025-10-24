@@ -11,6 +11,7 @@ import AboutPage from '@/pages/AboutPage';
 import TeamPage from '@/pages/TeamPage';
 import EventsPage from '@/pages/EventsPage';
 import NotFoundPage from '@/pages/NotFoundPage'; 
+import PaginaValidacion from '@/pages/PaginaValidacion';
 
 // Se importa el proveedor de reCAPTCHA
 // Google reCAPTCHA v3 removed - using only reCAPTCHA v2 where needed
@@ -51,6 +52,9 @@ function App() {
                   <Route path="/about" element={<AboutPage />} />
                   <Route path="/team" element={<TeamPage />} />
                   <Route path="/events" element={<EventsPage />} />
+                  <Route path="/validar-certificado" element={<PaginaValidacion />} />
+                  <Route path="/validacion" element={<PaginaValidacion />} />
+                  <Route path="*" element={<NotFoundPage />} /> {/* Ruta para página no encontrada */}
                 </Routes>
               </ErrorBoundary>
             </main>
