@@ -26,17 +26,17 @@ const TeamPage = () => {
     const imageSrc = member.resolvedImageUrl || member.imageUrl || null;
     if (!imageSrc) {
       return (
-        <div className="mb-6 overflow-hidden rounded-full w-40 h-40 mx-auto border-4 border-boreal-blue/50 flex items-center justify-center bg-white/5 text-white text-2xl font-bold">
+        <div className="mb-4 overflow-hidden rounded-full w-32 h-32 mx-auto border-2 border-boreal-blue/50 flex items-center justify-center bg-white/5 text-white text-xl font-bold">
           {initials}
         </div>
       );
     }
 
     return (
-      <div className="mb-6 overflow-hidden rounded-full w-40 h-40 mx-auto border-4 border-boreal-blue/50 bg-white/5 flex items-center justify-center">
+      <div className="mb-4 overflow-hidden rounded-full w-32 h-32 mx-auto border-2 border-boreal-blue/50 bg-white/5 flex items-center justify-center">
         {imgLoading && (
           <div className="animate-pulse w-full h-full flex items-center justify-center">
-            <div className="w-10 h-10 rounded-full bg-white/10" />
+            <div className="w-8 h-8 rounded-full bg-white/10" />
           </div>
         )}
         {!imgError ? (
@@ -48,7 +48,7 @@ const TeamPage = () => {
             onError={() => { setImgError(true); setImgLoading(false); }}
           />
         ) : (
-          <div className="w-full h-full flex items-center justify-center text-white text-2xl font-bold">
+          <div className="w-full h-full flex items-center justify-center text-white text-xl font-bold">
             {initials}
           </div>
         )}
@@ -116,10 +116,10 @@ const TeamPage = () => {
             transition={{ duration: 0.8 }}
             className="text-center mb-20"
           >
-            <h1 className="text-5xl md:text-6xl font-black mb-6">
+            <h1 className="text-4xl md:text-5xl font-black mb-6">
               Conoce a Nuestro <span className="text-gradient">Equipo</span>
             </h1>
-            <p className="text-xl text-gray-300 max-w-3xl mx-auto">
+            <p className="text-lg text-gray-300 max-w-3xl mx-auto">
               Individuos dedicados que trabajan juntos para crear oportunidades para la juventud nicaragüense.
             </p>
           </motion.div>
@@ -129,7 +129,7 @@ const TeamPage = () => {
               Cargando equipo...
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {teamMembers.map((member, index) => (
                 <motion.div
                   key={member.id}
@@ -137,16 +137,16 @@ const TeamPage = () => {
                   whileInView={{ opacity: 1, y: 0 }}
                   viewport={{ once: true }}
                   transition={{ duration: 0.6, delay: index * 0.1 }}
-                  className="glass-effect rounded-2xl p-6 text-center hover:bg-white/10 transition-all group transform hover:-translate-y-2"
+                  className="glass-effect rounded-2xl p-4 text-center hover:bg-white/10 transition-all group transform hover:-translate-y-1"
                 >
                   <MemberAvatar member={member} />
 
-                  <h3 className="text-2xl font-bold text-white mb-1">{member.name}</h3>
-                  <div className="text-boreal-aqua font-semibold mb-3">{member.role}</div>
-                  <p className="text-gray-400 mb-6 text-sm">{member.description}</p>
+                  <h3 className="text-xl font-bold text-white mb-1">{member.name}</h3>
+                  <div className="text-boreal-aqua font-medium mb-2 text-sm">{member.role}</div>
+                  <p className="text-gray-400 mb-4 text-xs">{member.description}</p>
 
                   {/* --- MODIFICACIÓN 2: Añadir iconos condicionales --- */}
-                  <div className="flex space-x-3 justify-center">
+                  <div className="flex space-x-2 justify-center">
                     {/* LinkedIn (si existe) */}
                     {member.linkedinUrl && (
                       <motion.a
@@ -155,10 +155,10 @@ const TeamPage = () => {
                         rel="noopener noreferrer"
                         whileHover={{ scale: 1.1 }}
                         whileTap={{ scale: 0.95 }}
-                        className="bg-white/10 hover:bg-white/20 p-2 rounded-lg transition-colors"
+                        className="bg-white/10 hover:bg-white/20 p-1 rounded-lg transition-colors"
                         aria-label="LinkedIn"
                       >
-                        <Linkedin className="w-5 h-5 text-boreal-aqua" />
+                        <Linkedin className="w-4 h-4 text-boreal-aqua" />
                       </motion.a>
                     )}
 
@@ -168,10 +168,10 @@ const TeamPage = () => {
                         href={`mailto:${member.email}`}
                         whileHover={{ scale: 1.1 }}
                         whileTap={{ scale: 0.95 }}
-                        className="bg-white/10 hover:bg-white/20 p-2 rounded-lg transition-colors"
+                        className="bg-white/10 hover:bg-white/20 p-1 rounded-lg transition-colors"
                         aria-label="Email"
                       >
-                        <Mail className="w-5 h-5 text-boreal-aqua" />
+                        <Mail className="w-4 h-4 text-boreal-aqua" />
                       </motion.a>
                     )}
 
@@ -183,10 +183,10 @@ const TeamPage = () => {
                         rel="noopener noreferrer"
                         whileHover={{ scale: 1.1 }}
                         whileTap={{ scale: 0.95 }}
-                        className="bg-white/10 hover:bg-white/20 p-2 rounded-lg transition-colors"
+                        className="bg-white/10 hover:bg-white/20 p-1 rounded-lg transition-colors"
                         aria-label="Instagram"
                       >
-                        <Instagram className="w-5 h-5 text-boreal-aqua" />
+                        <Instagram className="w-4 h-4 text-boreal-aqua" />
                       </motion.a>
                     )}
                     
@@ -198,10 +198,10 @@ const TeamPage = () => {
                         rel="noopener noreferrer"
                         whileHover={{ scale: 1.1 }}
                         whileTap={{ scale: 0.95 }}
-                        className="bg-white/10 hover:bg-white/20 p-2 rounded-lg transition-colors"
+                        className="bg-white/10 hover:bg-white/20 p-1 rounded-lg transition-colors"
                         aria-label="WhatsApp"
                       >
-                        <Smartphone className="w-5 h-5 text-boreal-aqua" />
+                        <Smartphone className="w-4 h-4 text-boreal-aqua" />
                       </motion.a>
                     )}
 
@@ -213,10 +213,10 @@ const TeamPage = () => {
                         rel="noopener noreferrer"
                         whileHover={{ scale: 1.1 }}
                         whileTap={{ scale: 0.95 }}
-                        className="bg-white/10 hover:bg-white/20 p-2 rounded-lg transition-colors"
+                        className="bg-white/10 hover:bg-white/20 p-1 rounded-lg transition-colors"
                         aria-label="Enlace externo"
                       >
-                        <LinkIcon className="w-5 h-5 text-boreal-aqua" />
+                        <LinkIcon className="w-4 h-4 text-boreal-aqua" />
                       </motion.a>
                     )}
                   </div>

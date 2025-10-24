@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useContext } from 'react';
 import { Helmet } from 'react-helmet';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Calendar, MapPin, Users, Clock, Share2, Copy, X as XIcon } from 'lucide-react'; // Icono Share2 añadido
@@ -22,6 +22,9 @@ import {
   SelectValue,
 } from "@/components/ui/select"; // Selector para la pregunta
 import { useToast } from '@/components/ui/use-toast';
+// reCAPTCHA v3 removed: using only reCAPTCHA v2 (react-google-recaptcha)
+import ReCAPTCHA from 'react-google-recaptcha';
+import { RecaptchaContext } from '@/App.jsx';
 // --- MODIFICACIÓN 1: Imports de Firebase ---
 import { db, storage } from '@/firebase.jsx'; // Asegúrate que la ruta sea correcta
 import { collection, getDocs, query, orderBy, addDoc, serverTimestamp } from 'firebase/firestore';
@@ -36,23 +39,36 @@ const categoryDisplayNames = {
 };
 
 // Componente del formulario (ahora dentro de EventsPage)
-const EventRegistrationForm = ({ event, onSuccess }) => {
+const EventRegistrationForm = ({ event, onSuccess, onShowConfirmation }) => {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [whatsapp, setWhatsapp] = useState('');
   const [university, setUniversity] = useState('');
   const [country, setCountry] = useState('');
   const [department, setDepartment] = useState('');
-  const [isMember, setIsMember] = useState(''); // Estado para el select
+  const [isMember, setIsMember] = useState('');
+  const [tipoAsistencia, setTipoAsistencia] = useState('');
   const [loading, setLoading] = useState(false);
+  const [recaptchaV2Token, setRecaptchaV2Token] = useState(null);
+  const recaptchaRef = useRef(null);
   const { toast } = useToast();
+  const { setRecaptchaTokenV2, recaptchaSiteKey } = useContext(RecaptchaContext);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!name || !email || !whatsapp || !university || !country || !department || !isMember) {
+    if (!name || !email || !whatsapp || !university || !country || !department || !isMember || !tipoAsistencia) {
       toast({
         title: "Campos incompletos",
         description: "Por favor, completa todos los campos del formulario.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!recaptchaV2Token) {
+      toast({
+        title: "Captcha requerido",
+        description: "Por favor, marca el captcha 'No soy un robot' antes de enviar.",
         variant: "destructive",
       });
       return;
@@ -63,14 +79,16 @@ const EventRegistrationForm = ({ event, onSuccess }) => {
     try {
       await addDoc(collection(db, 'registrations'), {
         eventName: event.title,
-        eventId: event.id, // Guardamos el ID del evento
+        eventId: event.id,
         userName: name,
         userEmail: email,
         userWhatsapp: whatsapp,
         userUniversity: university,
         userCountry: country,
         userDepartment: department,
-        isCommunityMember: isMember === 'yes', // Guardamos true/false
+        isCommunityMember: isMember === 'yes',
+        tipoAsistencia,
+        recaptchaTokenV2: recaptchaV2Token || null,
         registrationDate: serverTimestamp(),
       });
 
@@ -79,6 +97,7 @@ const EventRegistrationForm = ({ event, onSuccess }) => {
         description: `Te has registrado correctamente para ${event.title}.`,
       });
       
+      onShowConfirmation(`Te has registrado exitosamente para el evento: ${event.title}.\n\n¡Comparte tu registro!`);
       onSuccess(); // Llama a la función onSuccess para cerrar el modal
 
     } catch (error) {
@@ -111,7 +130,7 @@ const EventRegistrationForm = ({ event, onSuccess }) => {
         <Label htmlFor="reg-university" className="text-gray-300">Universidad/Centro de Procedencia</Label>
         <Input id="reg-university" value={university} onChange={(e) => setUniversity(e.target.value)} disabled={loading} className="bg-gray-800 border-gray-700 text-white"/>
       </div>
-       <div className="grid grid-cols-2 gap-4">
+  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="space-y-2">
             <Label htmlFor="reg-country" className="text-gray-300">País</Label>
             <Input id="reg-country" value={country} onChange={(e) => setCountry(e.target.value)} disabled={loading} className="bg-gray-800 border-gray-700 text-white"/>
@@ -136,6 +155,28 @@ const EventRegistrationForm = ({ event, onSuccess }) => {
           </select>
        </div>
 
+      <div className="space-y-2">
+        <Label htmlFor="reg-tipoAsistencia" className="text-gray-300">Tipo de Asistencia</Label>
+        <select
+          id="reg-tipoAsistencia"
+          value={tipoAsistencia}
+          onChange={(e) => setTipoAsistencia(e.target.value)}
+          disabled={loading}
+          className="w-full bg-gray-800 border border-gray-700 text-white px-3 py-2 rounded-md"
+        >
+          <option value="">Selecciona una opción</option>
+          <option value="Presencial">Presencial</option>
+          <option value="Virtual">Virtual</option>
+        </select>
+      </div>
+      <div className="my-4">
+          <ReCAPTCHA
+            sitekey={recaptchaSiteKey}
+            onChange={(token) => { setRecaptchaV2Token(token); if (setRecaptchaTokenV2) setRecaptchaTokenV2(token); }}
+            ref={recaptchaRef}
+          />
+      </div>
+
       <Button
         type="submit"
         disabled={loading}
@@ -154,6 +195,8 @@ const EventsPage = () => {
   // --- MODIFICACIÓN 2: Estado para eventos y carga ---
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [showConfirmation, setShowConfirmation] = useState(false);
+  const [confirmationMsg, setConfirmationMsg] = useState('');
   const { toast } = useToast(); // Toast para el botón de compartir
 
   // --- MODIFICACIÓN 3: Cargar eventos desde Firestore ---
@@ -226,16 +269,36 @@ const EventsPage = () => {
 
   const categories = [
     { value: 'all', label: 'Todos los Eventos' },
-    { value: 'workshop', label: 'Talleres' },
-    { value: 'conference', label: 'Conferencias' },
+    { value: 'workshop', label: 'Taller' },
+    { value: 'conference', label: 'Conferencia' },
     { value: 'networking', label: 'Networking' },
-    { value: 'competition', label: 'Competencias' },
+    { value: 'competition', label: 'Competencia' },
   ];
 
   // --- MODIFICACIÓN 4: Filtrar eventos cargados ---
-  const filteredEvents = filter === 'all' 
-    ? events 
-    : events.filter(event => event.category === filter);
+  // Normaliza y compara categorías de forma permissiva:
+  // - acepta que event.category venga en inglés (key), en español (label), en plural o con diferente capitalización
+  const normalize = (str) => (str || '').toString().trim().toLowerCase().replace(/s$/, '');
+
+  const categoryKeyFromLabel = (label) => {
+    if (!label) return null;
+    const normLabel = normalize(label);
+    for (const key of Object.keys(categoryDisplayNames)) {
+      const display = normalize(categoryDisplayNames[key]);
+      if (display === normLabel) return key;
+    }
+    // If label already looks like a key
+    return normLabel;
+  };
+
+  const filteredEvents = filter === 'all'
+    ? events
+    : events.filter(ev => {
+      const evCat = ev.category || ev.categoryName || ev.categoryLabel || '';
+      const evKey = categoryKeyFromLabel(evCat);
+      // compare normalized keys
+      return normalize(evKey) === normalize(filter);
+    });
 
   // Función para cerrar el modal
   const handleCloseModal = () => {
@@ -243,27 +306,25 @@ const EventsPage = () => {
   };
 
   // --- MODIFICACIÓN 5: Función para compartir ---
-  const handleShare = async (event) => {
-  const eventUrl = `${window.location.origin}/events/${event.id}/register`;
+  const handleShare = async () => {
+    const eventUrl = `https://borealabs.org/events`;
     const shareData = {
-      title: event.title,
-      text: `¡Mira este evento de Boreal Labs: ${event.title}!`,
+      title: 'Eventos Boreal Labs',
+      text: `¡Mira los eventos de Boreal Labs!`,
       url: eventUrl,
     };
     try {
       if (navigator.share) {
         await navigator.share(shareData);
-        console.log('Evento compartido exitosamente');
+        console.log('Enlace compartido exitosamente');
       } else {
-        // Fallback para escritorio: copiar enlace
-        await navigator.clipboard.writeText(shareData.url);
-        toast({ title: "Enlace Copiado", description: `URL del evento copiada: ${eventUrl}` });
+        await navigator.clipboard.writeText(eventUrl);
+        toast({ title: "Enlace Copiado", description: `URL copiada: ${eventUrl}` });
       }
     } catch (err) {
       console.error('Error al compartir:', err);
-      // Fallback si navigator.share falla
-      await navigator.clipboard.writeText(shareData.url);
-      toast({ title: "Enlace Copiado", description: `URL del evento copiada: ${eventUrl}` });
+      await navigator.clipboard.writeText(eventUrl);
+      toast({ title: "Enlace Copiado", description: `URL copiada: ${eventUrl}` });
     }
   };
 
@@ -274,7 +335,6 @@ const EventsPage = () => {
         <title>Actividades - Boreal Labs</title>
         <meta name="description" content="Descubre los próximos talleres, conferencias y eventos de networking en Boreal Labs. Únete para aprender y crecer." />
       </Helmet>
-
       <div className="pt-32 pb-20 bg-boreal-dark">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <motion.div
@@ -408,31 +468,34 @@ const EventsPage = () => {
 
         {/* --- MODIFICACIÓN 6: Modal con formulario integrado y botón compartir --- */}
         <Dialog open={!!selectedEvent} onOpenChange={handleCloseModal}>
-          <DialogContent className="bg-boreal-dark border-boreal-blue/50 text-white max-w-lg w-full"> {/* Ajusta max-w-* */}
+          <DialogContent className="bg-boreal-dark border-boreal-blue/50 text-white max-w-lg w-full">
             {selectedEvent && (
               <>
                 <DialogHeader className="mb-4">
                   <div className="relative mb-4">
-                    <div className="flex items-center gap-3">
-                      <DialogTitle className="text-2xl font-bold text-gradient">{selectedEvent.title}</DialogTitle>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleShare(selectedEvent)}
-                        className="text-boreal-aqua hover:text-white ml-2"
-                        aria-label="Compartir evento"
-                      >
-                        <Share2 className="w-5 h-5" />
-                      </Button>
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:gap-3 gap-2">
+                      <div className="flex items-center gap-3 justify-between w-full">
+                        <div className="flex items-center gap-3">
+                          <DialogTitle className="text-2xl font-bold text-gradient">{selectedEvent.title}</DialogTitle>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={handleShare}
+                            className="text-boreal-aqua hover:text-white ml-2 z-30"
+                            aria-label="Compartir evento"
+                          >
+                            <Share2 className="w-5 h-5" />
+                          </Button>
+                          <DialogClose onClick={handleCloseModal} className="text-gray-400 hover:text-white z-20">
+                            <XIcon className="w-5 h-5" />
+                          </DialogClose>
+                        </div>
+                      </div>
                     </div>
-
-                    <DialogClose onClick={handleCloseModal} className="absolute top-0 right-0 text-gray-400 hover:text-white">
-                      <XIcon className="w-5 h-5" />
-                    </DialogClose>
-                  </div>
-
-                  <DialogDescription className="text-gray-300 pr-2"> {/* Detalles (el scroll lo maneja el contenedor de la modal) */}
-                    <div className="space-y-3 mb-6">
+                    <DialogDescription className="text-gray-300 pr-2">
+                      <div className="space-y-3 mb-6">
                        {selectedEvent.date && (
                           <div className="flex items-center">
                             <Calendar className="w-5 h-5 mr-3 text-boreal-aqua" />
@@ -458,24 +521,57 @@ const EventsPage = () => {
                     </div>
                     <p className="text-gray-300 mb-6">{selectedEvent.description}</p>
                   </DialogDescription>
-                </DialogHeader>
-                
-                <div className="my-4">
-                  <h4 className="text-lg font-semibold text-white mb-3">Formulario de Registro</h4>
-                  <EventRegistrationForm 
-                    event={selectedEvent} 
-                    onSuccess={handleCloseModal} 
-                  />
                 </div>
+              </DialogHeader>
+              
+              <div className="my-4">
+                <h4 className="text-lg font-semibold text-white mb-3">Formulario de Registro</h4>
+                <EventRegistrationForm 
+                  event={selectedEvent} 
+                  onSuccess={handleCloseModal} 
+                  onShowConfirmation={(msg) => { setConfirmationMsg(msg); setShowConfirmation(true); }}
+                />
+              </div>
 
-                {/* Ya no necesitamos DialogFooter aquí */}
-              </>
-            )}
+              {/* Modal de confirmación personalizada */}
+              {showConfirmation && (
+                <Dialog open={showConfirmation} onOpenChange={() => setShowConfirmation(false)}>
+                  <DialogContent className="bg-boreal-dark border-boreal-blue/50 text-white max-w-md w-full">
+                    <DialogHeader>
+                      <DialogTitle className="text-xl font-bold text-gradient">¡Registro Exitoso!</DialogTitle>
+                    </DialogHeader>
+                    <div className="mb-4 text-gray-300 whitespace-pre-line">{confirmationMsg}</div>
+                    <div className="flex gap-3 justify-end">
+                      <Button
+                        variant="outline"
+                        onClick={async () => { await navigator.clipboard.writeText(confirmationMsg); toast({ title: "Mensaje copiado" }); }}
+                        className="flex items-center gap-2 border-boreal-aqua text-boreal-aqua"
+                      >
+                        <Copy className="w-4 h-4" /> Copiar
+                      </Button>
+                      <Button
+                        variant="default"
+                        onClick={() => setShowConfirmation(false)}
+                        className="bg-gradient-to-r from-boreal-blue to-boreal-purple text-white"
+                      >
+                        Cerrar
+                      </Button>
+                    </div>
+                  </DialogContent>
+                </Dialog>
+              )}
+            </>
+          )}
+
           </DialogContent>
         </Dialog>
-      </div>
-    </>
-  );
-};
 
+        {/* ESTA ETIQUETA FALTABA: 
+          Debe cerrar el <div className="pt-32 pb-20 bg-boreal-dark"> 
+        */}
+        </div>
+        
+      </>
+    );
+  };
 export default EventsPage;
