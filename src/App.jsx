@@ -10,6 +10,8 @@ import HomePage from '@/pages/HomePage';
 import AboutPage from '@/pages/AboutPage';
 import TeamPage from '@/pages/TeamPage';
 import EventsPage from '@/pages/EventsPage';
+import NotFoundPage from '@/pages/NotFoundPage'; 
+
 // Se importa el proveedor de reCAPTCHA
 // Google reCAPTCHA v3 removed - using only reCAPTCHA v2 where needed
 
