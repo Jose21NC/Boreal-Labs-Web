@@ -1,10 +1,11 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Helmet } from 'react-helmet';
 import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
 // Se agregó el ícono de 'Instagram'
 import { ArrowRight, Zap, Mic, Heart, Award, School as University, Building, Instagram } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { defaultLinks, subscribeLinks, normalizeYouTubeUrl } from '@/lib/configService';
 
 const ScrollAnimatedSection = ({ children, className }) => {
   return (
@@ -21,6 +22,16 @@ const ScrollAnimatedSection = ({ children, className }) => {
 };
 
 const HomePage = () => {
+  // URL del video controlada desde Firestore con fallback
+  const [youtubeUrl, setYoutubeUrl] = useState(defaultLinks.youtubeVideoUrl);
+
+  useEffect(() => {
+    // Suscribirse a cambios en siteConfig/links
+    const unsubscribe = subscribeLinks((links) => {
+      setYoutubeUrl(normalizeYouTubeUrl(links.youtubeUrl || links.youtubeVideoUrl));
+    });
+    return () => unsubscribe && unsubscribe();
+  }, []);
   
   const programs = [
     {
@@ -154,7 +165,7 @@ const HomePage = () => {
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 1.0, delay: 1.2 }}
             >
-              <Link to="/events">
+              <Link to="/eventos">
                 <Button size="lg" className="bg-gradient-to-r from-boreal-blue to-boreal-purple hover:opacity-90 text-white px-8 py-6 text-lg font-bold">
                   Ver Próximos Eventos
                   <ArrowRight className="ml-2 w-5 h-5" />
@@ -173,7 +184,7 @@ const HomePage = () => {
              <div className="relative overflow-hidden rounded-2xl shadow-xl" style={{ paddingBottom: '56.25%' }}>
                <iframe 
                  className="absolute top-0 left-0 w-full h-full"
-                 src="https://www.youtube.com/embed/TU_ID_DEL_VIDEO"
+                 src={youtubeUrl}
                  title="Video de Boreal Labs"
                  frameBorder="0" 
                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
@@ -200,7 +211,7 @@ const HomePage = () => {
               />
             </div>
             <div className="mt-12">
-              <Link to="/about">
+              <Link to="/nosotros">
                 <Button variant="outline" className="border-2 border-boreal-aqua text-boreal-aqua hover:bg-boreal-aqua/10 hover:text-boreal-aqua px-8 py-4 text-base font-semibold">
                   Conoce Nuestra Historia
                 </Button>

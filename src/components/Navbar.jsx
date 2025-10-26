@@ -1,18 +1,29 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Menu, X } from 'lucide-react'; // Se eliminó 'Rocket' porque ya no se usa
+import { Menu, X, Wallet as WalletIcon } from 'lucide-react'; // Se eliminó 'Rocket' porque ya no se usa
 import { Button } from '@/components/ui/button';
+import { defaultLinks, subscribeLinks } from '@/lib/configService';
 
 const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false);
+  const [walletUrl, setWalletUrl] = useState(defaultLinks.walletUrl);
+  const [communityUrl, setCommunityUrl] = useState(defaultLinks.communityUrl);
   const location = useLocation();
+  useEffect(() => {
+    const unsub = subscribeLinks((links) => {
+      setWalletUrl(links.walletUrl || defaultLinks.walletUrl);
+      setCommunityUrl(links.communityUrl || defaultLinks.communityUrl);
+    });
+    return () => unsub && unsub();
+  }, []);
+
 
   const navLinks = [
     { name: 'Inicio', path: '/' },
-    { name: 'Acerca de', path: '/about' },
-    { name: 'Equipo', path: '/team' },
-    { name: 'Eventos', path: '/events' },
+    { name: 'Nosotros', path: '/nosotros' },
+    { name: 'Equipo', path: '/equipo' },
+    { name: 'Eventos', path: '/eventos' },
     { name: 'Validación', path: '/validacion' },
   ];
 
@@ -62,12 +73,26 @@ const Navbar = () => {
               </Link>
             ))}
 
+            {/* Botón destacado: Wallet (externo) */}
+            <a
+              href={walletUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="relative inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold text-white transition-all
+                         border border-boreal-aqua/60 bg-white/5 hover:bg-white/10
+                         shadow-[0_0_18px_rgba(45,212,191,0.25)] hover:shadow-[0_0_26px_rgba(45,212,191,0.45)]"
+            >
+              <span className="absolute inset-0 rounded-full bg-gradient-to-r from-boreal-aqua/20 to-boreal-blue/20 opacity-0 blur-sm transition-opacity group-hover:opacity-100" />
+              <WalletIcon className="w-4 h-4 text-boreal-aqua" />
+              <span>Wallet</span>
+            </a>
+
             {/* --- MODIFICACIÓN 2: BOTÓN COMUNIDAD (DESKTOP) --- */}
             <Button
               asChild
               className="bg-gradient-to-r from-boreal-aqua to-boreal-blue text-white font-bold transition-transform hover:scale-105"
             >
-              <Link to="https://chat.whatsapp.com/HAaxnHFYsuaBltQ812XhRW?mode=wwc">Comunidad</Link>
+              <Link to={communityUrl}>Comunidad</Link>
             </Button>
             {/* --- FIN MODIFICACIÓN 2 --- */}
           </div>
@@ -107,9 +132,22 @@ const Navbar = () => {
                 </Link>
               ))}
 
+              {/* Botón destacado: Wallet (MÓVIL) */}
+              <a
+                href={walletUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={() => setIsOpen(false)}
+                className="flex items-center justify-center gap-2 text-lg font-bold text-white border border-boreal-aqua/60 rounded-xl py-3
+                           bg-white/5 hover:bg-white/10 transition-all shadow-[0_0_18px_rgba(45,212,191,0.25)]"
+              >
+                <WalletIcon className="w-5 h-5 text-boreal-aqua" />
+                Wallet
+              </a>
+
               {/* --- MODIFICACIÓN 3: BOTÓN COMUNIDAD (MÓVIL) --- */}
               <Link
-                to="https://chat.whatsapp.com/HAaxnHFYsuaBltQ812XhRW?mode=wwc"
+                to={communityUrl}
                 onClick={() => setIsOpen(false)}
                 className="block text-center text-lg font-bold text-white bg-gradient-to-r from-boreal-aqua to-boreal-blue rounded-lg py-3 transition-transform hover:scale-105 active:scale-95"
               >

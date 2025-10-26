@@ -1,11 +1,12 @@
 import React, { useState, createContext } from 'react';
 import ErrorBoundary from '@/components/ErrorBoundary'; // Assuming you have this component
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 // Se importa HelmetProvider y Helmet (si necesitas Helmet global)
 import { HelmetProvider, Helmet } from 'react-helmet-async'; 
 import { Toaster } from '@/components/ui/toaster';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
+import ScrollToTop from '@/components/ScrollToTop';
 import HomePage from '@/pages/HomePage';
 import AboutPage from '@/pages/AboutPage';
 import TeamPage from '@/pages/TeamPage';
@@ -33,6 +34,8 @@ function App() {
     <HelmetProvider>
       <RecaptchaContext.Provider value={{ recaptchaTokenV2, setRecaptchaTokenV2, recaptchaSiteKey }}>
         <Router>
+          {/* Fuerza scroll al tope en cada navegación */}
+          <ScrollToTop behavior="smooth" />
           {/* --- CÓDIGO RESTAURADO: Helmet original --- */}
           <Helmet>
             <title>Boreal Labs - Juventud que Innova Transforma crea Nicaragua</title>
@@ -49,9 +52,15 @@ function App() {
               <ErrorBoundary> {/* ErrorBoundary envuelve las Rutas */}
                 <Routes>
                   <Route path="/" element={<HomePage />} />
-                  <Route path="/about" element={<AboutPage />} />
-                  <Route path="/team" element={<TeamPage />} />
-                  <Route path="/events" element={<EventsPage />} />
+                  {/* Rutas en español */}
+                  <Route path="/nosotros" element={<AboutPage />} />
+                  <Route path="/equipo" element={<TeamPage />} />
+                  <Route path="/eventos" element={<EventsPage />} />
+
+                  {/* Redirecciones desde rutas antiguas en inglés */}
+                  <Route path="/about" element={<Navigate to="/nosotros" replace />} />
+                  <Route path="/team" element={<Navigate to="/equipo" replace />} />
+                  <Route path="/events" element={<Navigate to="/eventos" replace />} />
                   <Route path="/validar-certificado" element={<PaginaValidacion />} />
                   <Route path="/validacion" element={<PaginaValidacion />} />
                   <Route path="*" element={<NotFoundPage />} /> {/* Ruta para página no encontrada */}

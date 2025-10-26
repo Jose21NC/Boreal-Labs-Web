@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useContext } from 'react';
 import { Helmet } from 'react-helmet';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Calendar, MapPin, Users, Clock, Share2, Copy, X as XIcon } from 'lucide-react'; // Icono Share2 añadido
+import { Calendar, MapPin, Users, Clock, Share2, Copy, X as XIcon, CheckCircle } from 'lucide-react'; // Icono Share2 añadido
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -27,7 +27,7 @@ import ReCAPTCHA from 'react-google-recaptcha';
 import { RecaptchaContext } from '@/App.jsx';
 // --- MODIFICACIÓN 1: Imports de Firebase ---
 import { db, storage } from '@/firebase.jsx'; // Asegúrate que la ruta sea correcta
-import { collection, getDocs, query, orderBy, addDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, getDocs, query, orderBy, addDoc, serverTimestamp, where, getCountFromServer } from 'firebase/firestore';
 import { ref as storageRef, getDownloadURL } from 'firebase/storage';
 
 // Objeto para traducir las categorías
@@ -48,6 +48,25 @@ const EventRegistrationForm = ({ event, onSuccess, onShowConfirmation }) => {
   const [department, setDepartment] = useState('');
   const [isMember, setIsMember] = useState('');
   const [tipoAsistencia, setTipoAsistencia] = useState('');
+  // Opciones de asistencia configurables por evento
+  const getAttendanceOptions = () => {
+    // Soporta varias formas: array en event.tipoAsistencia o event.tipoAsistenciaOptions,
+    // e incluso string separado por comas.
+    const raw = Array.isArray(event?.tipoAsistencia)
+      ? event.tipoAsistencia
+      : Array.isArray(event?.tipoAsistenciaOptions)
+        ? event.tipoAsistenciaOptions
+        : (typeof event?.tipoAsistencia === 'string'
+            ? event.tipoAsistencia.split(',')
+            : (typeof event?.tipoAsistenciaOptions === 'string'
+                ? event.tipoAsistenciaOptions.split(',')
+                : null));
+    const cleaned = (raw || ['Presencial', 'Virtual'])
+      .map(o => (o ?? '').toString().trim())
+      .filter(Boolean);
+    return cleaned.length ? cleaned : ['Presencial', 'Virtual'];
+  };
+  const asistenciaOptions = getAttendanceOptions();
   const [loading, setLoading] = useState(false);
   const [recaptchaV2Token, setRecaptchaV2Token] = useState(null);
   const recaptchaRef = useRef(null);
@@ -97,7 +116,20 @@ const EventRegistrationForm = ({ event, onSuccess, onShowConfirmation }) => {
         description: `Te has registrado correctamente para ${event.title}.`,
       });
       
-      onShowConfirmation(`Te has registrado exitosamente para el evento: ${event.title}.\n\n¡Comparte tu registro!`);
+      const extraMsg = (
+        event?.mensajeConfirmacion ??
+        event?.confirmMessage ??
+        event?.mensaje ??
+        event?.mensajeExtra ??
+        event?.nota ??
+        (event && event['mensajeConfirmación']) ??
+        ''
+      ).toString().trim();
+      const baseMsg = `Te has registrado exitosamente para el evento: ${event.title}.`;
+      const asistenciaMsg = tipoAsistencia ? `\n\nTipo de asistencia seleccionado: ${tipoAsistencia}.` : '';
+      const finalMsg = [baseMsg + asistenciaMsg, extraMsg].filter(Boolean).join("\n\n");
+
+      onShowConfirmation(finalMsg || baseMsg);
       onSuccess(); // Llama a la función onSuccess para cerrar el modal
 
     } catch (error) {
@@ -165,9 +197,13 @@ const EventRegistrationForm = ({ event, onSuccess, onShowConfirmation }) => {
           className="w-full bg-gray-800 border border-gray-700 text-white px-3 py-2 rounded-md"
         >
           <option value="">Selecciona una opción</option>
-          <option value="Presencial">Presencial</option>
-          <option value="Virtual">Virtual</option>
+          {asistenciaOptions.map((opt) => (
+            <option key={opt} value={opt}>{opt}</option>
+          ))}
         </select>
+        {event?.mensajeConfirmacion && (
+          <p className="text-xs text-gray-400">Nota del evento: se te enviará información adicional al confirmar.</p>
+        )}
       </div>
       <div className="my-4">
           <ReCAPTCHA
@@ -198,6 +234,38 @@ const EventsPage = () => {
   const [showConfirmation, setShowConfirmation] = useState(false);
   const [confirmationMsg, setConfirmationMsg] = useState('');
   const { toast } = useToast(); // Toast para el botón de compartir
+
+  // Sonido de confirmación ligero (Web Audio API)
+  const playConfirmTone = () => {
+    try {
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      const ctx = new AudioCtx();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(880, ctx.currentTime);
+      gain.gain.setValueAtTime(0.0001, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.2, ctx.currentTime + 0.01);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start();
+      // Pequeño “chime” ascendente
+      osc.frequency.linearRampToValueAtTime(1320, ctx.currentTime + 0.18);
+      gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.26);
+      osc.stop(ctx.currentTime + 0.28);
+      setTimeout(() => ctx.close(), 400);
+    } catch (e) {
+      // Evitar romper en navegadores sin soporte
+      console.warn('No se pudo reproducir sonido de confirmación:', e);
+    }
+  };
+
+  // Reproducir sonido cuando se muestra la confirmación
+  useEffect(() => {
+    if (showConfirmation) {
+      playConfirmTone();
+    }
+  }, [showConfirmation]);
 
   // --- MODIFICACIÓN 3: Cargar eventos desde Firestore ---
   useEffect(() => {
@@ -252,9 +320,35 @@ const EventsPage = () => {
 
         return out;
       }));
-        
-        console.log("Eventos cargados:", fetchedEvents);
-        setEvents(fetchedEvents);
+        // Obtener conteo de registros por evento (para validar capacidad)
+        const eventsWithCounts = await Promise.all(fetchedEvents.map(async (ev) => {
+          let registeredCount = 0;
+          try {
+            if (ev.id) {
+              const rq = query(collection(db, 'registrations'), where('eventId', '==', ev.id));
+              try {
+                const agg = await getCountFromServer(rq);
+                registeredCount = agg.data().count || 0;
+              } catch (_) {
+                // Fallback si getCountFromServer no está disponible
+                const docs = await getDocs(rq);
+                registeredCount = docs.size;
+              }
+            }
+          } catch (e) {
+            console.warn('No se pudo obtener conteo de registros para', ev.id, e);
+          }
+          // Normalizar capacity a número
+          let capacityNum = ev.capacity;
+          if (typeof capacityNum === 'string') {
+            const n = parseInt(capacityNum, 10);
+            capacityNum = Number.isFinite(n) ? n : undefined;
+          }
+          return { ...ev, capacity: capacityNum, registeredCount };
+        }));
+
+        console.log("Eventos cargados:", eventsWithCounts);
+        setEvents(eventsWithCounts);
 
       } catch (error) {
         console.error("Error al cargar eventos: ", error);
@@ -300,6 +394,21 @@ const EventsPage = () => {
       return normalize(evKey) === normalize(filter);
     });
 
+  const isEventPast = (ev) => {
+    if (!ev?.date) return false;
+    const endOfDay = new Date(ev.date);
+    endOfDay.setHours(23, 59, 59, 999);
+    return endOfDay < new Date();
+  };
+
+  const isSoldOut = (ev) => {
+    // Permite forzar estado desde Firestore: soldOut | isFull | cupoLleno
+    if (ev?.soldOut === true || ev?.isFull === true || ev?.cupoLleno === true) return true;
+    const cap = typeof ev?.capacity === 'number' ? ev.capacity : undefined;
+    const count = typeof ev?.registeredCount === 'number' ? ev.registeredCount : 0;
+    return Number.isFinite(cap) && count >= cap;
+  };
+
   // Función para cerrar el modal
   const handleCloseModal = () => {
     setSelectedEvent(null);
@@ -307,7 +416,7 @@ const EventsPage = () => {
 
   // --- MODIFICACIÓN 5: Función para compartir ---
   const handleShare = async () => {
-    const eventUrl = `https://borealabs.org/events`;
+    const eventUrl = `https://borealabs.org/eventos`;
     const shareData = {
       title: 'Eventos Boreal Labs',
       text: `¡Mira los eventos de Boreal Labs!`,
@@ -391,14 +500,64 @@ const EventsPage = () => {
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: -20 }}
                     transition={{ duration: 0.5, delay: index * 0.05 }}
-                    className="glass-effect rounded-2xl p-8 hover:bg-white/10 transition-all group flex flex-col"
+                    className={`glass-effect rounded-2xl p-8 transition-all group flex flex-col relative ${
+                      isEventPast(event) || isSoldOut(event) ? 'opacity-95' : 'hover:bg-white/10'
+                    }`}
                   >
+                    {/* Badge se renderiza centrada sobre la imagen si existe */}
                     <div className="flex-grow">
                       {/* Imagen Opcional del Evento */}
                         {(event.resolvedImage || event.image) && (
-                         <div className="mb-4 overflow-hidden rounded-lg aspect-video">
+                         <div className="mb-4 overflow-hidden rounded-lg aspect-video relative">
                            <img src={event.resolvedImage || event.image} alt={`Imagen de ${event.title}`} className="w-full h-full object-cover"/>
+                           {(isEventPast(event) || isSoldOut(event)) && (
+                             <>
+                               <div className="absolute inset-0 bg-black/60 backdrop-blur-[1px] pointer-events-none" />
+                               <div className="absolute inset-0 flex items-center justify-center">
+                                 <span
+                                   className={`inline-flex items-center gap-3 px-5 py-2.5 rounded-full text-base font-extrabold tracking-wide shadow-lg ring-1 ring-white/20 ${
+                                     isEventPast(event)
+                                       ? 'bg-gradient-to-r from-gray-600 to-slate-700 text-white'
+                                       : 'bg-gradient-to-r from-red-500 to-rose-600 text-white'
+                                   }`}
+                                 >
+                                   {isEventPast(event) ? (
+                                     <>
+                                       <Clock className="w-5 h-5" /> Finalizado
+                                     </>
+                                   ) : (
+                                     <>
+                                       <Users className="w-5 h-5" /> Cupo lleno
+                                     </>
+                                   )}
+                                 </span>
+                               </div>
+                             </>
+                           )}
                          </div>
+                      )}
+                      {!(event.resolvedImage || event.image) && (isEventPast(event) || isSoldOut(event)) && (
+                        <div className="relative mb-4">
+                          <div className="absolute left-1/2 -translate-x-1/2 -top-2 z-10">
+                            <span
+                              className={`inline-flex items-center gap-3 px-5 py-2.5 rounded-full text-base font-extrabold tracking-wide shadow-lg ring-1 ring-white/20 ${
+                                isEventPast(event)
+                                  ? 'bg-gradient-to-r from-gray-600 to-slate-700 text-white'
+                                  : 'bg-gradient-to-r from-red-500 to-rose-600 text-white'
+                              }`}
+                            >
+                              {isEventPast(event) ? (
+                                <>
+                                  <Clock className="w-5 h-5" /> Finalizado
+                                </>
+                              ) : (
+                                <>
+                                  <Users className="w-5 h-5" /> Cupo lleno
+                                </>
+                              )}
+                            </span>
+                          </div>
+                        </div>
                       )}
 
                       <div className="flex items-start justify-between mb-4">
@@ -442,12 +601,21 @@ const EventsPage = () => {
                       </p>
                     </div>
                     
-                    <Button
-                      onClick={() => setSelectedEvent(event)}
-                      className="w-full bg-gradient-to-r from-boreal-blue to-boreal-purple hover:opacity-90 text-white font-bold mt-auto"
-                    >
-                      Ver Detalles y Registrarse
-                    </Button>
+                    {isEventPast(event) || isSoldOut(event) ? (
+                      <Button
+                        disabled
+                        className="w-full bg-gray-600 text-white font-bold mt-auto opacity-70 cursor-not-allowed"
+                      >
+                        {isEventPast(event) ? 'Evento finalizado' : 'Cupo lleno'}
+                      </Button>
+                    ) : (
+                      <Button
+                        onClick={() => setSelectedEvent(event)}
+                        className="w-full bg-gradient-to-r from-boreal-blue to-boreal-purple hover:opacity-90 text-white font-bold mt-auto"
+                      >
+                        Ver Detalles y Registrarse
+                      </Button>
+                    )}
                   </motion.div>
                 ))}
               </AnimatePresence>
@@ -494,7 +662,7 @@ const EventsPage = () => {
                         </div>
                       </div>
                     </div>
-                    <DialogDescription className="text-gray-300 pr-2">
+                    <DialogDescription className="text-gray-300 pr-2 mt-4">
                       <div className="space-y-3 mb-6">
                        {selectedEvent.date && (
                           <div className="flex items-center">
@@ -533,36 +701,59 @@ const EventsPage = () => {
                 />
               </div>
 
-              {/* Modal de confirmación personalizada */}
-              {showConfirmation && (
-                <Dialog open={showConfirmation} onOpenChange={() => setShowConfirmation(false)}>
-                  <DialogContent className="bg-boreal-dark border-boreal-blue/50 text-white max-w-md w-full">
-                    <DialogHeader>
-                      <DialogTitle className="text-xl font-bold text-gradient">¡Registro Exitoso!</DialogTitle>
-                    </DialogHeader>
-                    <div className="mb-4 text-gray-300 whitespace-pre-line">{confirmationMsg}</div>
-                    <div className="flex gap-3 justify-end">
-                      <Button
-                        variant="outline"
-                        onClick={async () => { await navigator.clipboard.writeText(confirmationMsg); toast({ title: "Mensaje copiado" }); }}
-                        className="flex items-center gap-2 border-boreal-aqua text-boreal-aqua"
-                      >
-                        <Copy className="w-4 h-4" /> Copiar
-                      </Button>
-                      <Button
-                        variant="default"
-                        onClick={() => setShowConfirmation(false)}
-                        className="bg-gradient-to-r from-boreal-blue to-boreal-purple text-white"
-                      >
-                        Cerrar
-                      </Button>
-                    </div>
-                  </DialogContent>
-                </Dialog>
-              )}
+              {/* (Se movió el modal de confirmación fuera de este Dialog para que no se cierre al cerrar el formulario) */}
             </>
           )}
 
+          </DialogContent>
+        </Dialog>
+
+        {/* Modal de confirmación personalizada (Top-level, mismo estilo que el formulario) */}
+        <Dialog open={showConfirmation} onOpenChange={(open) => setShowConfirmation(open)}>
+          <DialogContent className="bg-boreal-dark border-boreal-blue/50 text-white max-w-lg w-full">
+            <motion.div
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.25 }}
+            >
+              <div className="relative flex justify-center pt-2 pb-3">
+                <motion.div
+                  initial={{ scale: 0.6, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  transition={{ type: 'spring', stiffness: 260, damping: 18 }}
+                  className="relative z-10"
+                >
+                  <CheckCircle className="w-16 h-16 text-green-500" />
+                </motion.div>
+                <motion.div
+                  className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-green-500/40"
+                  style={{ width: '76px', height: '76px' }}
+                  initial={{ scale: 0.8, opacity: 0.6 }}
+                  animate={{ scale: 1.35, opacity: 0 }}
+                  transition={{ duration: 0.6 }}
+                />
+              </div>
+              <DialogHeader className="text-center items-center">
+                <DialogTitle className="text-2xl font-bold text-gradient w-full text-center block">¡Registro Exitoso!</DialogTitle>
+              </DialogHeader>
+              <div className="mb-4 mt-2 text-gray-300 whitespace-pre-line text-left">{confirmationMsg}</div>
+              <div className="flex gap-3 justify-end">
+                <Button
+                  variant="outline"
+                  onClick={async () => { await navigator.clipboard.writeText(confirmationMsg); toast({ title: 'Mensaje copiado' }); }}
+                  className="flex items-center gap-2 border-boreal-aqua text-boreal-aqua"
+                >
+                  <Copy className="w-4 h-4" /> Copiar
+                </Button>
+                <Button
+                  variant="default"
+                  onClick={() => setShowConfirmation(false)}
+                  className="bg-gradient-to-r from-boreal-blue to-boreal-purple text-white"
+                >
+                  Cerrar
+                </Button>
+              </div>
+            </motion.div>
           </DialogContent>
         </Dialog>
 
