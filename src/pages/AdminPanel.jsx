@@ -410,6 +410,7 @@ const AdminPanel = () => {
                                 const tipoCell = (reg.tipo || reg.tipoAsistencia || '').toLowerCase();
                                 const isPonente = tipoCell === 'ponente';
                                 const isStaff = tipoCell === 'staff';
+                                const isParticipante = tipoCell === 'participante';
                                 return (
                                     <motion.div
                                         key={reg.id}
@@ -440,8 +441,10 @@ const AdminPanel = () => {
                                                     <span className="inline-flex items-center text-[10px] uppercase tracking-wide rounded-full bg-boreal-purple/30 border border-boreal-purple/40 px-2 py-0.5">Ponente</span>
                                                 ) : isStaff ? (
                                                     <span className="inline-flex items-center text-[10px] uppercase tracking-wide rounded-full bg-boreal-aqua/30 border border-boreal-aqua/40 px-2 py-0.5 text-black">Staff</span>
+                                                ) : isParticipante ? (
+                                                    <span className="inline-flex items-center text-[10px] uppercase tracking-wide rounded-full bg-white/10 border border-white/20 px-2 py-0.5">{reg.modalidad || 'presencial'}</span>
                                                 ) : (
-                                                    <span className="inline-flex items-center text-[10px] uppercase tracking-wide rounded-full bg-white/10 border border-white/20 px-2 py-0.5">{(reg.modalidad || 'presencial')}</span>
+                                                    <span className="inline-flex items-center text-[10px] uppercase tracking-wide rounded-full bg-white/10 border border-white/20 px-2 py-0.5">{tipoCell.charAt(0).toUpperCase() + tipoCell.slice(1)}</span>
                                                 )}
                                             </div>
                                             <div className="shrink-0">
@@ -493,6 +496,7 @@ const AdminPanel = () => {
                                         const tipoCell = (reg.tipo || reg.tipoAsistencia || '').toLowerCase();
                                         const isPonente = tipoCell === 'ponente';
                                         const isStaff = tipoCell === 'staff';
+                                        const isParticipante = tipoCell === 'participante';
                                         return (
                                             <tr key={reg.id} className={`border-t border-white/10 ${isPonente ? 'bg-boreal-purple/10' : isStaff ? 'bg-boreal-aqua/10' : ''}`}>
                                                 {selectionMode && (
@@ -508,8 +512,10 @@ const AdminPanel = () => {
                                                         <span className="inline-flex items-center text-xs uppercase tracking-wide rounded-full bg-boreal-purple/30 border border-boreal-purple/40 px-2 py-0.5">Ponente</span>
                                                     ) : isStaff ? (
                                                         <span className="inline-flex items-center text-xs uppercase tracking-wide rounded-full bg-boreal-aqua/30 border border-boreal-aqua/40 px-2 py-0.5 text-black">Staff</span>
+                                                    ) : isParticipante ? (
+                                                        <span className="inline-flex items-center text-xs uppercase tracking-wide rounded-full bg-white/10 border border-white/20 px-2 py-0.5">{reg.modalidad || 'presencial'}</span>
                                                     ) : (
-                                                        <span className="inline-flex items-center text-xs uppercase tracking-wide rounded-full bg-white/10 border border-white/20 px-2 py-0.5">{(reg.modalidad || 'presencial')}</span>
+                                                        <span className="inline-flex items-center text-xs uppercase tracking-wide rounded-full bg-white/10 border border-white/20 px-2 py-0.5">{tipoCell.charAt(0).toUpperCase() + tipoCell.slice(1)}</span>
                                                     )}
                                                 </td>
                                                 <td className="px-4 py-2">
