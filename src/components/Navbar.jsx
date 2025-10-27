@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Menu, X, Wallet as WalletIcon } from 'lucide-react'; // Se eliminó 'Rocket' porque ya no se usa
 import { Button } from '@/components/ui/button';
 import { defaultLinks, subscribeLinks } from '@/lib/configService';
+import logoBoreal from '@/images/logoBoreal.svg';
 
 const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false);
@@ -44,9 +45,9 @@ const Navbar = () => {
               y usar 'src={logo}' abajo.
             */}
             <img 
-              src="src/images/logoBoreal.svg" 
+              src={logoBoreal} 
               alt="Boreal Labs" 
-              className="h-12 w-auto" // Ajusta la altura (h-10) según necesites
+              className="h-12 w-auto" 
             />
           </Link>
           {/* --- FIN MODIFICACIÓN 1 --- */}

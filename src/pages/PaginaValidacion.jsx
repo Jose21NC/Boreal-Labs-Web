@@ -141,20 +141,41 @@ const PaginaValidacion = () => {
                 <CheckCircle className="w-16 h-16 mr-3" />
                 <p className="text-2xl font-bold">Certificado Válido</p>
               </div>
-              <p className="text-lg text-gray-300">
-                Este documento certifica que{' '}
-                <strong className="text-white">{certificateData.nombreUsuario || 'Nombre no disponible'}</strong>{' '}
-                completó exitosamente el evento{' '}
-                <strong className="text-white">{certificateData.nombreEvento || 'Evento no disponible'}</strong>{' '}
-                en la fecha{' '}
-                <strong className="text-white">{formatFirestoreDate(certificateData.fechaEmision)}</strong>.
-              </p>
-              {/* Mostrar modalidad (presencial / virtual) */}
-              <p className="text-sm text-gray-400 mt-2">
-                Modalidad: <strong className="text-white">{certificateData.modalidad || 'No especificada'}</strong>
-              </p>
-              {/* Puedes añadir más detalles aquí si los tienes en Firestore */}
-              {/* <p className="text-sm text-gray-400">ID de Validación: {validationId}</p> */}
+              {(() => {
+                const nombre = certificateData.nombreUsuario || 'Nombre no disponible';
+                const evento = certificateData.nombreEvento || 'Evento no disponible';
+                const fecha = formatFirestoreDate(certificateData.fechaEmision);
+                const tipoRaw = (certificateData.tipo || '').toString().toLowerCase();
+                const modalidadRaw = (certificateData.modalidad || '').toString().toLowerCase();
+                const role = tipoRaw || (/^(ponente|speaker|staff)$/.test(modalidadRaw) ? modalidadRaw : 'participante');
+                const roleLabel = role === 'staff' ? 'Staff' : (role === 'ponente' || role === 'speaker' ? 'Speaker' : 'Participante');
+                const isParticipante = role === 'participante';
+                const isSpeaker = role === 'ponente' || role === 'speaker';
+                const isStaff = role === 'staff';
+                return (
+                  <>
+                    <p className="text-lg text-gray-300">
+                      {isParticipante && (
+                        <>Este documento certifica que <strong className="text-white">{nombre}</strong> participó en el evento <strong className="text-white">{evento}</strong> en la fecha <strong className="text-white">{fecha}</strong>.</>
+                      )}
+                      {isSpeaker && (
+                        <>Este documento certifica que <strong className="text-white">{nombre}</strong> participó como <strong className="text-white">Speaker</strong> en el evento <strong className="text-white">{evento}</strong> en la fecha <strong className="text-white">{fecha}</strong>.</>
+                      )}
+                      {isStaff && (
+                        <>Este documento certifica que <strong className="text-white">{nombre}</strong> formó parte del <strong className="text-white">Staff</strong> del evento <strong className="text-white">{evento}</strong> en la fecha <strong className="text-white">{fecha}</strong>.</>
+                      )}
+                    </p>
+                    {/* Mostrar modalidad solo para Participantes */}
+                    {isParticipante && (
+                      <p className="text-sm text-gray-400 mt-2">
+                        Modalidad: <strong className="text-white">{certificateData.modalidad || 'No especificada'}</strong>
+                      </p>
+                    )}
+                    {/* Rol visible para claridad */}
+                    <p className="text-xs text-gray-400 mt-1">Rol: <strong className="text-white">{roleLabel}</strong></p>
+                  </>
+                );
+              })()}
             </div>
           )}
 

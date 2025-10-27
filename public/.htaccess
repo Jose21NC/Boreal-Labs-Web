@@ -1,0 +1,13 @@
+# Vite SPA fallback for Apache (e.g., Hostinger)
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteBase /
+
+  # Allow existing files/directories
+  RewriteCond %{REQUEST_FILENAME} -f [OR]
+  RewriteCond %{REQUEST_FILENAME} -d
+  RewriteRule ^ - [L]
+
+  # Redirect everything else to index.html
+  RewriteRule . /index.html [L]
+</IfModule>

@@ -1,6 +1,6 @@
 import React, { useState, createContext } from 'react';
 import ErrorBoundary from '@/components/ErrorBoundary'; // Assuming you have this component
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 // Se importa HelmetProvider y Helmet (si necesitas Helmet global)
 import { HelmetProvider, Helmet } from 'react-helmet-async'; 
 import { Toaster } from '@/components/ui/toaster';
@@ -12,7 +12,10 @@ import AboutPage from '@/pages/AboutPage';
 import TeamPage from '@/pages/TeamPage';
 import EventsPage from '@/pages/EventsPage';
 import NotFoundPage from '@/pages/NotFoundPage'; 
+import LayoutEditor from '@/pages/LayoutEditor';
 import PaginaValidacion from '@/pages/PaginaValidacion';
+import AdminPanel from '@/pages/AdminPanel';
+import AdminGate from '@/components/AdminGate';
 
 // Se importa el proveedor de reCAPTCHA
 // Google reCAPTCHA v3 removed - using only reCAPTCHA v2 where needed
@@ -57,17 +60,22 @@ function App() {
                   <Route path="/equipo" element={<TeamPage />} />
                   <Route path="/eventos" element={<EventsPage />} />
 
+                  {/* Admin */}
+                  <Route path="/admin" element={<AdminGate><AdminPanel /></AdminGate>} />
+                  <Route path="/admin/layout" element={<AdminGate><LayoutEditor /></AdminGate>} />
+
                   {/* Redirecciones desde rutas antiguas en inglés */}
                   <Route path="/about" element={<Navigate to="/nosotros" replace />} />
                   <Route path="/team" element={<Navigate to="/equipo" replace />} />
                   <Route path="/events" element={<Navigate to="/eventos" replace />} />
                   <Route path="/validar-certificado" element={<PaginaValidacion />} />
                   <Route path="/validacion" element={<PaginaValidacion />} />
+
                   <Route path="*" element={<NotFoundPage />} /> {/* Ruta para página no encontrada */}
                 </Routes>
               </ErrorBoundary>
             </main>
-            <Footer />
+            <ConditionalFooter />
             <Toaster />
           </div>
         </Router>
@@ -77,4 +85,19 @@ function App() {
 }
 
 export default App;
+
+// Footer condicional según ruta y viewport (ocultar en móviles para admin y validación)
+function ConditionalFooter() {
+  const location = useLocation();
+  const path = location.pathname || '';
+  const hideOnMobile = path.startsWith('/admin') || path === '/validacion' || path === '/validar-certificado';
+  if (hideOnMobile) {
+    return (
+      <div className="hidden sm:block">
+        <Footer />
+      </div>
+    );
+  }
+  return <Footer />;
+}
 

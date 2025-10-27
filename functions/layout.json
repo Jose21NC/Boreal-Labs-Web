@@ -1,0 +1,138 @@
+{
+  "canvas": {
+    "widthPx": 2000,
+    "heightPx": 1414,
+    "orientation": "landscape",
+    "paperHint": "≈ A4"
+  },
+  "safeMarginPx": 35,
+  "elements": {
+    "nombreUsuario": {
+      "absPx": {
+        "x": 44,
+        "y": 421,
+        "width": 1910,
+        "height": 113
+      },
+      "rel": {
+        "x": 0.022,
+        "y": 0.298,
+        "width": 0.9550000000000001,
+        "height": 0.08
+      },
+      "style": {
+        "fontFamily": "Libre Franklin",
+        "fontSizePx": 68,
+        "fontWeight": 800,
+        "fontStyle": "normal",
+        "color": "#373737",
+        "textAlign": "center",
+        "transform": "uppercase"
+      }
+    },
+    "nombreEvento": {
+      "absPx": {
+        "x": 290,
+        "y": 646,
+        "width": 1400,
+        "height": 79
+      },
+      "rel": {
+        "x": 0.145,
+        "y": 0.457,
+        "width": 0.7,
+        "height": 0.056
+      },
+      "style": {
+        "fontFamily": "Libre Franklin",
+        "fontSizePx": 52,
+        "fontWeight": 700,
+        "fontStyle": "normal",
+        "color": "#373737",
+        "textAlign": "center",
+        "transform": "none"
+      }
+    },
+    "ciudadFecha": {
+      "absPx": {
+        "x": 46,
+        "y": 901,
+        "width": 1910,
+        "height": 57
+      },
+      "rel": {
+        "x": 0.023,
+        "y": 0.637,
+        "width": 0.9550000000000001,
+        "height": 0.04
+      },
+      "style": {
+        "fontFamily": "Libre Franklin",
+        "fontSizePx": 39,
+        "fontWeight": 800,
+        "fontStyle": "italic",
+        "color": "#373737",
+        "textAlign": "center"
+      }
+    },
+    "tipoParticipacion": {
+      "absPx": {
+        "x": 1746,
+        "y": 1032,
+        "width": 190,
+        "height": 57
+      },
+      "rel": {
+        "x": 0.873,
+        "y": 0.73,
+        "width": 0.095,
+        "height": 0.04
+      },
+      "style": {
+        "fontFamily": "Libre Franklin",
+        "fontSizePx": 30,
+        "fontWeight": 405,
+        "fontStyle": "italic",
+        "color": "#373737",
+        "textAlign": "center",
+        "transform": "uppercase"
+      }
+    },
+    "qrValidacion": {
+      "absPx": {
+        "x": 1736,
+        "y": 1075,
+        "width": 210,
+        "height": 219
+      },
+      "rel": {
+        "x": 0.868,
+        "y": 0.76,
+        "width": 0.105,
+        "height": 0.155
+      }
+    },
+    "idValidacion": {
+      "absPx": {
+        "x": 1606,
+        "y": 1273,
+        "width": 320,
+        "height": 28
+      },
+      "rel": {
+        "x": 0.803,
+        "y": 0.9,
+        "width": 0.16,
+        "height": 0.02
+      },
+      "style": {
+        "fontFamily": "Libre Franklin",
+        "fontSizePx": 8,
+        "fontWeight": 400,
+        "fontStyle": "normal",
+        "color": "#373737",
+        "textAlign": "right"
+      }
+    }
+  }
+}
