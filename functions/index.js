@@ -49,10 +49,12 @@ export const generateCertificates = onCall({ cors: true, region: 'us-central1' }
   }
   const pointsByEmail = new Map();
 
-  // Intentar obtener la fecha del evento desde la colección 'events' o 'adminEvents'
+  // Intentar obtener metadata del evento desde 'events' o 'adminEvents'
   let eventDate = null;
+  let inferredTemplateSet = null;
   try {
     let eventDocSnap = null;
+    let eventDocData = null;
     const withId = regs.find((r) => r.eventId);
     if (withId?.eventId) {
       // Buscar por ID de evento del primer registro con eventId
@@ -64,11 +66,23 @@ export const generateCertificates = onCall({ cors: true, region: 'us-central1' }
       if (!evQuery.empty) eventDocSnap = evQuery.docs[0];
     }
     if (eventDocSnap && eventDocSnap.exists) {
+      eventDocData = eventDocSnap.data() || {};
       const ed = eventDocSnap.get('date');
       // Puede ser Timestamp, Date o string
       if (ed?.toDate) eventDate = ed.toDate();
       else if (typeof ed === 'string') eventDate = new Date(ed);
       else if (ed instanceof Date) eventDate = ed;
+
+      const categoryRaw = eventDocData?.category;
+      const categories = Array.isArray(categoryRaw)
+        ? categoryRaw.map((v) => String(v || '').toLowerCase())
+        : [String(categoryRaw || '').toLowerCase()];
+      const categoryName = String(eventDocData?.categoryName || '').toLowerCase();
+      const title = String(eventDocData?.title || eventName || '').toLowerCase();
+      const isVolunteerEvent = categories.includes('voluntariado')
+        || categoryName.includes('voluntariado')
+        || title.includes('voluntariado');
+      if (isVolunteerEvent) inferredTemplateSet = 'VOLUNTARIADO';
     }
     if (!eventDate) {
       const adminQuery = await db.collection('adminEvents').where('name', '==', eventName).limit(1).get();
@@ -77,6 +91,9 @@ export const generateCertificates = onCall({ cors: true, region: 'us-central1' }
         if (ad?.toDate) eventDate = ad.toDate();
         else if (typeof ad === 'string') eventDate = new Date(ad);
         else if (ad instanceof Date) eventDate = ad;
+
+        const adminName = String(adminQuery.docs[0].get('name') || eventName || '').toLowerCase();
+        if (adminName.includes('voluntariado')) inferredTemplateSet = 'VOLUNTARIADO';
       }
     }
   } catch (e) {
@@ -93,7 +110,7 @@ export const generateCertificates = onCall({ cors: true, region: 'us-central1' }
     return cleaned;
   };
 
-  const templateSetSafe = normalizeTemplateSet(templateSet);
+  const templateSetSafe = normalizeTemplateSet(templateSet) || normalizeTemplateSet(inferredTemplateSet);
   const templateRoot = templateSetSafe ? `cert-templates/${templateSetSafe}` : 'cert-templates';
 
   for (const r of regs) {
@@ -194,7 +211,7 @@ export const generateCertificates = onCall({ cors: true, region: 'us-central1' }
     if (isVirtualParticipant) {
       return ['base-virtual.pdf', 'virtual.pdf', 'base.pdf'];
     }
-    return ['base.pdf', 'participante.pdf'];
+    return ['base-volunt.pdf', 'base.pdf', 'participante.pdf'];
   })();
   const templatePick = await loadFirst([
     ...templateCandidates.map((p) => `${templateRoot}/${p}`),
