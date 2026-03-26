@@ -27,8 +27,9 @@ const db = getFirestore(app);
 const analytics = getAnalytics(app); // Analytics
 const storage = getStorage(app);
 
-// Habilitar logs de debug para Firestore (útil para desarrollo)
-setLogLevel('debug');
+// Evita ruido en consola; activar solo si VITE_FIRESTORE_DEBUG=true en desarrollo.
+const enableFirestoreDebug = import.meta.env.DEV && import.meta.env.VITE_FIRESTORE_DEBUG === 'true';
+setLogLevel(enableFirestoreDebug ? 'debug' : 'silent');
 
 // --- AUTENTICACIÓN ---
 // Inicia sesión anónimamente para que las reglas de seguridad de

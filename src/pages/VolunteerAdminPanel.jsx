@@ -99,6 +99,21 @@ const VolunteerAdminPanel = () => {
     const navigate = useNavigate();
     const auth = getAuth();
 
+    const getCallableErrorMessage = (error) => {
+        const code = String(error?.code || '');
+        const detailsMessage = typeof error?.details === 'string' ? error.details : error?.details?.message;
+        if (code.includes('unauthenticated')) {
+            return 'Tu sesión de admin expiró. Cierra sesión y vuelve a ingresar.';
+        }
+        if (code.includes('failed-precondition')) {
+            return detailsMessage || error?.message || 'Falta configurar la plantilla PDF en Storage.';
+        }
+        if (code.includes('not-found')) {
+            return 'La Cloud Function no está desplegada o no existe en us-central1.';
+        }
+        return detailsMessage || error?.message || 'Inténtalo nuevamente.';
+    };
+
     const dayDefinitions = [
         { key: 'lunes', initial: 'L', labels: ['lunes', 'lun'] },
         { key: 'martes', initial: 'M', labels: ['martes', 'mar'] },
@@ -565,8 +580,14 @@ const VolunteerAdminPanel = () => {
             return;
         }
 
+        if (!auth.currentUser) {
+            toast({ title: 'Sesión no válida', description: 'Inicia sesión de nuevo para generar certificados.', variant: 'destructive' });
+            return;
+        }
+
         setGeneratingCertificates(true);
         try {
+            await auth.currentUser.getIdToken();
             const functions = getFunctions(undefined, 'us-central1');
             const callable = httpsCallable(functions, 'generateCertificates');
             const res = await callable({ eventName: selectedEvent });
@@ -578,7 +599,7 @@ const VolunteerAdminPanel = () => {
             setShowCertificatesModal(false);
         } catch (error) {
             console.error('Error generando certificados:', error);
-            toast({ title: 'Error', description: 'No se pudieron generar certificados.', variant: 'destructive' });
+            toast({ title: 'Error', description: getCallableErrorMessage(error), variant: 'destructive' });
         } finally {
             setGeneratingCertificates(false);
         }

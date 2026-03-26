@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { db, storage } from '../firebase'; // Asegúrate de que la configuración de Firebase esté correcta
+import { db, storage, auth } from '../firebase'; // Asegúrate de que la configuración de Firebase esté correcta
 import { collection, getDocs, updateDoc, doc, addDoc, deleteDoc, setDoc, getDoc, writeBatch, serverTimestamp, query, where, increment } from 'firebase/firestore';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { getAuth, signOut } from 'firebase/auth';
@@ -336,6 +336,21 @@ const AdminPanel = () => {
         return toPresent;
     };
 
+    const getCallableErrorMessage = (error) => {
+        const code = String(error?.code || '');
+        const detailsMessage = typeof error?.details === 'string' ? error.details : error?.details?.message;
+        if (code.includes('unauthenticated')) {
+            return 'Tu sesión de admin expiró. Cierra sesión y vuelve a ingresar.';
+        }
+        if (code.includes('failed-precondition')) {
+            return detailsMessage || error?.message || 'Falta configurar la plantilla PDF en Storage.';
+        }
+        if (code.includes('not-found')) {
+            return 'La Cloud Function no está desplegada o no existe en us-central1.';
+        }
+        return detailsMessage || error?.message || 'Inténtalo nuevamente.';
+    };
+
     const currentList = useMemo(() => {
         const list = eventData[selectedEvent] || [];
         return [...list].sort((a, b) => (a.userName || '').localeCompare(b.userName || ''));
@@ -390,8 +405,13 @@ const AdminPanel = () => {
             toast({ title: 'Puntos inválidos', description: 'Ingresa una cantidad válida mayor a 0.', variant: 'destructive' });
             return;
         }
+        if (!auth.currentUser) {
+            toast({ title: 'Sesión no válida', description: 'Inicia sesión de nuevo para generar certificados.', variant: 'destructive' });
+            return;
+        }
         setGenerating(true);
         try {
+            await auth.currentUser.getIdToken();
             const functions = getFunctions(undefined, 'us-central1');
             const callable = httpsCallable(functions, 'generateCertificates');
             const res = await callable({
@@ -406,7 +426,7 @@ const AdminPanel = () => {
             setCertificatesGenerated(true);
         } catch (e) {
             console.error('Error generando certificados (Cloud Function)', e);
-            toast({ title: 'Error generando certificados', description: e.message || 'Inténtalo nuevamente', variant: 'destructive' });
+            toast({ title: 'Error generando certificados', description: getCallableErrorMessage(e), variant: 'destructive' });
         } finally {
             setGenerating(false);
         }
@@ -477,8 +497,13 @@ const AdminPanel = () => {
 
     const mergeCertificatesForCurrentEvent = async () => {
         if (!selectedEvent) return;
+        if (!auth.currentUser) {
+            toast({ title: 'Sesión no válida', description: 'Inicia sesión de nuevo para combinar certificados.', variant: 'destructive' });
+            return;
+        }
         setMerging(true);
         try {
+            await auth.currentUser.getIdToken();
             const functions = getFunctions(undefined, 'us-central1');
             const callable = httpsCallable(functions, 'mergeCertificatesPdf');
             const res = await callable({ eventName: selectedEvent });
@@ -491,7 +516,7 @@ const AdminPanel = () => {
             if (urlPdf) window.open(urlPdf, '_blank', 'noopener');
         } catch (e) {
             console.error('Error combinando PDFs', e);
-            toast({ title: 'Error al combinar PDFs', description: e.message || 'Inténtalo nuevamente', variant: 'destructive' });
+            toast({ title: 'Error al combinar PDFs', description: getCallableErrorMessage(e), variant: 'destructive' });
         } finally {
             setMerging(false);
         }
