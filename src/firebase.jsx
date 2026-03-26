@@ -13,7 +13,7 @@ const firebaseConfig = {
   apiKey: "AIzaSyCEP8h9z4pW9NIV3qEd2XrrAOGkkgZGAiQ",
   authDomain: "borealabsweb.firebaseapp.com",
   projectId: "borealabsweb",
-  storageBucket: "borealabsweb.firebasestorage.app",
+  storageBucket: "borealabsweb.appspot.com",
   messagingSenderId: "338356857449",
   appId: "1:338356857449:web:742c8d0f7fb9e25e1390f8",
   measurementId: "G-4EGW38C9RY"

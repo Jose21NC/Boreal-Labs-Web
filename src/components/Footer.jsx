@@ -2,7 +2,24 @@ import React from 'react';
 import { motion } from 'framer-motion';
 // --- MODIFICACIÓN 1: IMPORTS ---
 // Se eliminaron Facebook, Linkedin, Twitter y toast. Solo se conserva Instagram.
-import { Instagram, Mail, MapPin } from 'lucide-react';
+import { Instagram, Linkedin, Mail, MapPin, Phone } from 'lucide-react';
+
+const TiktokIcon = ({ className }) => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    width="24"
+    height="24"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    className={className}
+  >
+    <path d="M9 12a4 4 0 1 0 4 4V4a5 5 0 0 0 5 5v3a3 3 0 0 1-3-3v11a4 4 0 1 1-4-4Z" />
+  </svg>
+);
 
 const Footer = () => {
   // --- MODIFICACIÓN 2: LÓGICA SIMPLIFICADA ---
@@ -37,6 +54,10 @@ const Footer = () => {
                 <span>contacto@borealabs.org</span>
               </div>
               <div className="flex items-center space-x-3 text-gray-400 text-sm">
+                <Phone className="w-4 h-4 text-boreal-aqua" />
+                <span>+505 7679-6164</span>
+              </div>
+              <div className="flex items-center space-x-3 text-gray-400 text-sm">
                 <MapPin className="w-4 h-4 text-boreal-aqua" />
                 <span>Managua, Nicaragua</span>
               </div>
@@ -60,6 +81,28 @@ const Footer = () => {
               >
                 <Instagram className="w-5 h-5 text-boreal-aqua" />
               </motion.a>
+              <motion.a
+                href="https://www.tiktok.com/@boreal.labs"
+                target="_blank"
+                rel="noopener noreferrer"
+                whileHover={{ scale: 1.1, y: -2 }}
+                whileTap={{ scale: 0.95 }}
+                className="bg-white/10 hover:bg-white/20 p-3 rounded-lg transition-colors"
+                aria-label="TikTok"
+              >
+                <TiktokIcon className="w-5 h-5 text-boreal-aqua" />
+              </motion.a>
+              <motion.a
+                href="https://www.linkedin.com/company/boreal-labs/"
+                target="_blank"
+                rel="noopener noreferrer"
+                whileHover={{ scale: 1.1, y: -2 }}
+                whileTap={{ scale: 0.95 }}
+                className="bg-white/10 hover:bg-white/20 p-3 rounded-lg transition-colors"
+                aria-label="LinkedIn"
+              >
+                <Linkedin className="w-5 h-5 text-boreal-aqua" />
+              </motion.a>
             </div>
           </div>
         </div>
@@ -67,7 +110,7 @@ const Footer = () => {
         <div className="mt-8 pt-8 border-t border-white/10 text-center">
           {/* --- MODIFICACIÓN 4: TEXTO EN ESPAÑOL --- */}
           <p className="text-gray-400 text-sm">
-            © 2025 Boreal Labs. Todos los derechos reservados.
+            © 2026 Boreal Labs. Todos los derechos reservados.
           </p>
         </div>
       </div>

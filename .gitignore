@@ -35,3 +35,7 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# local tooling archives
+google-cloud-sdk/
+google-cloud-cli.tar.gz

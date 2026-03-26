@@ -3,9 +3,9 @@ import { Helmet } from 'react-helmet';
 import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
 // Se agregó el ícono de 'Instagram'
-import { ArrowRight, Zap, Mic, Heart, Award, School as University, Building, Instagram } from 'lucide-react';
+import { ArrowRight, Zap, Mic, Heart, Award, School as University, Building, Instagram, Star, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { defaultLinks, subscribeLinks, normalizeYouTubeUrl } from '@/lib/configService';
+import { defaultLinks, subscribeLinks, normalizeYouTubeUrl, subscribeHomeConfig, defaultHomeConfig } from '@/lib/configService';
 
 const ScrollAnimatedSection = ({ children, className }) => {
   return (
@@ -24,13 +24,22 @@ const ScrollAnimatedSection = ({ children, className }) => {
 const HomePage = () => {
   // URL del video controlada desde Firestore con fallback
   const [youtubeUrl, setYoutubeUrl] = useState(defaultLinks.youtubeVideoUrl);
+  // Estado para la configuración de la UI (Impacto y Aliados)
+  const [homeConfig, setHomeConfig] = useState(defaultHomeConfig);
 
   useEffect(() => {
     // Suscribirse a cambios en siteConfig/links
-    const unsubscribe = subscribeLinks((links) => {
+    const unsubscribeLinks = subscribeLinks((links) => {
       setYoutubeUrl(normalizeYouTubeUrl(links.youtubeUrl || links.youtubeVideoUrl));
     });
-    return () => unsubscribe && unsubscribe();
+    // Suscribirse a cambios en siteConfig/home
+    const unsubscribeHome = subscribeHomeConfig((config) => {
+      setHomeConfig(config);
+    });
+    return () => {
+      unsubscribeLinks && unsubscribeLinks();
+      unsubscribeHome && unsubscribeHome();
+    };
   }, []);
   
   const programs = [
@@ -51,36 +60,17 @@ const HomePage = () => {
     },
   ];
 
-  const impacts = [
-    {
-      icon: Heart,
-      metric: '+650',
-      description: 'Jóvenes impactados a nivel nacional.',
-    },
-    {
-      icon: Award,
-      metric: '12',
-      description: 'Eventos y talleres realizados con éxito.',
-    },
-    {
-      icon: University,
-      metric: '7',
-      description: 'Alianzas con universidades y centros de innovación.',
-    },
-    {
-      icon: Zap,
-      metric: '8',
-      description: 'Proyectos de emprendimiento en desarrollo.',
-    },
-  ];
+  // Mapeamos los nombres de los iconos guardados en BD a los componentes importados de Lucide
+  const iconMap = {
+    Heart, Award, University, Zap, Building, Mic, Instagram, Star, Users
+  };
 
-  const partners = [
-    { name: 'Universidad Americana (UAM)', alt: 'Logo UAM', imgSrc: 'https://logosnicas.com/wp-content/uploads/2022/08/universidad_americana_2020.png' },
-    { name: 'Universidad Nacional de Ingeniería', alt: 'Logo UNI', imgSrc: 'https://www.ualn.edu.ni/wp-content/uploads/2023/02/UNI.png' },
-    { name: 'Tecnologico Nacional (INATEC)', alt: 'Logo INATEC', imgSrc: 'https://www.tecnacional.edu.ni/media/uploads/2016/11/18/logo-inatec-2016.png' },
-    { name: 'Universidad Nacional Autonoma de Nicaragua, Managua - UNAN', alt: 'Logo UNAN', imgSrc: 'https://www.ualn.edu.ni/wp-content/uploads/2023/02/UNAN-MANAGUA.png' },
-    { name: 'Aspire Institute Inc.', alt: 'Logo Aspire', imgSrc: 'https://www.aspireleaders.org/wp-content/uploads/2025/04/Aspire-logotype_red_lg_transparent-1.png' },
-  ];
+  const impacts = homeConfig.impacts.map(item => ({
+    ...item,
+    icon: iconMap[item.icon] || Heart // Por defecto Heart si no se encuentra
+  }));
+
+  const partners = homeConfig.partners;
 
   useEffect(() => {
     // Inyectar script de EmbedSocial si no existe

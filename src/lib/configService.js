@@ -4,6 +4,7 @@ import { doc, getDoc, onSnapshot } from 'firebase/firestore';
 // Colección y documento donde centralizamos enlaces y configuraciones editables
 const CONFIG_COLLECTION = 'siteConfig';
 const LINKS_DOC = 'links';
+const HOME_DOC = 'home'; // Nuevo documento para info de la página de inicio
 
 // Valores por defecto para evitar fallos si el documento aún no existe
 export const defaultLinks = {
@@ -75,3 +76,35 @@ export async function getLink(key, fallback) {
   const links = await getLinks();
   return links?.[key] ?? fallback ?? null;
 }
+
+// Configuración por defecto para la Home (Impacto y Aliados)
+export const defaultHomeConfig = {
+  impacts: [
+    { icon: 'Heart', metric: '+650', description: 'Jóvenes impactados a nivel nacional.' },
+    { icon: 'Award', metric: '12', description: 'Eventos y talleres realizados con éxito.' },
+    { icon: 'University', metric: '7', description: 'Alianzas con universidades y centros de innovación.' },
+    { icon: 'Zap', metric: '8', description: 'Proyectos de emprendimiento en desarrollo.' }
+  ],
+  partners: [
+    { name: 'Universidad Americana (UAM)', alt: 'Logo UAM', imgSrc: 'https://logosnicas.com/wp-content/uploads/2022/08/universidad_americana_2020.png' },
+    { name: 'Universidad Nacional de Ingeniería', alt: 'Logo UNI', imgSrc: 'https://www.ualn.edu.ni/wp-content/uploads/2023/02/UNI.png' },
+    { name: 'Tecnologico Nacional (INATEC)', alt: 'Logo INATEC', imgSrc: 'https://www.tecnacional.edu.ni/media/uploads/2016/11/18/logo-inatec-2016.png' },
+    { name: 'Universidad Nacional Autonoma de Nicaragua, Managua - UNAN', alt: 'Logo UNAN', imgSrc: 'https://www.ualn.edu.ni/wp-content/uploads/2023/02/UNAN-MANAGUA.png' },
+    { name: 'Aspire Institute Inc.', alt: 'Logo Aspire', imgSrc: 'https://www.aspireleaders.org/wp-content/uploads/2025/04/Aspire-logotype_red_lg_transparent-1.png' },
+  ]
+};
+
+export function subscribeHomeConfig(callback) {
+  const ref = doc(db, CONFIG_COLLECTION, HOME_DOC);
+  return onSnapshot(ref, (snap) => {
+    const data = snap.exists() ? snap.data() : {};
+    callback({
+      impacts: data.impacts || defaultHomeConfig.impacts,
+      partners: data.partners || defaultHomeConfig.partners
+    });
+  }, (error) => {
+    callback(defaultHomeConfig);
+    console.error('Error suscribiéndose a siteConfig/home:', error);
+  });
+}
+

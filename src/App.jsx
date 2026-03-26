@@ -11,10 +11,12 @@ import HomePage from '@/pages/HomePage';
 import AboutPage from '@/pages/AboutPage';
 import TeamPage from '@/pages/TeamPage';
 import EventsPage from '@/pages/EventsPage';
+import VolunteerPage from '@/pages/VolunteerPage';
 import NotFoundPage from '@/pages/NotFoundPage'; 
 import LayoutEditor from '@/pages/LayoutEditor';
 import PaginaValidacion from '@/pages/PaginaValidacion';
 import AdminPanel from '@/pages/AdminPanel';
+import VolunteerAdminPanel from '@/pages/VolunteerAdminPanel';
 import AdminGate from '@/components/AdminGate';
 
 // Se importa el proveedor de reCAPTCHA
@@ -59,15 +61,18 @@ function App() {
                   <Route path="/nosotros" element={<AboutPage />} />
                   <Route path="/equipo" element={<TeamPage />} />
                   <Route path="/eventos" element={<EventsPage />} />
+                  <Route path="/voluntariado" element={<VolunteerPage />} />
 
                   {/* Admin */}
                   <Route path="/admin" element={<AdminGate><AdminPanel /></AdminGate>} />
                   <Route path="/admin/layout" element={<AdminGate><LayoutEditor /></AdminGate>} />
+                  <Route path="/voluntariado/admin" element={<AdminGate><VolunteerAdminPanel /></AdminGate>} />
 
                   {/* Redirecciones desde rutas antiguas en inglés */}
                   <Route path="/about" element={<Navigate to="/nosotros" replace />} />
                   <Route path="/team" element={<Navigate to="/equipo" replace />} />
                   <Route path="/events" element={<Navigate to="/eventos" replace />} />
+                  <Route path="/volunteer" element={<Navigate to="/voluntariado" replace />} />
                   <Route path="/validar-certificado" element={<PaginaValidacion />} />
                   <Route path="/validacion" element={<PaginaValidacion />} />
 

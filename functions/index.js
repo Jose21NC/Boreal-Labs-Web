@@ -16,7 +16,7 @@ const isPresent = (value) => {
 };
 
 export const generateCertificates = onCall({ cors: true, region: 'us-central1' }, async (request) => {
-  const { eventName } = request.data || {};
+  const { eventName, templateSet, addPoints, points } = request.data || {};
 
   if (!eventName) throw new HttpsError('invalid-argument', 'Falta eventName');
   // Requerir autenticación de Firebase
@@ -33,15 +33,23 @@ export const generateCertificates = onCall({ cors: true, region: 'us-central1' }
       const email = (d.get('correoUsuario') || '').toLowerCase();
       // Algunos certificados antiguos no tenían 'tipo'; inferir: si modalidad es 'ponente' o 'staff' tomarlos como tal; de lo contrario, 'participante'
       const tipo = (d.get('tipo') || '').toLowerCase() || ((d.get('modalidad') || '').toLowerCase().match(/^(ponente|staff)$/)?.[0] || 'participante');
-      return `${email}|${tipo}`;
+      const nombreEvt = d.get('nombreEvento') || eventName;
+      return `${email}|${tipo}|${nombreEvt}`;
     })
   );
 
   let created = 0;
   let skipped = 0;
   const errors = [];
+  const addPointsEnabled = Boolean(addPoints);
+  const pointsRaw = Number(points);
+  const pointsPerCertificate = addPointsEnabled ? Math.floor(pointsRaw) : 0;
+  if (addPointsEnabled && (!Number.isFinite(pointsPerCertificate) || pointsPerCertificate <= 0)) {
+    throw new HttpsError('invalid-argument', 'Puntos inválidos');
+  }
+  const pointsByEmail = new Map();
 
-  // Intentar obtener la fecha del evento desde la colección 'events'
+  // Intentar obtener la fecha del evento desde la colección 'events' o 'adminEvents'
   let eventDate = null;
   try {
     let eventDocSnap = null;
@@ -62,9 +70,31 @@ export const generateCertificates = onCall({ cors: true, region: 'us-central1' }
       else if (typeof ed === 'string') eventDate = new Date(ed);
       else if (ed instanceof Date) eventDate = ed;
     }
+    if (!eventDate) {
+      const adminQuery = await db.collection('adminEvents').where('name', '==', eventName).limit(1).get();
+      if (!adminQuery.empty) {
+        const ad = adminQuery.docs[0].get('date');
+        if (ad?.toDate) eventDate = ad.toDate();
+        else if (typeof ad === 'string') eventDate = new Date(ad);
+        else if (ad instanceof Date) eventDate = ad;
+      }
+    }
   } catch (e) {
     console.warn('No se pudo leer fecha del evento', e?.message || e);
   }
+
+  const normalizeTemplateSet = (value) => {
+    if (!value) return null;
+    let cleaned = String(value).trim().replace(/\\/g, '/');
+    cleaned = cleaned.replace(/^\/+/, '').replace(/\/+$/, '');
+    // Si viene como ruta completa, quitar el prefijo cert-templates/
+    cleaned = cleaned.replace(/^cert-templates\//, '');
+    if (!cleaned || cleaned.includes('..')) return null;
+    return cleaned;
+  };
+
+  const templateSetSafe = normalizeTemplateSet(templateSet);
+  const templateRoot = templateSetSafe ? `cert-templates/${templateSetSafe}` : 'cert-templates';
 
   for (const r of regs) {
     if (!isPresent(r.statusAsistencia)) continue; // solo presentes
@@ -72,13 +102,14 @@ export const generateCertificates = onCall({ cors: true, region: 'us-central1' }
   if (!email) { skipped++; continue; }
   // Determinar rol del registro para comparar duplicados por rol
   const roleLower = (r.tipo || '').toLowerCase() || ((r.tipoAsistencia || '').toLowerCase().match(/^(ponente|staff|participante)$/)?.[0] || 'participante');
-  if (existingByEmailRole.has(`${email}|${roleLower}`)) { skipped++; continue; }
+  const tempEventTitle = (roleLower === 'ponente' && r.customEventName) ? r.customEventName : (r.eventName || eventName || '');
+  if (existingByEmailRole.has(`${email}|${roleLower}|${tempEventTitle}`)) { skipped++; continue; }
 
     try {
       const idValidacion = (globalThis.crypto?.randomUUID?.() || `${Date.now()}_${Math.random().toString(36).slice(2,8)}`);
 
       // Helpers para layout
-    const loadOptional = async (path) => {
+      const loadOptional = async (path) => {
       try {
         const file = bucket.file(path);
         const [exists] = await file.exists();
@@ -89,6 +120,14 @@ export const generateCertificates = onCall({ cors: true, region: 'us-central1' }
         return null;
       }
     };
+
+      const loadFirst = async (paths) => {
+        for (const p of paths) {
+          const buf = await loadOptional(p);
+          if (buf) return { buf, path: p };
+        }
+        return null;
+      };
 
       const defaultLayout = {
       canvas: { widthPx: 2000, heightPx: 1414, orientation: 'landscape', paperHint: '≈ A4' },
@@ -120,8 +159,11 @@ export const generateCertificates = onCall({ cors: true, region: 'us-central1' }
       }
     };
 
-      const layoutBuf = await loadOptional('cert-templates/layout.json');
-      const loadedLayout = layoutBuf ? JSON.parse(layoutBuf.toString('utf8')) : null;
+      const layoutPick = await loadFirst([
+        `${templateRoot}/layout.json`,
+        'cert-templates/layout.json',
+      ]);
+      const loadedLayout = layoutPick?.buf ? JSON.parse(layoutPick.buf.toString('utf8')) : null;
       // Mezclar con defaults para asegurar campos como 'ciudadFecha' aunque el JSON subido no los tenga
       const layout = loadedLayout
         ? {
@@ -142,15 +184,29 @@ export const generateCertificates = onCall({ cors: true, region: 'us-central1' }
   const isStaff = roleLower === 'staff';
   const isParticipante = roleLower === 'participante';
   const isVirtualParticipant = isParticipante && modalityLower === 'virtual';
-  const templatePath = isPonente
-    ? 'cert-templates/base-ponente.pdf'
-    : isStaff
-    ? 'cert-templates/base-staff.pdf'
-    : (isVirtualParticipant ? 'cert-templates/base-virtual.pdf' : 'cert-templates/base.pdf');
-  const templateBuf = await loadOptional(templatePath);
+  const templateCandidates = (() => {
+    if (isPonente) {
+      return ['base-ponente.pdf', 'ponente.pdf', 'speaker.pdf', 'ponente-virtual.pdf'];
+    }
+    if (isStaff) {
+      return ['base-staff.pdf', 'staff.pdf'];
+    }
+    if (isVirtualParticipant) {
+      return ['base-virtual.pdf', 'virtual.pdf', 'base.pdf'];
+    }
+    return ['base.pdf', 'participante.pdf'];
+  })();
+  const templatePick = await loadFirst([
+    ...templateCandidates.map((p) => `${templateRoot}/${p}`),
+    ...templateCandidates.map((p) => `cert-templates/${p}`),
+  ]);
+  if (!templatePick?.buf) {
+    throw new HttpsError('failed-precondition', `No se encontró plantilla en ${templateRoot}. Revisa nombres: ${templateCandidates.join(', ')}`);
+  }
+  console.info('[generateCertificates] Template usado:', templatePick.path, 'role=', roleLower, 'event=', eventName);
       let pdfDoc;
-      if (templateBuf) {
-        pdfDoc = await PDFDocument.load(templateBuf);
+      if (templatePick?.buf) {
+        pdfDoc = await PDFDocument.load(templatePick.buf);
       } else {
         // A4 landscape aprox (pts)
         pdfDoc = await PDFDocument.create();
@@ -301,10 +357,13 @@ export const generateCertificates = onCall({ cors: true, region: 'us-central1' }
     if (L.nombreUsuario?.rel) drawTextBox(r.userName || '', L.nombreUsuario.rel, L.nombreUsuario.style || {});
   const eventTitleForThis = isPonente && r.customEventName ? r.customEventName : (r.eventName || eventName || '');
   if (L.nombreEvento?.rel) drawTextBox(eventTitleForThis, L.nombreEvento.rel, L.nombreEvento.style || {});
-    // Soportar 'modalidad' o 'tipoParticipacion' según el layout (solo para participantes)
+    // Soportar 'modalidad' o 'tipoParticipacion' según el layout
     const modalidadBox = L.modalidad || L.tipoParticipacion;
-    const modalidadText = isParticipante ? (r.modalidad || r.tipoParticipacion || r.tipoAsistencia || '') : '';
-    if (modalidadBox?.rel && modalidadText) drawTextBox(modalidadText, modalidadBox.rel, modalidadBox.style || {});
+    const modalidadText = (r.modalidad || r.tipoParticipacion || r.tipoAsistencia || '').toString();
+    // Solo dibujar modalidad para los participantes
+    if (modalidadBox?.rel && modalidadText && isParticipante) {
+      drawTextBox(modalidadText, modalidadBox.rel, modalidadBox.style || {});
+    }
   if (L.idValidacion?.rel) drawTextBox(`${idValidacion}`, L.idValidacion.rel, L.idValidacion.style || {});
     if (L.ciudadFecha?.rel) drawTextBox(ciudadFechaText, L.ciudadFecha.rel, L.ciudadFecha.style || {});
 
@@ -325,9 +384,12 @@ export const generateCertificates = onCall({ cors: true, region: 'us-central1' }
       const urlPdf = `https://firebasestorage.googleapis.com/v0/b/${file.bucket.name}/o/${encodedPath}?alt=media&token=${token}`;
 
       // 3) Crear documento en 'certificados'
+      const fechaEmisionValue = eventDate && !Number.isNaN(eventDate.getTime())
+        ? eventDate
+        : FieldValue.serverTimestamp();
       await db.collection('certificados').add({
-        correoUsuario: r.userEmail || '',
-        fechaEmision: FieldValue.serverTimestamp(),
+        correoUsuario: email, // Usar email en minúscula para asegurar fácil búsqueda / wallet
+        fechaEmision: fechaEmisionValue,
         idValidacion,
         modalidad: modalidadText || '',
         tipo: roleLower,
@@ -336,13 +398,113 @@ export const generateCertificates = onCall({ cors: true, region: 'us-central1' }
         urlPdf,
       });
       
-  existingByEmailRole.add(`${email}|${roleLower}`);
+    existingByEmailRole.add(`${email}|${roleLower}|${eventTitleForThis || eventName}`);
       created++;
+      if (addPointsEnabled && email) {
+        pointsByEmail.set(email, (pointsByEmail.get(email) || 0) + 1);
+      }
     } catch (err) {
       console.error('Error en certificado para', email, err?.message || err);
       errors.push({ email, message: err?.message || String(err) });
     }
   }
 
-  return { created, skipped, errors };
+  let pointsApplied = 0;
+  const pointsErrors = [];
+  if (addPointsEnabled && pointsByEmail.size > 0) {
+    const grantedBy = request.auth?.token?.email || request.auth?.uid || 'system';
+    for (const [email, count] of pointsByEmail.entries()) {
+      const amount = pointsPerCertificate * count;
+      try {
+        const snap = await db.collection('userPoints').where('email', '==', email).limit(1).get();
+        let userRef;
+        if (!snap.empty) {
+          userRef = snap.docs[0].ref;
+          await userRef.update({
+            balance: FieldValue.increment(amount),
+            updatedAt: FieldValue.serverTimestamp(),
+            lastEvent: eventName,
+          });
+        } else {
+          userRef = db.collection('userPoints').doc();
+          await userRef.set({
+            email,
+            balance: amount,
+            updatedAt: FieldValue.serverTimestamp(),
+            lastEvent: eventName,
+          });
+        }
+
+        await userRef.collection('adminGrants').add({
+          amount,
+          email,
+          grantedAt: FieldValue.serverTimestamp(),
+          grantedBy,
+          note: eventName || 'Certificado',
+          type: 'certificate-award',
+        });
+        pointsApplied += 1;
+      } catch (e) {
+        console.error('Error asignando puntos', email, e?.message || e);
+        pointsErrors.push({ email, message: e?.message || String(e) });
+      }
+    }
+  }
+
+  return { created, skipped, errors, pointsApplied, pointsErrors };
+});
+
+export const mergeCertificatesPdf = onCall({ cors: true, region: 'us-central1', timeoutSeconds: 540, memory: '1GiB' }, async (request) => {
+  const { eventName } = request.data || {};
+  if (!eventName) throw new HttpsError('invalid-argument', 'Falta eventName');
+  if (!request.auth) throw new HttpsError('unauthenticated', 'Debes estar autenticado');
+
+  const certsSnap = await db.collection('certificados').where('nombreEvento', '==', eventName).get();
+  if (certsSnap.empty) return { merged: false, reason: 'Sin certificados' };
+
+  const safeEvent = eventName.replace(/[^a-zA-Z0-9_-]+/g, '_');
+  const mergedDoc = await PDFDocument.create();
+
+  const parseStoragePath = (url) => {
+    if (!url) return null;
+    const match = url.match(/\/o\/([^?]+)/i);
+    if (!match?.[1]) return null;
+    try { return decodeURIComponent(match[1]); } catch { return match[1]; }
+  };
+
+  let addedPages = 0;
+  for (const docSnap of certsSnap.docs) {
+    const urlPdf = docSnap.get('urlPdf');
+    const path = parseStoragePath(urlPdf);
+    if (!path) continue;
+    try {
+      const file = bucket.file(path);
+      const [exists] = await file.exists();
+      if (!exists) continue;
+      const [buf] = await file.download();
+      const pdf = await PDFDocument.load(buf);
+      const pages = await mergedDoc.copyPages(pdf, pdf.getPageIndices());
+      pages.forEach((p) => mergedDoc.addPage(p));
+      addedPages += pages.length;
+    } catch (e) {
+      console.warn('No se pudo agregar PDF', path, e?.message || e);
+    }
+  }
+
+  if (addedPages === 0) return { merged: false, reason: 'Sin páginas válidas' };
+
+  const mergedBytes = await mergedDoc.save();
+  const outPath = `certificates-merged/${safeEvent}/${Date.now()}.pdf`;
+  const outFile = bucket.file(outPath);
+  const token = (globalThis.crypto?.randomUUID?.() || `${Date.now()}_${Math.random().toString(36).slice(2,8)}`);
+  await outFile.save(Buffer.from(mergedBytes), {
+    contentType: 'application/pdf',
+    metadata: { metadata: { firebaseStorageDownloadTokens: token } },
+    public: false,
+    resumable: false,
+  });
+  const encodedPath = encodeURIComponent(outPath);
+  const urlPdf = `https://firebasestorage.googleapis.com/v0/b/${outFile.bucket.name}/o/${encodedPath}?alt=media&token=${token}`;
+
+  return { merged: true, urlPdf, pages: addedPages };
 });

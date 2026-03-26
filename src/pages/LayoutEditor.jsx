@@ -28,6 +28,11 @@ const FIELDS = [
   { key: 'idValidacion', label: 'ID Validación' },
 ];
 
+const TEMPLATE_SETS = [
+  'BASE UAM - DIEM',
+];
+const TEMPLATE_SET_STORAGE_KEY = 'admin:templateSets';
+
 function clamp(v, min, max) { return Math.max(min, Math.min(max, v)); }
 
 export default function LayoutEditor() {
@@ -41,6 +46,8 @@ export default function LayoutEditor() {
   const [zoom, setZoom] = useState(1);
   const [snap, setSnap] = useState(true);
   const [snapStep, setSnapStep] = useState(0.005);
+  const [templateSet, setTemplateSet] = useState(TEMPLATE_SETS[0] || '');
+  const [templateSets, setTemplateSets] = useState(TEMPLATE_SETS);
 
   const containerRef = useRef(null);
   const [containerSize, setContainerSize] = useState({ w: 0, h: 0 });
@@ -54,6 +61,19 @@ export default function LayoutEditor() {
     onResize();
     window.addEventListener('resize', onResize);
     return () => window.removeEventListener('resize', onResize);
+  }, []);
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(TEMPLATE_SET_STORAGE_KEY);
+      if (!raw) return;
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        const merged = Array.from(new Set([...TEMPLATE_SETS, ...parsed].filter(Boolean)));
+        setTemplateSets(merged);
+        if (!templateSet && merged[0]) setTemplateSet(merged[0]);
+      }
+    } catch {}
   }, []);
 
   const aspect = canvas.widthPx / canvas.heightPx;
@@ -114,6 +134,35 @@ export default function LayoutEditor() {
       }
     };
     reader.readAsText(file);
+  };
+
+  const normalizeTemplateSet = (value) => {
+    if (!value) return '';
+    const cleaned = String(value).replace(/\\/g, '/').replace(/^\/+/, '').replace(/\/+$/, '');
+    if (!cleaned || cleaned.includes('..')) return '';
+    return cleaned;
+  };
+
+  const addTemplateSet = () => {
+    const cleaned = normalizeTemplateSet(templateSet);
+    if (!cleaned) return;
+    setTemplateSets((prev) => {
+      const next = Array.from(new Set([...prev, cleaned]));
+      try { localStorage.setItem(TEMPLATE_SET_STORAGE_KEY, JSON.stringify(next)); } catch {}
+      return next;
+    });
+    setTemplateSet(cleaned);
+  };
+
+  const ensureTemplateSet = (value) => {
+    const cleaned = normalizeTemplateSet(value);
+    if (!cleaned) return;
+    setTemplateSets((prev) => {
+      if (prev.includes(cleaned)) return prev;
+      const next = [...prev, cleaned];
+      try { localStorage.setItem(TEMPLATE_SET_STORAGE_KEY, JSON.stringify(next)); } catch {}
+      return next;
+    });
   };
 
   const updateRel = (key, updater) => {
@@ -185,14 +234,30 @@ export default function LayoutEditor() {
 
   const uploadToStorage = async () => {
     try {
+      const safeSet = normalizeTemplateSet(templateSet);
+      const root = safeSet ? `cert-templates/${safeSet}` : 'cert-templates';
       const out = buildJson();
       const blob = new Blob([JSON.stringify(out, null, 2)], { type: 'application/json' });
-      const path = 'cert-templates/layout.json';
+      const path = `${root}/layout.json`;
       const ref = storageRef(storage, path);
       await uploadBytes(ref, blob, { contentType: 'application/json' });
       alert('layout.json subido a Storage en ' + path);
     } catch (e) {
       alert('Error subiendo a Storage: ' + (e?.message || e));
+    }
+  };
+
+  const uploadTemplatePdf = async (file, name) => {
+    if (!file) return;
+    try {
+      const safeSet = normalizeTemplateSet(templateSet);
+      const root = safeSet ? `cert-templates/${safeSet}` : 'cert-templates';
+      const path = `${root}/${name}`;
+      const ref = storageRef(storage, path);
+      await uploadBytes(ref, file, { contentType: 'application/pdf' });
+      alert('PDF subido a Storage en ' + path);
+    } catch (e) {
+      alert('Error subiendo PDF: ' + (e?.message || e));
     }
   };
 
@@ -339,6 +404,24 @@ export default function LayoutEditor() {
         <div className="space-y-4">
           <div className="bg-white/5 p-4 rounded-xl border border-white/10 shadow-lg">
             <div className="font-semibold mb-3">Lienzo y base</div>
+            <div className="mb-2">
+              <Label className="block text-sm text-neutral-300">Carpeta de plantilla</Label>
+              <Input
+                list="templateSetOptions"
+                value={templateSet}
+                onChange={(e) => setTemplateSet(e.target.value)}
+                onBlur={(e) => ensureTemplateSet(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); ensureTemplateSet(e.currentTarget.value); } }}
+                placeholder="Ej: BASE UAM - DIEM"
+                className="text-sm h-9"
+              />
+              <datalist id="templateSetOptions">
+                {templateSets.map((opt) => (
+                  <option key={opt} value={opt} />
+                ))}
+              </datalist>
+              <p className="text-xs text-neutral-400 mt-2">Carpeta en Storage: cert-templates/&lt;carpeta&gt;/</p>
+            </div>
             <div className="flex gap-2 mb-2">
               <div className="flex-1">
                 <Label className="block text-sm text-neutral-300">Ancho (px)</Label>
@@ -356,6 +439,15 @@ export default function LayoutEditor() {
             <div className="mb-2">
               <Label className="block text-sm text-neutral-300 mb-1">Imagen base (PNG/JPG)</Label>
               <Input type="file" accept="image/*" onChange={onBgSelect} />
+            </div>
+            <div className="mb-2">
+              <Label className="block text-sm text-neutral-300 mb-1">Plantillas PDF (Base / Staff / Speaker)</Label>
+              <div className="grid grid-cols-1 gap-2">
+                <Input type="file" accept="application/pdf" onChange={(e) => uploadTemplatePdf(e.target.files?.[0], 'base.pdf')} />
+                <Input type="file" accept="application/pdf" onChange={(e) => uploadTemplatePdf(e.target.files?.[0], 'base-staff.pdf')} />
+                <Input type="file" accept="application/pdf" onChange={(e) => uploadTemplatePdf(e.target.files?.[0], 'base-ponente.pdf')} />
+              </div>
+              <p className="text-xs text-neutral-400 mt-1">Speaker usa base-ponente.pdf. Los PDFs se guardan en la carpeta seleccionada.</p>
             </div>
             <div className="mb-2">
               <Label className="block text-sm text-neutral-300 mb-1">Importar layout.json</Label>

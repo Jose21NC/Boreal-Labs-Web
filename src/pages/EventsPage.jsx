@@ -100,7 +100,7 @@ const EventRegistrationForm = ({ event, onSuccess, onShowConfirmation }) => {
         eventName: event.title,
         eventId: event.id,
         userName: name,
-        userEmail: email,
+        userEmail: email.toLowerCase(),
         userWhatsapp: whatsapp,
         userUniversity: university,
         userCountry: country,
@@ -127,7 +127,10 @@ const EventRegistrationForm = ({ event, onSuccess, onShowConfirmation }) => {
       ).toString().trim();
       const baseMsg = `Te has registrado exitosamente para el evento: ${event.title}.`;
       const asistenciaMsg = tipoAsistencia ? `\n\nTipo de asistencia seleccionado: ${tipoAsistencia}.` : '';
-      const finalMsg = [baseMsg + asistenciaMsg, extraMsg].filter(Boolean).join("\n\n");
+      const virtualMsg = (tipoAsistencia || '').toLowerCase().includes('virtual')
+        ? '📍 Si tu asistencia es Virtual: Entrá aquí el día del taller: https://meet.google.com/nyx-nkmg-kwc'
+        : '';
+      const finalMsg = [baseMsg + asistenciaMsg, extraMsg, virtualMsg].filter(Boolean).join("\n\n");
 
       onShowConfirmation(finalMsg || baseMsg);
       onSuccess(); // Llama a la función onSuccess para cerrar el modal
@@ -385,15 +388,6 @@ const EventsPage = () => {
     return normLabel;
   };
 
-  const filteredEvents = filter === 'all'
-    ? events
-    : events.filter(ev => {
-      const evCat = ev.category || ev.categoryName || ev.categoryLabel || '';
-      const evKey = categoryKeyFromLabel(evCat);
-      // compare normalized keys
-      return normalize(evKey) === normalize(filter);
-    });
-
   const isEventPast = (ev) => {
     if (!ev?.date) return false;
     const endOfDay = new Date(ev.date);
@@ -408,6 +402,32 @@ const EventsPage = () => {
     const count = typeof ev?.registeredCount === 'number' ? ev.registeredCount : 0;
     return Number.isFinite(cap) && count >= cap;
   };
+
+  // 1) Filtrar los de "visible" explícito a false
+  const visibleEvents = events.filter(ev => ev.visible !== false);
+
+  // 2) Filtrar por categoría
+  const categoryEvents = filter === 'all'
+    ? visibleEvents
+    : visibleEvents.filter(ev => {
+      const evCat = ev.category || ev.categoryName || ev.categoryLabel || '';
+      const evKey = categoryKeyFromLabel(evCat);
+      return normalize(evKey) === normalize(filter);
+    });
+
+  // 3) Ordenar: (futuro y con cupo) -> (pasado o lleno) -> conservando orden de fecha
+  const filteredEvents = categoryEvents.sort((a, b) => {
+    const aPriority = !isEventPast(a) && !isSoldOut(a);
+    const bPriority = !isEventPast(b) && !isSoldOut(b);
+
+    if (aPriority && !bPriority) return -1;
+    if (!aPriority && bPriority) return 1;
+
+    // Si empatan, ya vienen medianamente ordenados de Firestore o podemos refinar:
+    const dateA = a.date ? new Date(a.date).getTime() : 0;
+    const dateB = b.date ? new Date(b.date).getTime() : 0;
+    return dateA - dateB;
+  });
 
   // Función para cerrar el modal
   const handleCloseModal = () => {
