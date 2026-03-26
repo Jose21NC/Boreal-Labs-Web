@@ -553,8 +553,9 @@ export const processVolunteerAttendanceCredits = onDocumentCreated(
     const endAt = parseDateTime(attendanceDate, endTime);
     const validTimes = !Number.isNaN(startAt.getTime()) && !Number.isNaN(endAt.getTime()) && endAt > startAt;
 
-    const hoursWorked = validTimes ? Math.max(0, (endAt.getTime() - startAt.getTime()) / (1000 * 60 * 60)) : 0;
-    const creditsToAssign = Math.floor(hoursWorked / 2);
+    const minutesWorked = validTimes
+      ? Math.max(0, Math.floor((endAt.getTime() - startAt.getTime()) / (1000 * 60)))
+      : 0;
 
     let volunteerRef = null;
     if (email) {
@@ -569,25 +570,33 @@ export const processVolunteerAttendanceCredits = onDocumentCreated(
       const updates = {
         creditsProcessed: true,
         creditsProcessedAt: FieldValue.serverTimestamp(),
-        computedHours: Number(hoursWorked.toFixed(2)),
-        creditsGranted: creditsToAssign,
-        creditsRule: '1 credito por cada 2 horas',
+        computedHours: Number((minutesWorked / 60).toFixed(2)),
+        workedMinutes: minutesWorked,
       };
 
       if (!validTimes) {
         updates.creditStatus = 'invalid-time-range';
       } else if (!volunteerRef) {
         updates.creditStatus = 'volunteer-not-found';
-      } else if (creditsToAssign <= 0) {
-        updates.creditStatus = 'below-credit-threshold';
-        updates.volunteerId = volunteerRef.id;
       } else {
+        const volunteerDoc = await tx.get(volunteerRef);
+        const previousCarryMinutes = Math.max(0, Number(volunteerDoc.get('creditMinutesCarry') || 0));
+        const totalMinutes = previousCarryMinutes + minutesWorked;
+        const creditsToAssign = Math.floor(totalMinutes / 120);
+        const remainingCarryMinutes = totalMinutes % 120;
+
         tx.update(volunteerRef, {
           creditos: FieldValue.increment(creditsToAssign),
+          creditMinutesCarry: remainingCarryMinutes,
           updatedAt: FieldValue.serverTimestamp(),
         });
-        updates.creditStatus = 'assigned';
+
+        updates.creditStatus = creditsToAssign > 0 ? 'assigned' : 'minutes-accumulated';
         updates.volunteerId = volunteerRef.id;
+        updates.previousCarryMinutes = previousCarryMinutes;
+        updates.totalProcessedMinutes = totalMinutes;
+        updates.remainingCarryMinutes = remainingCarryMinutes;
+        updates.creditsGranted = creditsToAssign;
       }
 
       tx.update(snap.ref, updates);
