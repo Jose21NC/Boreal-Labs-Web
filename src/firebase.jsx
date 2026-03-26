@@ -1,5 +1,5 @@
 import { initializeApp } from "firebase/app";
-import { getAuth, signInAnonymously, signInWithCustomToken } from "firebase/auth";
+import { getAuth, signInAnonymously } from "firebase/auth";
 import { getFirestore, setLogLevel } from "firebase/firestore";
 import { getStorage } from 'firebase/storage';
 // getAnalytics es opcional, pero puedes mantenerlo si lo usas
@@ -36,6 +36,16 @@ setLogLevel(enableFirestoreDebug ? 'debug' : 'silent');
 // Firestore (como 'allow read if request.auth != null') funcionen.
 // No usaremos __initial_auth_token por ahora para simplificar.
 const authenticate = async () => {
+  // Solo intenta auth anónima si se habilita explícitamente por entorno.
+  if (import.meta.env.VITE_ENABLE_ANON_AUTH !== 'true') {
+    return;
+  }
+
+  // Si ya hay sesión iniciada (admin/email), no sobreescribir flujo.
+  if (auth.currentUser) {
+    return;
+  }
+
   try {
     console.log("Autenticando anónimamente...");
     await signInAnonymously(auth);

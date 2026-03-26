@@ -201,9 +201,15 @@ export const generateCertificates = onCall({ cors: true, region: 'us-central1' }
     ...templateCandidates.map((p) => `cert-templates/${p}`),
   ]);
   if (!templatePick?.buf) {
-    throw new HttpsError('failed-precondition', `No se encontró plantilla en ${templateRoot}. Revisa nombres: ${templateCandidates.join(', ')}`);
+    console.warn('[generateCertificates] No se encontró plantilla. Usando fallback A4 en blanco.', {
+      templateRoot,
+      templateCandidates,
+      role: roleLower,
+      event: eventName,
+    });
+  } else {
+    console.info('[generateCertificates] Template usado:', templatePick.path, 'role=', roleLower, 'event=', eventName);
   }
-  console.info('[generateCertificates] Template usado:', templatePick.path, 'role=', roleLower, 'event=', eventName);
       let pdfDoc;
       if (templatePick?.buf) {
         pdfDoc = await PDFDocument.load(templatePick.buf);
