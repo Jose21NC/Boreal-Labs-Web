@@ -12,6 +12,7 @@ import AboutPage from '@/pages/AboutPage';
 import TeamPage from '@/pages/TeamPage';
 import EventsPage from '@/pages/EventsPage';
 import VolunteerPage from '@/pages/VolunteerPage';
+import VolunteerAttendancePage from '@/pages/VolunteerAttendancePage';
 import NotFoundPage from '@/pages/NotFoundPage'; 
 import LayoutEditor from '@/pages/LayoutEditor';
 import PaginaValidacion from '@/pages/PaginaValidacion';
@@ -62,6 +63,7 @@ function App() {
                   <Route path="/equipo" element={<TeamPage />} />
                   <Route path="/eventos" element={<EventsPage />} />
                   <Route path="/voluntariado" element={<VolunteerPage />} />
+                  <Route path="/voluntariado/asistencia" element={<VolunteerAttendancePage />} />
 
                   {/* Admin */}
                   <Route path="/admin" element={<AdminGate><AdminPanel /></AdminGate>} />

@@ -1,4 +1,5 @@
 import { onCall, HttpsError } from 'firebase-functions/v2/https';
+import { onDocumentCreated } from 'firebase-functions/v2/firestore';
 import { initializeApp } from 'firebase-admin/app';
 import { getFirestore, FieldValue } from 'firebase-admin/firestore';
 import { getStorage } from 'firebase-admin/storage';
@@ -531,3 +532,65 @@ export const mergeCertificatesPdf = onCall({ cors: true, region: 'us-central1', 
 
   return { merged: true, urlPdf, pages: addedPages };
 });
+
+export const processVolunteerAttendanceCredits = onDocumentCreated(
+  { document: 'volunteerAttendanceLogs/{attendanceId}', region: 'us-central1' },
+  async (event) => {
+    const snap = event.data;
+    if (!snap?.exists) return;
+
+    const data = snap.data() || {};
+    const email = String(data.email || '').trim().toLowerCase();
+    const attendanceDate = String(data.attendanceDate || '').trim();
+    const startTime = String(data.startTime || '').trim();
+    const endTime = String(data.endTime || '').trim();
+
+    const latest = await snap.ref.get();
+    if (!latest.exists || latest.get('creditsProcessed') === true) return;
+
+    const parseDateTime = (dateValue, timeValue) => new Date(`${dateValue}T${timeValue}:00`);
+    const startAt = parseDateTime(attendanceDate, startTime);
+    const endAt = parseDateTime(attendanceDate, endTime);
+    const validTimes = !Number.isNaN(startAt.getTime()) && !Number.isNaN(endAt.getTime()) && endAt > startAt;
+
+    const hoursWorked = validTimes ? Math.max(0, (endAt.getTime() - startAt.getTime()) / (1000 * 60 * 60)) : 0;
+    const creditsToAssign = Math.floor(hoursWorked / 2);
+
+    let volunteerRef = null;
+    if (email) {
+      const volunteerSnap = await db.collection('voluntarios2026').where('email', '==', email).limit(1).get();
+      if (!volunteerSnap.empty) volunteerRef = volunteerSnap.docs[0].ref;
+    }
+
+    await db.runTransaction(async (tx) => {
+      const currentAttendance = await tx.get(snap.ref);
+      if (!currentAttendance.exists || currentAttendance.get('creditsProcessed') === true) return;
+
+      const updates = {
+        creditsProcessed: true,
+        creditsProcessedAt: FieldValue.serverTimestamp(),
+        computedHours: Number(hoursWorked.toFixed(2)),
+        creditsGranted: creditsToAssign,
+        creditsRule: '1 credito por cada 2 horas',
+      };
+
+      if (!validTimes) {
+        updates.creditStatus = 'invalid-time-range';
+      } else if (!volunteerRef) {
+        updates.creditStatus = 'volunteer-not-found';
+      } else if (creditsToAssign <= 0) {
+        updates.creditStatus = 'below-credit-threshold';
+        updates.volunteerId = volunteerRef.id;
+      } else {
+        tx.update(volunteerRef, {
+          creditos: FieldValue.increment(creditsToAssign),
+          updatedAt: FieldValue.serverTimestamp(),
+        });
+        updates.creditStatus = 'assigned';
+        updates.volunteerId = volunteerRef.id;
+      }
+
+      tx.update(snap.ref, updates);
+    });
+  }
+);
