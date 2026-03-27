@@ -10,9 +10,11 @@ import ScrollToTop from '@/components/ScrollToTop';
 import HomePage from '@/pages/HomePage';
 import AboutPage from '@/pages/AboutPage';
 import TeamPage from '@/pages/TeamPage';
+import TeamEditorPage from '@/pages/TeamEditorPage';
 import EventsPage from '@/pages/EventsPage';
 import VolunteerPage from '@/pages/VolunteerPage';
 import VolunteerAttendancePage from '@/pages/VolunteerAttendancePage';
+import VolunteerPersonalPage from '@/pages/VolunteerPersonalPage';
 import NotFoundPage from '@/pages/NotFoundPage'; 
 import LayoutEditor from '@/pages/LayoutEditor';
 import PaginaValidacion from '@/pages/PaginaValidacion';
@@ -61,9 +63,11 @@ function App() {
                   {/* Rutas en español */}
                   <Route path="/nosotros" element={<AboutPage />} />
                   <Route path="/equipo" element={<TeamPage />} />
+                  <Route path="/equipo/editar" element={<TeamEditorPage />} />
                   <Route path="/eventos" element={<EventsPage />} />
                   <Route path="/voluntariado" element={<VolunteerPage />} />
                   <Route path="/voluntariado/asistencia" element={<VolunteerAttendancePage />} />
+                  <Route path="/voluntariado/personal" element={<VolunteerPersonalPage />} />
 
                   {/* Admin */}
                   <Route path="/admin" element={<AdminGate><AdminPanel /></AdminGate>} />

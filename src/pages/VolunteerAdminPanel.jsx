@@ -1,13 +1,13 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { db, storage } from '../firebase';
-import { collection, getDocs, updateDoc, doc, query, orderBy, deleteDoc, addDoc, serverTimestamp, increment } from 'firebase/firestore';
+import { collection, getDocs, updateDoc, doc, query, orderBy, deleteDoc, addDoc, serverTimestamp, increment, writeBatch } from 'firebase/firestore';
 import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { getAuth, signOut } from 'firebase/auth';
 import { useToast } from '@/components/ui/use-toast';
 import { useNavigate } from 'react-router-dom';
 import Cropper from 'react-easy-crop';
-import { Users, LogOut, CheckCircle, Download, Calendar, Activity, XCircle, Search, Trash2, Menu, Plus, Minus, SlidersHorizontal } from 'lucide-react';
+import { Users, LogOut, CheckCircle, Download, Calendar, Activity, XCircle, Search, Trash2, Menu, Plus, Minus, SlidersHorizontal, BadgeDollarSign, Eye } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Helmet } from 'react-helmet-async';
 import * as XLSX from 'xlsx';
@@ -20,6 +20,10 @@ const VolunteerAdminPanel = () => {
     const [selectedEvent, setSelectedEvent] = useState('');
     const [loading, setLoading] = useState(true);
     const [activeTab, setActiveTab] = useState('inscripciones');
+    const [attendanceLogs, setAttendanceLogs] = useState([]);
+    const [attendanceLogsLoading, setAttendanceLogsLoading] = useState(true);
+    const [creditsLogSearch, setCreditsLogSearch] = useState('');
+    const [selectedEvidence, setSelectedEvidence] = useState({ open: false, url: '', name: '' });
     
     // New Feature States
     const [searchQuery, setSearchQuery] = useState('');
@@ -41,11 +45,25 @@ const VolunteerAdminPanel = () => {
         volunteerName: '',
         tempCredits: 0
     });
+    const [creditsLogDetail, setCreditsLogDetail] = useState({
+        open: false,
+        item: null,
+    });
+    const [registrationEditor, setRegistrationEditor] = useState({
+        open: false,
+        id: '',
+        userName: '',
+        userEmail: '',
+    });
     const [showCreateEventModal, setShowCreateEventModal] = useState(false);
     const [showEditEventModal, setShowEditEventModal] = useState(false);
     const [showImageCropperModal, setShowImageCropperModal] = useState(false);
     const [showCertificatesModal, setShowCertificatesModal] = useState(false);
     const [showAssignCreditsModal, setShowAssignCreditsModal] = useState(false);
+    const [showEventActionsMenu, setShowEventActionsMenu] = useState(false);
+    const [eventSelectionEnabled, setEventSelectionEnabled] = useState(false);
+    const [selectedEventRegs, setSelectedEventRegs] = useState([]);
+    const [eventActionLoading, setEventActionLoading] = useState(false);
     const [generatingCertificates, setGeneratingCertificates] = useState(false);
     const [assigningCredits, setAssigningCredits] = useState(false);
     const [creditsToAssign, setCreditsToAssign] = useState('1');
@@ -292,6 +310,52 @@ const VolunteerAdminPanel = () => {
         });
     };
 
+    const formatLogDateTime = (value) => {
+        if (!value) return '-';
+        const dateObj = typeof value?.toDate === 'function' ? value.toDate() : new Date(value);
+        if (Number.isNaN(dateObj.getTime())) return '-';
+        return dateObj.toLocaleString('es-CO', {
+            year: 'numeric',
+            month: 'short',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit',
+        });
+    };
+
+    const formatCreditsAsDuration = (creditsValue) => {
+        const numeric = Number(creditsValue || 0);
+        const safe = Number.isFinite(numeric) ? Math.max(0, numeric) : 0;
+        const totalMinutes = Math.round(safe * 120);
+        const hours = Math.floor(totalMinutes / 60);
+        const minutes = totalMinutes % 60;
+        const hourLabel = hours === 1 ? 'hora' : 'horas';
+        const minuteLabel = minutes === 1 ? 'minuto' : 'minutos';
+        return `${hours} ${hourLabel} y ${minutes} ${minuteLabel}`;
+    };
+
+    const getLogCreditsValue = (logItem) => {
+        const explicitCredits = Number(logItem?.pendingCredits);
+        const registeredHours = Number(logItem?.registeredHours);
+        const formula = String(logItem?.creditsFormula || '').toLowerCase();
+
+        if (Number.isFinite(explicitCredits)) {
+            // Backward compatibility: old logs saved pendingCredits as hours (1h = 1 credito).
+            const isLegacyFormula = formula.includes('1h = 1 credito') || formula.includes('1h=1credito');
+            const looksLikeHours = Number.isFinite(registeredHours) && Math.abs(explicitCredits - registeredHours) < 0.02;
+
+            if (isLegacyFormula || looksLikeHours) {
+                return Math.max(0, explicitCredits / 2);
+            }
+
+            return Math.max(0, explicitCredits);
+        }
+
+        if (Number.isFinite(registeredHours)) return Math.max(0, registeredHours / 2);
+
+        return 0;
+    };
+
     const isVolunteerCategory = (category) => {
         if (Array.isArray(category)) {
             return category.some((item) => String(item || '').toLowerCase().includes('volunt'));
@@ -368,12 +432,33 @@ const VolunteerAdminPanel = () => {
                 if (evNames.length > 0) {
                     setSelectedEvent((prev) => (prev && evNames.includes(prev) ? prev : evNames[0]));
                 }
+
+                // 3. Fetch volunteer attendance logs used for credits management
+                let logs = [];
+                try {
+                    const logsQuery = query(collection(db, 'volunteerAttendanceLogs'), orderBy('createdAt', 'desc'));
+                    const logsSnap = await getDocs(logsQuery);
+                    logs = logsSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
+                } catch (err) {
+                    console.warn('Attendance logs index missing, using default query', err);
+                    const logsSnapFallback = await getDocs(collection(db, 'volunteerAttendanceLogs'));
+                    logs = logsSnapFallback.docs
+                        .map((d) => ({ id: d.id, ...d.data() }))
+                        .sort((a, b) => {
+                            const aDate = a.createdAt && typeof a.createdAt.toDate === 'function' ? a.createdAt.toDate().getTime() : 0;
+                            const bDate = b.createdAt && typeof b.createdAt.toDate === 'function' ? b.createdAt.toDate().getTime() : 0;
+                            return bDate - aDate;
+                        });
+                }
+                setAttendanceLogs(logs);
                 
                 setLoading(false);
+                setAttendanceLogsLoading(false);
             } catch (err) {
                 console.error('Error fetching data:', err);
                 toast({ title: 'Error', description: 'No se pudieron cargar los datos de Firebase.', variant: 'destructive' });
                 setLoading(false);
+                setAttendanceLogsLoading(false);
             }
         };
         fetchData();
@@ -638,6 +723,9 @@ const VolunteerAdminPanel = () => {
         setAssigningCredits(true);
 
         try {
+            const sourceEventMeta = volunteerEventMeta[selectedEvent] || null;
+            const eventDateValue = sourceEventMeta?.date ? toDateInputValue(sourceEventMeta.date) : '';
+
             for (const p of participants) {
                 const email = String(p.userEmail || '').toLowerCase().trim();
                 if (!email) {
@@ -654,6 +742,30 @@ const VolunteerAdminPanel = () => {
                 await updateDoc(doc(db, 'voluntarios2026', volunteer.id), {
                     creditos: increment(points)
                 });
+
+                await addDoc(collection(db, 'volunteerAttendanceLogs'), {
+                    fullName: String(p.userName || volunteer.fullName || '').trim(),
+                    email,
+                    activityName: selectedEvent,
+                    sourceEventName: selectedEvent,
+                    creditSourceType: 'evento',
+                    attendanceDate: eventDateValue,
+                    startTime: '',
+                    endTime: '',
+                    startAtIso: '',
+                    endAtIso: '',
+                    proofImageUrl: '',
+                    proofImagePath: '',
+                    registeredHours: Number((points * 2).toFixed(2)),
+                    pendingCredits: Number(points.toFixed(2)),
+                    creditsFormula: '1 credito = 2 horas',
+                    creditsProcessed: true,
+                    creditsAssigned: Number(points.toFixed(2)),
+                    creditsAssignedAt: serverTimestamp(),
+                    creditsAssignedBy: auth.currentUser?.email || 'admin',
+                    creditsGeneratedFromEvent: true,
+                    createdAt: serverTimestamp(),
+                });
                 updated += 1;
             }
 
@@ -662,6 +774,23 @@ const VolunteerAdminPanel = () => {
                     const isTarget = participants.some((p) => String(p.userEmail || '').toLowerCase().trim() === String(v.email || '').toLowerCase().trim());
                     return isTarget ? { ...v, creditos: (v.creditos || 0) + points } : v;
                 }));
+
+                let refreshedLogs = [];
+                try {
+                    const logsQuery = query(collection(db, 'volunteerAttendanceLogs'), orderBy('createdAt', 'desc'));
+                    const logsSnap = await getDocs(logsQuery);
+                    refreshedLogs = logsSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
+                } catch (err) {
+                    const logsSnapFallback = await getDocs(collection(db, 'volunteerAttendanceLogs'));
+                    refreshedLogs = logsSnapFallback.docs
+                        .map((d) => ({ id: d.id, ...d.data() }))
+                        .sort((a, b) => {
+                            const aDate = a.createdAt && typeof a.createdAt.toDate === 'function' ? a.createdAt.toDate().getTime() : 0;
+                            const bDate = b.createdAt && typeof b.createdAt.toDate === 'function' ? b.createdAt.toDate().getTime() : 0;
+                            return bDate - aDate;
+                        });
+                }
+                setAttendanceLogs(refreshedLogs);
             }
 
             toast({ title: 'Créditos asignados', description: `Actualizados: ${updated}. Omitidos: ${skipped}.` });
@@ -850,6 +979,34 @@ const VolunteerAdminPanel = () => {
         return Boolean(val);
     };
 
+    const filteredAttendanceLogs = useMemo(() => {
+        const queryText = creditsLogSearch.trim().toLowerCase();
+        if (!queryText) return attendanceLogs;
+
+        return attendanceLogs.filter((item) => {
+            const haystack = [
+                item.fullName,
+                item.email,
+                item.activityName,
+                item.sourceEventName,
+                item.attendanceDate,
+            ]
+                .filter(Boolean)
+                .join(' ')
+                .toLowerCase();
+            return haystack.includes(queryText);
+        });
+    }, [attendanceLogs, creditsLogSearch]);
+
+    const creditLogsStats = useMemo(() => {
+        const processed = attendanceLogs.filter((item) => Boolean(item.creditsProcessed)).length;
+        return {
+            total: attendanceLogs.length,
+            processed,
+            pending: Math.max(0, attendanceLogs.length - processed),
+        };
+    }, [attendanceLogs]);
+
     const nextStatusValue = (val) => {
         const toPresent = !isPresent(val);
         if (typeof val === 'string') return toPresent ? 'Presente' : 'Ausente';
@@ -877,6 +1034,169 @@ const VolunteerAdminPanel = () => {
         }
     };
 
+    const assignPendingCredits = async (logItem) => {
+        if (logItem.creditsProcessed) {
+            toast({ title: 'Ya procesado', description: 'Este registro ya tiene créditos asignados.' });
+            return false;
+        }
+
+        const email = String(logItem.email || '').toLowerCase().trim();
+        if (!email) {
+            toast({ title: 'Sin correo', description: 'Este registro no tiene correo para asociar voluntario.', variant: 'destructive' });
+            return false;
+        }
+
+        const volunteer = volunteers.find((v) => String(v.email || '').toLowerCase().trim() === email);
+        if (!volunteer?.id) {
+            toast({ title: 'Voluntario no encontrado', description: 'No existe inscripción en voluntarios2026 con ese correo.', variant: 'destructive' });
+            return false;
+        }
+
+        const points = Number(getLogCreditsValue(logItem).toFixed(2));
+
+        if (points <= 0) {
+            toast({ title: 'Créditos inválidos', description: 'Este registro no tiene créditos pendientes válidos.', variant: 'destructive' });
+            return false;
+        }
+
+        try {
+            const batch = writeBatch(db);
+            batch.update(doc(db, 'voluntarios2026', volunteer.id), {
+                creditos: increment(points),
+            });
+            batch.update(doc(db, 'volunteerAttendanceLogs', logItem.id), {
+                creditsProcessed: true,
+                creditsAssigned: points,
+                creditsAssignedAt: serverTimestamp(),
+                creditsAssignedBy: auth.currentUser?.email || 'admin',
+                updatedAt: serverTimestamp(),
+            });
+
+            await batch.commit();
+
+            setVolunteers((prev) => prev.map((v) => (
+                v.id === volunteer.id ? { ...v, creditos: Number(((v.creditos || 0) + points).toFixed(2)) } : v
+            )));
+
+            setAttendanceLogs((prev) => prev.map((item) => (
+                item.id === logItem.id
+                    ? {
+                        ...item,
+                        creditsProcessed: true,
+                        creditsAssigned: points,
+                        creditsAssignedBy: auth.currentUser?.email || 'admin',
+                    }
+                    : item
+            )));
+
+            toast({
+                title: 'Créditos asignados',
+                description: `${logItem.fullName || 'Voluntario'} recibió ${points} crédito(s).`,
+            });
+            return true;
+        } catch (error) {
+            console.error('Error asignando créditos desde asistencia:', error);
+            toast({ title: 'Error', description: 'No se pudieron asignar los créditos pendientes.', variant: 'destructive' });
+            return false;
+        }
+    };
+
+    const removeAssignedCredits = async (logItem) => {
+        if (!logItem.creditsProcessed) {
+            toast({ title: 'No asignado', description: 'Este registro todavía no tiene créditos asignados.' });
+            return false;
+        }
+
+        const email = String(logItem.email || '').toLowerCase().trim();
+        if (!email) {
+            toast({ title: 'Sin correo', description: 'Este registro no tiene correo para ubicar voluntario.', variant: 'destructive' });
+            return false;
+        }
+
+        const volunteer = volunteers.find((v) => String(v.email || '').toLowerCase().trim() === email);
+        if (!volunteer?.id) {
+            toast({ title: 'Voluntario no encontrado', description: 'No se encontró el voluntario asociado.', variant: 'destructive' });
+            return false;
+        }
+
+        const points = Number((Number(logItem.creditsAssigned ?? getLogCreditsValue(logItem) ?? 0)).toFixed(2));
+        if (points <= 0) {
+            toast({ title: 'Créditos inválidos', description: 'No se pudo determinar el valor a revertir.', variant: 'destructive' });
+            return false;
+        }
+
+        const nextCredits = Math.max(0, Number(((volunteer.creditos || 0) - points).toFixed(2)));
+
+        try {
+            const batch = writeBatch(db);
+            batch.update(doc(db, 'voluntarios2026', volunteer.id), {
+                creditos: nextCredits,
+            });
+            batch.update(doc(db, 'volunteerAttendanceLogs', logItem.id), {
+                creditsProcessed: false,
+                creditsRemovedAt: serverTimestamp(),
+                creditsRemovedBy: auth.currentUser?.email || 'admin',
+                updatedAt: serverTimestamp(),
+            });
+            await batch.commit();
+
+            setVolunteers((prev) => prev.map((v) => (
+                v.id === volunteer.id ? { ...v, creditos: nextCredits } : v
+            )));
+
+            setAttendanceLogs((prev) => prev.map((item) => (
+                item.id === logItem.id
+                    ? {
+                        ...item,
+                        creditsProcessed: false,
+                        creditsRemovedBy: auth.currentUser?.email || 'admin',
+                    }
+                    : item
+            )));
+
+            toast({ title: 'Créditos removidos', description: `Se revirtieron ${points} crédito(s) para ${logItem.fullName || 'el voluntario'}.` });
+            return true;
+        } catch (error) {
+            console.error('Error removiendo créditos:', error);
+            toast({ title: 'Error', description: 'No se pudieron remover los créditos.', variant: 'destructive' });
+            return false;
+        }
+    };
+
+    const saveRegistrationEdit = async () => {
+        const id = String(registrationEditor.id || '').trim();
+        const userName = String(registrationEditor.userName || '').trim();
+        const userEmail = String(registrationEditor.userEmail || '').trim().toLowerCase();
+
+        if (!id || !userName || !userEmail) {
+            toast({ title: 'Campos requeridos', description: 'Completa nombre y correo antes de guardar.', variant: 'destructive' });
+            return;
+        }
+
+        try {
+            await updateDoc(doc(db, 'registrations', id), {
+                userName,
+                userEmail,
+            });
+
+            setEventData((prev) => {
+                const copy = { ...prev };
+                Object.keys(copy).forEach((eventName) => {
+                    copy[eventName] = (copy[eventName] || []).map((reg) => (
+                        reg.id === id ? { ...reg, userName, userEmail } : reg
+                    ));
+                });
+                return copy;
+            });
+
+            setRegistrationEditor({ open: false, id: '', userName: '', userEmail: '' });
+            toast({ title: 'Participante actualizado', description: 'Se guardaron el nombre y correo.' });
+        } catch (error) {
+            console.error('Error actualizando participante:', error);
+            toast({ title: 'Error', description: 'No se pudo actualizar el participante.', variant: 'destructive' });
+        }
+    };
+
     const currentList = useMemo(() => {
         const list = eventData[selectedEvent] || [];
         return [...list].sort((a, b) => (a.userName || '').localeCompare(b.userName || ''));
@@ -888,6 +1208,92 @@ const VolunteerAdminPanel = () => {
         return { present, absent: list.length - present, total: list.length };
     }, [eventData, selectedEvent]);
 
+    useEffect(() => {
+        setSelectedEventRegs([]);
+        setShowEventActionsMenu(false);
+    }, [selectedEvent]);
+
+    const deleteSelectedEventParticipants = async () => {
+        if (!selectedEvent) {
+            toast({ title: 'Selecciona un evento', description: 'Debes elegir un evento primero.', variant: 'destructive' });
+            return;
+        }
+        if (selectedEventRegs.length === 0) {
+            toast({ title: 'Sin selección', description: 'Selecciona al menos un participante para eliminar.', variant: 'destructive' });
+            return;
+        }
+
+        if (!window.confirm(`¿Eliminar ${selectedEventRegs.length} participante(s) del evento ${selectedEvent}?`)) return;
+
+        setEventActionLoading(true);
+        try {
+            for (const regId of selectedEventRegs) {
+                await deleteDoc(doc(db, 'registrations', regId));
+            }
+
+            setEventData((prev) => {
+                const copy = { ...prev };
+                copy[selectedEvent] = (copy[selectedEvent] || []).filter((item) => !selectedEventRegs.includes(item.id));
+                return copy;
+            });
+
+            setSelectedEventRegs([]);
+            toast({ title: 'Participantes eliminados', description: 'Se eliminaron los registros seleccionados.' });
+        } catch (error) {
+            console.error('Error eliminando participantes del evento:', error);
+            toast({ title: 'Error', description: 'No se pudieron eliminar los participantes seleccionados.', variant: 'destructive' });
+        } finally {
+            setEventActionLoading(false);
+        }
+    };
+
+    const hideSelectedEventFromPanel = async () => {
+        if (!selectedEvent) {
+            toast({ title: 'Selecciona un evento', description: 'Debes elegir un evento primero.', variant: 'destructive' });
+            return;
+        }
+
+        const meta = volunteerEventMeta[selectedEvent];
+        if (!meta?.id) {
+            toast({ title: 'Evento no editable', description: 'Este evento no tiene documento asociado en events.', variant: 'destructive' });
+            return;
+        }
+
+        if (!window.confirm(`¿Ocultar "${selectedEvent}"? Esto cambiará visible=false y dejará de mostrarse en la página principal.`)) return;
+
+        setEventActionLoading(true);
+        try {
+            await updateDoc(doc(db, 'events', meta.id), {
+                visible: false,
+                updatedAt: serverTimestamp(),
+            });
+
+            setVolunteerEventMeta((prev) => {
+                const copy = { ...prev };
+                delete copy[selectedEvent];
+                return copy;
+            });
+
+            setEventData((prev) => {
+                const copy = { ...prev };
+                delete copy[selectedEvent];
+                const remaining = Object.keys(copy);
+                setSelectedEvent(remaining[0] || '');
+                return copy;
+            });
+
+            setEventSelectionEnabled(false);
+            setSelectedEventRegs([]);
+            setShowEventActionsMenu(false);
+            toast({ title: 'Evento ocultado', description: 'El evento fue ocultado del panel y de la sección pública.' });
+        } catch (error) {
+            console.error('Error ocultando evento:', error);
+            toast({ title: 'Error', description: 'No se pudo ocultar el evento.', variant: 'destructive' });
+        } finally {
+            setEventActionLoading(false);
+        }
+    };
+
     return (
         <div className="min-h-screen bg-boreal-dark text-white font-sans flex flex-col">
             <Helmet>
@@ -896,7 +1302,7 @@ const VolunteerAdminPanel = () => {
             </Helmet>
 
             <div className="flex-grow pt-24 px-6 pb-6 max-w-7xl mx-auto w-full space-y-8">
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-[#161c2d] p-6 rounded-2xl border border-white/5 shadow-2xl">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-[#121a2b] p-6 rounded-2xl border border-white/15 shadow-2xl">
                     <div>
                         <h1 className="text-3xl items-center font-bold bg-clip-text text-transparent bg-gradient-to-r from-boreal-aqua to-boreal-purple pb-1 flex gap-3">
                             <Users className="w-8 h-8 text-boreal-aqua" />
@@ -907,19 +1313,19 @@ const VolunteerAdminPanel = () => {
                         </p>
                     </div>
                     <div className="flex items-center gap-3">
-                        <Button onClick={handleLogout} variant="outline" className="border-white/10 hover:bg-white/5 text-gray-300 hover:text-white">
+                        <Button onClick={handleLogout} variant="outline" className="border-white/20 hover:bg-[#212b42] text-gray-300 hover:text-white">
                             <LogOut className="w-4 h-4 mr-2" /> Salir
                         </Button>
                     </div>
                 </div>
 
-                <div className="flex bg-[#161c2d] p-1.5 rounded-xl border border-white/5 w-fit">
+                <div className="flex bg-[#121a2b] p-1.5 rounded-xl border border-white/15 w-fit">
                     <button
                         onClick={() => setActiveTab('inscripciones')}
                         className={`flex items-center gap-2 px-6 py-2.5 rounded-lg text-sm font-medium transition-all ${
                             activeTab === 'inscripciones' 
-                            ? 'bg-gradient-to-r from-boreal-aqua/20 to-boreal-purple/20 text-white shadow-lg border border-white/5' 
-                            : 'text-gray-400 hover:text-gray-200 hover:bg-white/5'
+                            ? 'bg-[#263450] text-white shadow-lg border border-white/20' 
+                            : 'text-gray-300 hover:text-white hover:bg-[#1e2740]'
                         }`}
                     >
                         <Users className="w-4 h-4" /> Voluntarios
@@ -928,15 +1334,25 @@ const VolunteerAdminPanel = () => {
                         onClick={() => setActiveTab('asistencia')}
                         className={`flex items-center gap-2 px-6 py-2.5 rounded-lg text-sm font-medium transition-all ${
                             activeTab === 'asistencia' 
-                            ? 'bg-gradient-to-r from-boreal-aqua/20 to-boreal-purple/20 text-white shadow-lg border border-white/5' 
-                            : 'text-gray-400 hover:text-gray-200 hover:bg-white/5'
+                            ? 'bg-[#263450] text-white shadow-lg border border-white/20' 
+                            : 'text-gray-300 hover:text-white hover:bg-[#1e2740]'
                         }`}
                     >
                         <Calendar className="w-4 h-4" /> Gestion de Eventos
                     </button>
+                    <button
+                        onClick={() => setActiveTab('creditos')}
+                        className={`flex items-center gap-2 px-6 py-2.5 rounded-lg text-sm font-medium transition-all ${
+                            activeTab === 'creditos'
+                            ? 'bg-[#263450] text-white shadow-lg border border-white/20'
+                            : 'text-gray-300 hover:text-white hover:bg-[#1e2740]'
+                        }`}
+                    >
+                        <BadgeDollarSign className="w-4 h-4" /> Gestion de creditos
+                    </button>
                 </div>
 
-                <div className="bg-[#161c2d] rounded-2xl border border-white/5 shadow-xl p-6 min-h-[500px]">
+                <div className="bg-[#121a2b] rounded-2xl border border-white/15 shadow-xl p-6 min-h-[500px]">
                     {loading ? (
                         <div className="flex flex-col justify-center items-center h-64 space-y-4">
                             <div className="w-12 h-12 border-4 border-boreal-aqua border-t-transparent rounded-full animate-spin"></div>
@@ -952,7 +1368,7 @@ const VolunteerAdminPanel = () => {
                                         </h2>
                                         
                                         {/* Controles: Buscar, Filtrar, Ocultar/Mostrar, Eliminar, Exportar */}
-                                        <div className="flex flex-col lg:flex-row gap-4 justify-between items-start lg:items-center p-3 bg-white/5 rounded-xl border border-white/5">
+                                        <div className="flex flex-col lg:flex-row gap-4 justify-between items-start lg:items-center p-3 bg-[#1a2338] rounded-xl border border-white/10">
                                             
                                             <div className="flex flex-wrap items-center gap-2 w-full lg:w-auto">
                                                 <div className="relative flex-grow md:w-64 max-w-sm">
@@ -971,7 +1387,7 @@ const VolunteerAdminPanel = () => {
                                                         setFiltersDraft({ sortBy, procedenciaFilter, availabilityDayFilter });
                                                         setShowFiltersModal(true);
                                                     }}
-                                                    className="bg-[#0a0f1b] border border-white/10 text-white text-sm rounded-lg px-3 py-2 outline-none hover:bg-white/5 cursor-pointer transition-colors inline-flex items-center gap-2"
+                                                    className="bg-[#0a0f1b] border border-white/15 text-white text-sm rounded-lg px-3 py-2 outline-none hover:bg-[#202a42] cursor-pointer transition-colors inline-flex items-center gap-2"
                                                 >
                                                     <SlidersHorizontal className="w-4 h-4" />
                                                     Clasificar y filtrar
@@ -981,7 +1397,7 @@ const VolunteerAdminPanel = () => {
                                                     <button 
                                                         onClick={() => setShowColMenu(!showColMenu)} 
                                                         title="Configurar columnas"
-                                                        className="p-2.5 bg-[#0a0f1b] border border-white/10 rounded-lg hover:bg-white/5 text-gray-300 transition-colors flex items-center justify-center"
+                                                        className="p-2.5 bg-[#0a0f1b] border border-white/15 rounded-lg hover:bg-[#202a42] text-gray-300 transition-colors flex items-center justify-center"
                                                     >
                                                         <Menu className="w-4 h-4" />
                                                     </button>
@@ -1151,7 +1567,7 @@ const VolunteerAdminPanel = () => {
                                             </table>
                                         </div>
                                     ) : (
-                                        <div className="text-center py-16 flex flex-col items-center gap-3 bg-white/5 rounded-xl border border-white/5">
+                                        <div className="text-center py-16 flex flex-col items-center gap-3 bg-[#1a2338] rounded-xl border border-white/10">
                                             <Search className="w-12 h-12 text-white/10" />
                                             <p className="text-gray-500">No se encontraron voluntarios con los filtros actuales.</p>
                                         </div>
@@ -1192,7 +1608,7 @@ const VolunteerAdminPanel = () => {
                                                 <Button
                                                     type="button"
                                                     onClick={openEditEventModal}
-                                                    className="bg-white/10 hover:bg-white/20 border border-white/15 text-white"
+                                                    className="bg-[#27314a] hover:bg-[#33405f] border border-white/20 text-white"
                                                 >
                                                     Editar evento
                                                 </Button>
@@ -1210,10 +1626,60 @@ const VolunteerAdminPanel = () => {
                                             <Button
                                                 type="button"
                                                 onClick={() => setShowAssignCreditsModal(true)}
-                                                className="bg-white/10 hover:bg-white/20 border border-white/15 text-white"
+                                                className="bg-[#27314a] hover:bg-[#33405f] border border-white/20 text-white"
                                             >
                                                 Asignar créditos
                                             </Button>
+                                            <div className="relative">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setShowEventActionsMenu((prev) => !prev)}
+                                                    className="inline-flex items-center justify-center w-10 h-10 rounded-lg border border-white/20 bg-[#202a42] hover:bg-[#2c3855] text-white"
+                                                    title="Más acciones"
+                                                >
+                                                    <Menu className="w-5 h-5" />
+                                                </button>
+
+                                                {showEventActionsMenu && (
+                                                    <div className="absolute right-0 mt-2 w-72 z-[60] rounded-xl border border-white/20 bg-[#0f172a] shadow-2xl p-2 space-y-1">
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => {
+                                                                setEventSelectionEnabled((prev) => {
+                                                                    const next = !prev;
+                                                                    if (!next) setSelectedEventRegs([]);
+                                                                    return next;
+                                                                });
+                                                            }}
+                                                            className="w-full text-left px-3 py-2 rounded-lg hover:bg-[#24304d] text-sm text-white"
+                                                        >
+                                                            {eventSelectionEnabled ? 'Desactivar selección de participantes' : 'Activar selección de participantes'}
+                                                        </button>
+
+                                                        {eventSelectionEnabled && (
+                                                            <button
+                                                                type="button"
+                                                                onClick={deleteSelectedEventParticipants}
+                                                                disabled={selectedEventRegs.length === 0 || eventActionLoading}
+                                                                className="w-full text-left px-3 py-2 rounded-lg hover:bg-red-500/20 text-sm text-red-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                                                            >
+                                                                Eliminar seleccionados ({selectedEventRegs.length})
+                                                            </button>
+                                                        )}
+
+                                                        <div className="h-px bg-white/10 my-1" />
+
+                                                        <button
+                                                            type="button"
+                                                            onClick={hideSelectedEventFromPanel}
+                                                            disabled={eventActionLoading}
+                                                            className="w-full text-left px-3 py-2 rounded-lg hover:bg-amber-500/20 text-sm text-amber-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                                                        >
+                                                            Ocultar evento del panel
+                                                        </button>
+                                                    </div>
+                                                )}
+                                            </div>
                                         </div>
                                     </div>
 
@@ -1238,6 +1704,22 @@ const VolunteerAdminPanel = () => {
                                                 <table className="w-full text-left text-sm whitespace-nowrap">
                                                     <thead className="bg-[#0a0f1b] text-gray-300">
                                                         <tr>
+                                                            {eventSelectionEnabled && (
+                                                                <th className="px-4 py-4 font-semibold w-12 text-center">
+                                                                    <input
+                                                                        type="checkbox"
+                                                                        checked={currentList.length > 0 && selectedEventRegs.length === currentList.length}
+                                                                        onChange={(e) => {
+                                                                            if (e.target.checked) {
+                                                                                setSelectedEventRegs(currentList.map((r) => r.id));
+                                                                            } else {
+                                                                                setSelectedEventRegs([]);
+                                                                            }
+                                                                        }}
+                                                                        className="accent-boreal-aqua w-4 h-4 cursor-pointer"
+                                                                    />
+                                                                </th>
+                                                            )}
                                                             <th className="px-4 py-4 font-semibold w-12">#</th>
                                                             <th className="px-4 py-4 font-semibold">Participante</th>
                                                             <th className="px-4 py-4 font-semibold">Contacto</th>
@@ -1249,9 +1731,51 @@ const VolunteerAdminPanel = () => {
                                                             const present = isPresent(reg.statusAsistencia);
                                                             return (
                                                                 <tr key={reg.id} className="hover:bg-white-[0.02] transition-colors">
+                                                                    {eventSelectionEnabled && (
+                                                                        <td className="px-4 py-3 text-center">
+                                                                            <input
+                                                                                type="checkbox"
+                                                                                checked={selectedEventRegs.includes(reg.id)}
+                                                                                onChange={(e) => {
+                                                                                    if (e.target.checked) {
+                                                                                        setSelectedEventRegs((prev) => [...prev, reg.id]);
+                                                                                    } else {
+                                                                                        setSelectedEventRegs((prev) => prev.filter((id) => id !== reg.id));
+                                                                                    }
+                                                                                }}
+                                                                                className="accent-boreal-aqua w-4 h-4 cursor-pointer"
+                                                                            />
+                                                                        </td>
+                                                                    )}
                                                                     <td className="px-4 py-3">{index + 1}</td>
-                                                                    <td className="px-4 py-3 text-white font-medium">{reg.userName}</td>
-                                                                    <td className="px-4 py-3 text-xs">{reg.userEmail}</td>
+                                                                    <td className="px-4 py-3 text-white font-medium">
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={() => setRegistrationEditor({
+                                                                                open: true,
+                                                                                id: reg.id,
+                                                                                userName: reg.userName || '',
+                                                                                userEmail: reg.userEmail || '',
+                                                                            })}
+                                                                            className="text-left hover:text-boreal-aqua transition-colors"
+                                                                        >
+                                                                            {reg.userName}
+                                                                        </button>
+                                                                    </td>
+                                                                    <td className="px-4 py-3 text-xs">
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={() => setRegistrationEditor({
+                                                                                open: true,
+                                                                                id: reg.id,
+                                                                                userName: reg.userName || '',
+                                                                                userEmail: reg.userEmail || '',
+                                                                            })}
+                                                                            className="text-left hover:text-boreal-aqua transition-colors"
+                                                                        >
+                                                                            {reg.userEmail}
+                                                                        </button>
+                                                                    </td>
                                                                     <td className="px-4 py-3 text-center">
                                                                         <button
                                                                             onClick={() => toggleAttendance(reg)}
@@ -1277,6 +1801,276 @@ const VolunteerAdminPanel = () => {
                                             <p className="text-gray-500">No hay registros de asistencia asociados aún.</p>
                                         </div>
                                     )}
+                                </div>
+                            )}
+
+                            {activeTab === 'creditos' && (
+                                <div className="space-y-6">
+                                    <div className="flex flex-col gap-4">
+                                        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                                            <h2 className="text-xl font-bold flex items-center gap-2">
+                                                <BadgeDollarSign className="w-5 h-5 text-boreal-aqua" /> Gestion de creditos
+                                            </h2>
+
+                                            <div className="relative w-full md:w-[360px]">
+                                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
+                                                <input
+                                                    type="text"
+                                                    value={creditsLogSearch}
+                                                    onChange={(e) => setCreditsLogSearch(e.target.value)}
+                                                    placeholder="Buscar por nombre, correo o actividad..."
+                                                    className="w-full bg-[#0a0f1b] border border-white/10 rounded-lg pl-10 pr-4 py-2 text-sm text-white outline-none focus:border-boreal-aqua"
+                                                />
+                                            </div>
+                                        </div>
+
+                                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                                            <div className="bg-[#0a0f1b] p-4 rounded-xl border border-white/5 text-center">
+                                                <div className="text-2xl font-bold text-white">{creditLogsStats.total}</div>
+                                                <div className="text-xs text-gray-500 uppercase tracking-wide mt-1">Registros</div>
+                                            </div>
+                                            <div className="bg-emerald-500/10 p-4 rounded-xl border border-emerald-500/20 text-center">
+                                                <div className="text-2xl font-bold text-emerald-400">{creditLogsStats.processed}</div>
+                                                <div className="text-xs text-emerald-500/70 uppercase tracking-wide mt-1">Procesados</div>
+                                            </div>
+                                            <div className="bg-amber-500/10 p-4 rounded-xl border border-amber-500/20 text-center">
+                                                <div className="text-2xl font-bold text-amber-400">{creditLogsStats.pending}</div>
+                                                <div className="text-xs text-amber-500/70 uppercase tracking-wide mt-1">Pendientes</div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {attendanceLogsLoading ? (
+                                        <div className="flex flex-col justify-center items-center h-48 space-y-4">
+                                            <div className="w-10 h-10 border-4 border-boreal-aqua border-t-transparent rounded-full animate-spin"></div>
+                                            <p className="text-gray-400 text-sm">Cargando registros de asistencia...</p>
+                                        </div>
+                                    ) : filteredAttendanceLogs.length > 0 ? (
+                                        <div className="overflow-x-auto rounded-xl border border-white/10">
+                                            <table className="w-full text-left text-sm whitespace-nowrap">
+                                                <thead className="bg-[#0a0f1b] text-gray-300">
+                                                    <tr>
+                                                        <th className="px-4 py-3 font-semibold">Fecha de registro</th>
+                                                        <th className="px-4 py-3 font-semibold">Voluntario</th>
+                                                        <th className="px-4 py-3 font-semibold">Actividad</th>
+                                                        <th className="px-4 py-3 font-semibold">Asistencia</th>
+                                                        <th className="px-4 py-3 font-semibold text-center">Horas</th>
+                                                        <th className="px-4 py-3 font-semibold text-center">Origen</th>
+                                                        <th className="px-4 py-3 font-semibold text-center">Evidencia</th>
+                                                        <th className="px-4 py-3 font-semibold text-center">Acción</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody className="divide-y divide-white/5 text-gray-300">
+                                                    {filteredAttendanceLogs.map((item) => (
+                                                        <tr key={item.id} className="hover:bg-white/5 transition-colors">
+                                                            <td className="px-4 py-3 text-xs text-gray-400">{formatLogDateTime(item.createdAt)}</td>
+                                                            <td className="px-4 py-3">
+                                                                <p className="text-white font-medium">{item.fullName || '-'}</p>
+                                                                <p className="text-xs text-boreal-aqua">{item.email || '-'}</p>
+                                                            </td>
+                                                            <td className="px-4 py-3 text-xs">{item.activityName || '-'}</td>
+                                                            <td className="px-4 py-3 text-xs">
+                                                                {item.attendanceDate || '-'}
+                                                                <div className="text-[11px] text-gray-500 mt-0.5">
+                                                                    {item.startTime || '--:--'} - {item.endTime || '--:--'}
+                                                                </div>
+                                                            </td>
+                                                            <td className="px-4 py-3 text-center font-semibold text-white tabular-nums">{item.registeredHours ?? 0}</td>
+                                                            <td className="px-4 py-3 text-center">
+                                                                {String(item.creditSourceType || '').toLowerCase() === 'evento' || item.creditsGeneratedFromEvent ? (
+                                                                    <span className="inline-flex items-center justify-center px-2 py-1 rounded-md text-[11px] font-semibold bg-boreal-purple/20 border border-boreal-purple/30 text-boreal-aqua">
+                                                                        Evento{item.sourceEventName ? `: ${item.sourceEventName}` : ''}
+                                                                    </span>
+                                                                ) : (
+                                                                    <span className="inline-flex items-center justify-center px-2 py-1 rounded-md text-[11px] font-semibold bg-white/5 border border-white/15 text-gray-300">
+                                                                        Formulario
+                                                                    </span>
+                                                                )}
+                                                            </td>
+                                                            <td className="px-4 py-3 text-center">
+                                                                {item.proofImageUrl ? (
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => setSelectedEvidence({ open: true, url: item.proofImageUrl, name: item.fullName || 'Evidencia' })}
+                                                                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md border border-white/15 bg-white/5 hover:bg-white/10 text-xs"
+                                                                    >
+                                                                        <Eye className="w-3.5 h-3.5" /> Ver foto
+                                                                    </button>
+                                                                ) : (
+                                                                    <span className="text-xs text-gray-500">Sin evidencia</span>
+                                                                )}
+                                                            </td>
+                                                            <td className="px-4 py-3 text-center">
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => setCreditsLogDetail({ open: true, item })}
+                                                                    className={`inline-flex items-center justify-center px-3 py-1.5 rounded-md text-xs font-semibold border transition-colors ${
+                                                                        item.creditsProcessed
+                                                                            ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30 hover:bg-emerald-500/25'
+                                                                            : 'bg-amber-500/10 text-amber-300 border-amber-500/30 hover:bg-amber-500/20'
+                                                                    }`}
+                                                                >
+                                                                    {item.creditsProcessed
+                                                                        ? 'Asignados'
+                                                                        : `Asignar ${Number(getLogCreditsValue(item)).toFixed(2)}`}
+                                                                </button>
+                                                            </td>
+                                                        </tr>
+                                                    ))}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    ) : (
+                                        <div className="text-center py-16 bg-white/5 rounded-xl border border-white/5">
+                                            <p className="text-gray-500">No hay registros de asistencia para mostrar.</p>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+
+                            {selectedEvidence.open && (
+                                <div className="fixed inset-0 bg-black/80 z-[95] flex items-center justify-center p-4">
+                                    <div className="relative w-full max-w-3xl bg-[#111827] border border-white/15 rounded-2xl overflow-hidden">
+                                        <div className="flex items-center justify-between px-4 py-3 border-b border-white/10">
+                                            <h3 className="text-sm sm:text-base font-semibold text-white">Evidencia de {selectedEvidence.name}</h3>
+                                            <div className="flex items-center gap-2">
+                                                <a
+                                                    href={selectedEvidence.url}
+                                                    download
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="inline-flex items-center px-3 py-1.5 rounded-md border border-white/15 bg-white/5 hover:bg-white/10 text-xs text-white"
+                                                >
+                                                    Descargar foto
+                                                </a>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setSelectedEvidence({ open: false, url: '', name: '' })}
+                                                    className="text-gray-400 hover:text-white"
+                                                >
+                                                    <XCircle className="w-5 h-5" />
+                                                </button>
+                                            </div>
+                                        </div>
+                                        <div className="h-[70vh] overflow-auto bg-black/30 flex items-center justify-center p-3">
+                                            <img
+                                                src={selectedEvidence.url}
+                                                alt={`Evidencia de ${selectedEvidence.name}`}
+                                                className="max-h-full max-w-full h-auto w-auto object-contain rounded-lg"
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {creditsLogDetail.open && creditsLogDetail.item && (
+                                <div className="fixed inset-0 bg-black/60 z-[98] flex items-center justify-center p-4">
+                                    <div className="w-full max-w-md bg-[#161c2d] border border-white/10 rounded-2xl shadow-2xl p-5 space-y-4">
+                                        <div className="flex items-center justify-between">
+                                            <h3 className="text-base font-semibold text-white">Detalle de créditos</h3>
+                                            <button
+                                                type="button"
+                                                onClick={() => setCreditsLogDetail({ open: false, item: null })}
+                                                className="text-gray-400 hover:text-white"
+                                            >
+                                                <XCircle className="w-5 h-5" />
+                                            </button>
+                                        </div>
+
+                                        <div className="space-y-1 text-sm">
+                                            <p className="text-white font-medium">{creditsLogDetail.item.fullName || 'Voluntario'}</p>
+                                            <p className="text-gray-400">Actividad: {creditsLogDetail.item.activityName || '-'}</p>
+                                        </div>
+
+                                        <div className="rounded-xl border border-white/10 bg-black/20 p-4 text-center">
+                                            <p className="text-xs uppercase tracking-wider text-gray-400">Créditos pendientes</p>
+                                            <p className="text-3xl font-black text-white mt-1 tabular-nums">
+                                                {Number(getLogCreditsValue(creditsLogDetail.item)).toFixed(2)}
+                                            </p>
+                                            <p className="text-[11px] text-gray-400 mt-1">
+                                                Origen: {String(creditsLogDetail.item.creditSourceType || '').toLowerCase() === 'evento' || creditsLogDetail.item.creditsGeneratedFromEvent
+                                                    ? `Evento${creditsLogDetail.item.sourceEventName ? ` (${creditsLogDetail.item.sourceEventName})` : ''}`
+                                                    : 'Formulario'}
+                                            </p>
+                                            <p className="text-xs text-boreal-aqua mt-2">
+                                                Equivale a {formatCreditsAsDuration(getLogCreditsValue(creditsLogDetail.item))}.
+                                            </p>
+                                        </div>
+
+                                        <div className="flex items-center justify-end gap-2 pt-1">
+                                            <Button
+                                                type="button"
+                                                variant="outline"
+                                                onClick={() => setCreditsLogDetail({ open: false, item: null })}
+                                                className="border-white/15 text-gray-200 hover:bg-white/10"
+                                            >
+                                                Cancelar
+                                            </Button>
+                                            <Button
+                                                type="button"
+                                                onClick={async () => {
+                                                    const ok = creditsLogDetail.item.creditsProcessed
+                                                        ? await removeAssignedCredits(creditsLogDetail.item)
+                                                        : await assignPendingCredits(creditsLogDetail.item);
+                                                    if (ok) setCreditsLogDetail({ open: false, item: null });
+                                                }}
+                                                className={`${creditsLogDetail.item.creditsProcessed ? 'bg-red-500/20 hover:bg-red-500/30 text-red-200 border border-red-400/30' : 'bg-boreal-aqua hover:bg-emerald-500 text-black'} font-semibold`}
+                                            >
+                                                {creditsLogDetail.item.creditsProcessed ? 'Quitar créditos' : 'Asignar créditos'}
+                                            </Button>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {registrationEditor.open && (
+                                <div className="fixed inset-0 bg-black/60 z-[99] flex items-center justify-center p-4">
+                                    <div className="w-full max-w-md bg-[#161c2d] border border-white/10 rounded-2xl shadow-2xl p-5 space-y-4">
+                                        <div className="flex items-center justify-between">
+                                            <h3 className="text-base font-semibold text-white">Editar participante</h3>
+                                            <button
+                                                type="button"
+                                                onClick={() => setRegistrationEditor({ open: false, id: '', userName: '', userEmail: '' })}
+                                                className="text-gray-400 hover:text-white"
+                                            >
+                                                <XCircle className="w-5 h-5" />
+                                            </button>
+                                        </div>
+
+                                        <div className="space-y-1.5">
+                                            <label className="text-xs text-gray-400 uppercase tracking-wider">Nombre</label>
+                                            <input
+                                                type="text"
+                                                value={registrationEditor.userName}
+                                                onChange={(e) => setRegistrationEditor((prev) => ({ ...prev, userName: e.target.value }))}
+                                                className="w-full bg-[#0a0f1b] border border-white/10 rounded-lg px-3 py-2 text-sm text-white outline-none"
+                                            />
+                                        </div>
+
+                                        <div className="space-y-1.5">
+                                            <label className="text-xs text-gray-400 uppercase tracking-wider">Correo</label>
+                                            <input
+                                                type="email"
+                                                value={registrationEditor.userEmail}
+                                                onChange={(e) => setRegistrationEditor((prev) => ({ ...prev, userEmail: e.target.value }))}
+                                                className="w-full bg-[#0a0f1b] border border-white/10 rounded-lg px-3 py-2 text-sm text-white outline-none"
+                                            />
+                                        </div>
+
+                                        <div className="flex items-center justify-end gap-2 pt-2">
+                                            <Button
+                                                type="button"
+                                                variant="outline"
+                                                onClick={() => setRegistrationEditor({ open: false, id: '', userName: '', userEmail: '' })}
+                                                className="border-white/15 text-gray-200 hover:bg-white/10"
+                                            >
+                                                Cancelar
+                                            </Button>
+                                            <Button type="button" onClick={saveRegistrationEdit} className="bg-boreal-aqua hover:bg-emerald-500 text-black font-semibold">
+                                                Guardar cambios
+                                            </Button>
+                                        </div>
+                                    </div>
                                 </div>
                             )}
 
@@ -1407,21 +2201,25 @@ const VolunteerAdminPanel = () => {
 
                                         <p className="text-sm text-gray-300">{creditEditor.volunteerName}</p>
 
-                                        <div className="flex items-center justify-center gap-4">
+                                        <div className="flex items-center justify-center gap-5">
                                             <button
                                                 onClick={() => setCreditEditor(prev => ({ ...prev, tempCredits: Math.max(0, (prev.tempCredits || 0) - 1) }))}
-                                                className="p-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-md text-gray-300"
+                                                className="w-16 h-16 flex items-center justify-center bg-white/5 hover:bg-white/10 border border-white/10 rounded-2xl text-gray-300"
                                             >
                                                 <Minus className="w-4 h-4" />
                                             </button>
-                                            <span className="text-2xl font-bold text-white w-12 text-center tabular-nums">{creditEditor.tempCredits || 0}</span>
+                                            <span className="text-5xl font-black text-white min-w-[140px] text-center tabular-nums leading-none">{creditEditor.tempCredits || 0}</span>
                                             <button
                                                 onClick={() => setCreditEditor(prev => ({ ...prev, tempCredits: (prev.tempCredits || 0) + 1 }))}
-                                                className="p-2 bg-boreal-aqua/10 hover:bg-boreal-aqua/20 border border-boreal-aqua/20 rounded-md text-boreal-aqua"
+                                                className="w-16 h-16 flex items-center justify-center bg-boreal-aqua/10 hover:bg-boreal-aqua/20 border border-boreal-aqua/20 rounded-2xl text-boreal-aqua"
                                             >
                                                 <Plus className="w-4 h-4" />
                                             </button>
                                         </div>
+
+                                        <p className="text-center text-xs text-boreal-aqua">
+                                            Equivale a {formatCreditsAsDuration(creditEditor.tempCredits || 0)}.
+                                        </p>
 
                                         <div className="flex items-center justify-end gap-2 pt-2">
                                             <Button

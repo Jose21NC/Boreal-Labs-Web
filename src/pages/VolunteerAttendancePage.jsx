@@ -2,7 +2,8 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { collection, getDocs, addDoc, serverTimestamp } from 'firebase/firestore';
 import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { Camera, CalendarClock, CheckCircle2, ClipboardCheck, Clock3, Sparkles, UploadCloud } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Camera, CalendarClock, CheckCircle2, ClipboardCheck, Clock3, Home, Sparkles, UploadCloud } from 'lucide-react';
 import { db, storage } from '@/firebase';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -32,6 +33,59 @@ const resolveEventEndDate = (item) => {
   );
 };
 
+const compressImageFile = async (file, options = {}) => {
+  if (!file || !file.type.startsWith('image/')) return file;
+
+  const {
+    maxWidth = 1600,
+    maxHeight = 1600,
+    quality = 0.8,
+  } = options;
+
+  return new Promise((resolve) => {
+    const image = new Image();
+    const src = URL.createObjectURL(file);
+
+    image.onload = () => {
+      const scale = Math.min(1, maxWidth / image.width, maxHeight / image.height);
+      const width = Math.max(1, Math.round(image.width * scale));
+      const height = Math.max(1, Math.round(image.height * scale));
+
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      const context = canvas.getContext('2d');
+
+      if (!context) {
+        URL.revokeObjectURL(src);
+        resolve(file);
+        return;
+      }
+
+      context.drawImage(image, 0, 0, width, height);
+
+      canvas.toBlob((blob) => {
+        URL.revokeObjectURL(src);
+        if (!blob) {
+          resolve(file);
+          return;
+        }
+
+        const safeBaseName = (file.name || 'evidencia').replace(/\.[^/.]+$/, '');
+        const compressedFile = new File([blob], `${safeBaseName}-compressed.jpg`, { type: 'image/jpeg' });
+        resolve(compressedFile);
+      }, 'image/jpeg', quality);
+    };
+
+    image.onerror = () => {
+      URL.revokeObjectURL(src);
+      resolve(file);
+    };
+
+    image.src = src;
+  });
+};
+
 const isVolunteerCategory = (item) => {
   const category = Array.isArray(item.category)
     ? item.category.map((v) => String(v || '')).join(' ')
@@ -44,9 +98,11 @@ const isVolunteerCategory = (item) => {
 
 function VolunteerAttendancePage() {
   const { toast } = useToast();
+  const navigate = useNavigate();
   const [events, setEvents] = useState([]);
   const [loadingEvents, setLoadingEvents] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
 
   const [form, setForm] = useState({
     fullName: '',
@@ -104,6 +160,34 @@ function VolunteerAttendancePage() {
     return new Date(`${dateValue}T${timeValue}:00`);
   };
 
+  const playSuccessSound = () => {
+    try {
+      const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+      const notes = [659.25, 783.99, 987.77];
+
+      notes.forEach((frequency, index) => {
+        const oscillator = audioContext.createOscillator();
+        const gainNode = audioContext.createGain();
+        oscillator.connect(gainNode);
+        gainNode.connect(audioContext.destination);
+
+        const start = audioContext.currentTime + (index * 0.11);
+        const end = start + 0.18;
+        oscillator.type = 'sine';
+        oscillator.frequency.setValueAtTime(frequency, start);
+
+        gainNode.gain.setValueAtTime(0.0001, start);
+        gainNode.gain.exponentialRampToValueAtTime(0.09, start + 0.03);
+        gainNode.gain.exponentialRampToValueAtTime(0.0001, end);
+
+        oscillator.start(start);
+        oscillator.stop(end);
+      });
+    } catch (error) {
+      console.log('No se pudo reproducir el sonido de confirmación', error);
+    }
+  };
+
   const handleSubmit = async (event) => {
     event.preventDefault();
 
@@ -112,10 +196,10 @@ function VolunteerAttendancePage() {
       ? String(form.customActivity || '').trim()
       : String(form.activity || '').trim();
 
-    if (!form.fullName || !email || !selectedActivity || !form.attendanceDate || !form.startTime || !form.endTime || !form.proofFile) {
+    if (!form.fullName || !email || !selectedActivity || !form.attendanceDate || !form.startTime || !form.endTime) {
       toast({
         title: 'Faltan campos',
-        description: 'Completa todos los campos e incluye una imagen de prueba.',
+        description: 'Completa todos los campos requeridos.',
         variant: 'destructive',
       });
       return;
@@ -136,13 +220,29 @@ function VolunteerAttendancePage() {
     setSubmitting(true);
 
     try {
-      const safeName = form.proofFile.name.replace(/\s+/g, '-').replace(/[^a-zA-Z0-9._-]/g, '');
-      const filePath = `attendance-proofs/${Date.now()}-${safeName}`;
-      const fileRef = storageRef(storage, filePath);
-      await uploadBytes(fileRef, form.proofFile);
-      const proofImageUrl = await getDownloadURL(fileRef);
+      let proofImageUrl = '';
+      let filePath = '';
+      let originalImageName = '';
+      let originalImageSizeBytes = 0;
+      let uploadedImageSizeBytes = 0;
+      let compressionApplied = false;
+
+      if (form.proofFile) {
+        const compressedProofFile = await compressImageFile(form.proofFile);
+        const safeName = compressedProofFile.name.replace(/\s+/g, '-').replace(/[^a-zA-Z0-9._-]/g, '');
+        filePath = `attendance-proofs/${Date.now()}-${safeName}`;
+        const fileRef = storageRef(storage, filePath);
+        await uploadBytes(fileRef, compressedProofFile);
+        proofImageUrl = await getDownloadURL(fileRef);
+
+        originalImageName = form.proofFile.name;
+        originalImageSizeBytes = form.proofFile.size || 0;
+        uploadedImageSizeBytes = compressedProofFile.size || 0;
+        compressionApplied = uploadedImageSizeBytes < originalImageSizeBytes;
+      }
 
       const hours = Math.max(0, (end.getTime() - start.getTime()) / (1000 * 60 * 60));
+      const pendingCredits = Number((hours / 2).toFixed(2));
 
       await addDoc(collection(db, 'volunteerAttendanceLogs'), {
         fullName: String(form.fullName).trim(),
@@ -155,15 +255,19 @@ function VolunteerAttendancePage() {
         endAtIso: end.toISOString(),
         proofImageUrl,
         proofImagePath: filePath,
+        originalImageName,
+        originalImageSizeBytes,
+        uploadedImageSizeBytes,
+        compressionApplied,
         registeredHours: Number(hours.toFixed(2)),
+        pendingCredits,
+        creditsFormula: '1 credito = 2 horas',
         creditsProcessed: false,
         createdAt: serverTimestamp(),
       });
 
-      toast({
-        title: 'Asistencia registrada',
-        description: 'Tu asistencia fue enviada. Los créditos se asignarán automáticamente.',
-      });
+      playSuccessSound();
+      setShowSuccessModal(true);
 
       setForm({
         fullName: '',
@@ -190,7 +294,7 @@ function VolunteerAttendancePage() {
   };
 
   return (
-    <div className="min-h-screen bg-boreal-dark text-white pt-24 pb-16">
+    <div className="min-h-screen bg-boreal-dark text-white pt-20 sm:pt-24 pb-10 sm:pb-16">
       <Helmet>
         <title>Registro de Asistencia | Voluntariado Boreal</title>
         <meta
@@ -199,39 +303,39 @@ function VolunteerAttendancePage() {
         />
       </Helmet>
 
-      <div className="max-w-4xl mx-auto px-4 sm:px-6">
-        <div className="relative overflow-hidden rounded-3xl border border-white/15 bg-[#0f172acc] p-6 sm:p-8 shadow-[0_30px_80px_rgba(0,0,0,0.45)]">
+      <div className="max-w-3xl mx-auto px-3 sm:px-6">
+        <div className="relative overflow-hidden rounded-2xl sm:rounded-3xl border border-white/15 bg-[#0f172acc] p-4 sm:p-8 shadow-[0_24px_60px_rgba(0,0,0,0.45)]">
           <div className="pointer-events-none absolute -top-24 -left-16 h-64 w-64 rounded-full bg-boreal-blue/30 blur-3xl" />
           <div className="pointer-events-none absolute -bottom-28 -right-10 h-72 w-72 rounded-full bg-boreal-aqua/20 blur-3xl" />
 
-          <div className="relative mb-7">
-            <div className="inline-flex items-center gap-2 rounded-full border border-boreal-aqua/40 bg-boreal-aqua/10 px-3 py-1 text-xs font-semibold text-boreal-aqua">
+          <div className="relative mb-5 sm:mb-7">
+            <div className="inline-flex items-center gap-2 rounded-full border border-boreal-aqua/40 bg-boreal-aqua/10 px-3 py-1 text-[11px] sm:text-xs font-semibold text-boreal-aqua">
               <Sparkles className="h-3.5 w-3.5" />
               Registro rápido de asistencia
             </div>
-            <h1 className="mt-3 text-2xl sm:text-3xl font-extrabold tracking-tight">Registrar participación voluntaria</h1>
-            <p className="text-sm sm:text-base text-white/75 mt-2 max-w-2xl">
-              Completa tus datos, selecciona la actividad y adjunta la evidencia. Los créditos y minutos pendientes se procesan automáticamente.
+            <h1 className="mt-3 text-xl sm:text-3xl font-extrabold tracking-tight">Registrar participación a voluntariado</h1>
+            <p className="text-xs sm:text-base text-white/75 mt-2 max-w-2xl leading-relaxed">
+              Completa tus datos, selecciona la actividad y adjunta la evidencia. Los créditos se calculan automáticamente y quedan pendientes de validaciónc.
             </p>
           </div>
 
-          <div className="relative mb-6 grid gap-3 sm:grid-cols-3">
+          <div className="relative mb-4 sm:mb-6 grid gap-2 sm:gap-3 grid-cols-1 sm:grid-cols-3">
             <div className="rounded-xl border border-white/15 bg-white/5 p-3 text-sm">
-              <p className="font-semibold inline-flex items-center gap-2"><ClipboardCheck className="h-4 w-4 text-boreal-aqua" /> Paso 1</p>
-              <p className="text-white/70 mt-1">Datos del voluntario</p>
+              <p className="font-semibold inline-flex items-center gap-2 text-sm"><ClipboardCheck className="h-4 w-4 text-boreal-aqua" /> Paso 1</p>
+              <p className="text-white/70 mt-1 text-xs sm:text-sm">Datos del voluntario</p>
             </div>
             <div className="rounded-xl border border-white/15 bg-white/5 p-3 text-sm">
-              <p className="font-semibold inline-flex items-center gap-2"><CalendarClock className="h-4 w-4 text-boreal-aqua" /> Paso 2</p>
-              <p className="text-white/70 mt-1">Actividad y horario</p>
+              <p className="font-semibold inline-flex items-center gap-2 text-sm"><CalendarClock className="h-4 w-4 text-boreal-aqua" /> Paso 2</p>
+              <p className="text-white/70 mt-1 text-xs sm:text-sm">Actividad y horario</p>
             </div>
             <div className="rounded-xl border border-white/15 bg-white/5 p-3 text-sm">
-              <p className="font-semibold inline-flex items-center gap-2"><Camera className="h-4 w-4 text-boreal-aqua" /> Paso 3</p>
-              <p className="text-white/70 mt-1">Evidencia fotográfica</p>
+              <p className="font-semibold inline-flex items-center gap-2 text-sm"><Camera className="h-4 w-4 text-boreal-aqua" /> Paso 3</p>
+              <p className="text-white/70 mt-1 text-xs sm:text-sm">Evidencia fotográfica</p>
             </div>
           </div>
 
-          <form onSubmit={handleSubmit} className="relative space-y-5">
-            <div className="grid sm:grid-cols-2 gap-4 rounded-2xl border border-white/10 bg-black/20 p-4">
+          <form onSubmit={handleSubmit} className="relative space-y-4 sm:space-y-5">
+            <div className="grid sm:grid-cols-2 gap-3 sm:gap-4 rounded-xl sm:rounded-2xl border border-white/10 bg-black/20 p-3 sm:p-4">
               <div className="space-y-1">
                 <Label htmlFor="full-name">Nombre completo</Label>
                 <Input
@@ -255,7 +359,7 @@ function VolunteerAttendancePage() {
               </div>
             </div>
 
-            <div className="rounded-2xl border border-white/10 bg-black/20 p-4 space-y-3">
+            <div className="rounded-xl sm:rounded-2xl border border-white/10 bg-black/20 p-3 sm:p-4 space-y-3">
               <Label htmlFor="activity">Actividad</Label>
               <select
                 id="activity"
@@ -274,7 +378,7 @@ function VolunteerAttendancePage() {
             </div>
 
             {form.activity === '__other__' && (
-              <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
+              <div className="rounded-xl sm:rounded-2xl border border-white/10 bg-black/20 p-3 sm:p-4">
                 <Label htmlFor="custom-activity">Especifica la actividad</Label>
                 <Input
                   id="custom-activity"
@@ -286,7 +390,7 @@ function VolunteerAttendancePage() {
               </div>
             )}
 
-            <div className="grid sm:grid-cols-3 gap-4 rounded-2xl border border-white/10 bg-black/20 p-4">
+            <div className="grid sm:grid-cols-3 gap-3 sm:gap-4 rounded-xl sm:rounded-2xl border border-white/10 bg-black/20 p-3 sm:p-4">
               <div className="space-y-1">
                 <Label htmlFor="attendance-date">Fecha</Label>
                 <Input
@@ -319,7 +423,7 @@ function VolunteerAttendancePage() {
               </div>
             </div>
 
-            <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
+            <div className="rounded-xl sm:rounded-2xl border border-white/10 bg-black/20 p-3 sm:p-4">
               <Label htmlFor="attendance-proof-file" className="inline-flex items-center gap-2">
                 <UploadCloud className="w-4 h-4" /> Imagen de prueba de asistencia
               </Label>
@@ -327,17 +431,15 @@ function VolunteerAttendancePage() {
                 id="attendance-proof-file"
                 type="file"
                 accept="image/*"
-                capture="environment"
                 onChange={(e) => updateField('proofFile', e.target.files?.[0] || null)}
-                required
               />
               <p className="text-xs text-white/60 mt-2 inline-flex items-center gap-2">
                 <Camera className="w-3.5 h-3.5" />
-                Puedes tomar la foto directamente desde tu celular o adjuntarla desde galería.
+                Puedes elegir entre cámara o galería según las opciones de tu teléfono.
               </p>
             </div>
 
-            <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3 text-sm text-emerald-200 inline-flex items-center gap-2">
+            <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3 text-xs sm:text-sm text-emerald-200 inline-flex items-center gap-2">
               <CheckCircle2 className="w-4 h-4" />
               El sistema procesa y acumula automáticamente tus minutos para el cálculo de créditos.
             </div>
@@ -346,7 +448,7 @@ function VolunteerAttendancePage() {
               <Button
                 type="submit"
                 disabled={submitting}
-                className="w-full sm:w-auto bg-gradient-to-r from-boreal-aqua to-boreal-blue hover:from-emerald-400 hover:to-blue-500 text-black font-semibold"
+                className="w-full sm:w-auto h-11 bg-gradient-to-r from-boreal-aqua to-boreal-blue hover:from-emerald-400 hover:to-blue-500 text-black font-semibold"
               >
                 {submitting ? 'Registrando...' : 'Registrar asistencia'}
               </Button>
@@ -354,6 +456,34 @@ function VolunteerAttendancePage() {
           </form>
         </div>
       </div>
+
+      {showSuccessModal && (
+        <div className="fixed inset-0 z-[70] bg-[#020617] flex items-center justify-center p-4 sm:p-6">
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(45,212,191,0.18),_transparent_45%),radial-gradient(circle_at_bottom,_rgba(56,189,248,0.16),_transparent_40%)]" />
+
+          <div className="relative w-full max-w-2xl rounded-3xl border border-emerald-300/30 bg-[#0b1329]/95 px-5 py-8 sm:px-8 sm:py-10 text-center shadow-[0_35px_90px_rgba(0,0,0,0.55)]">
+            <div className="mx-auto mb-5 h-20 w-20 rounded-full bg-emerald-400/15 border border-emerald-300/40 flex items-center justify-center">
+              <CheckCircle2 className="h-11 w-11 text-emerald-300" />
+            </div>
+            <h2 className="text-2xl sm:text-4xl font-black tracking-tight text-white">Asistencia enviada con éxito</h2>
+            <p className="mt-3 text-sm sm:text-base text-white/80 max-w-xl mx-auto leading-relaxed">
+              Gracias por sumar a esta jornada. Tu registro fue guardado y los créditos quedaron pendientes hasta validación de evidencia por administración.
+            </p>
+
+            <Button
+              type="button"
+              onClick={() => {
+                setShowSuccessModal(false);
+                navigate('/voluntariado');
+              }}
+              className="mt-7 w-full sm:w-auto min-w-[260px] h-11 bg-gradient-to-r from-emerald-300 to-boreal-aqua text-black font-bold hover:from-emerald-200 hover:to-sky-300"
+            >
+              <Home className="h-4 w-4 mr-2" />
+              Volver a la página de voluntariado
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
