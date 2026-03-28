@@ -6,6 +6,8 @@ import { Link } from 'react-router-dom';
 import { ArrowRight, Zap, Mic, Heart, Award, School as University, Building, Instagram, Star, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { defaultLinks, subscribeLinks, normalizeYouTubeUrl, subscribeHomeConfig, defaultHomeConfig } from '@/lib/configService';
+import headerImage from '@/images/headear.webp';
+import workshopImage from '@/images/taller.webp';
 
 const ScrollAnimatedSection = ({ children, className }) => {
   return (
@@ -141,6 +143,7 @@ const HomePage = () => {
         <meta name="twitter:card" content="summary_large_image" />
         <meta name="twitter:title" content="Boreal Labs | Juventud que innova, crea y transforma" />
         <meta name="twitter:description" content="Comunidad juvenil que impulsa innovación y emprendimiento en Nicaragua y Latinoamérica." />
+        <link rel="preload" as="image" href={headerImage} fetchpriority="high" />
       </Helmet>
 
       <div>
@@ -148,7 +151,7 @@ const HomePage = () => {
         <section className="relative min-h-screen flex items-center justify-center text-center text-white overflow-hidden">
           <div className="absolute inset-0 bg-boreal-dark z-10 opacity-60"></div>
           <div className="absolute inset-0 z-0">
-             <img alt="Grupo de jovenes en evento de lanzamiento de Boreal Labs" className="w-full h-full object-cover" src="src/images/headear.jpg" fetchpriority="high" decoding="async" />
+             <img alt="Grupo de jovenes en evento de lanzamiento de Boreal Labs" className="w-full h-full object-cover" src={headerImage} width="1920" height="1080" fetchpriority="high" decoding="async" />
           </div>
           <motion.div
             className="relative z-20 max-w-4xl mx-auto px-4"
@@ -245,9 +248,11 @@ const HomePage = () => {
             </p>
             <div className="mt-12 flex justify-center">
               <img 
-                src="src/images/taller.png"
+                src={workshopImage}
                 alt="Jóvenes de Boreal Labs en un taller" 
                 className="rounded-2xl shadow-xl object-cover w-full max-w-3xl h-auto"
+                width="1280"
+                height="720"
                 loading="lazy"
                 decoding="async"
               />
@@ -318,6 +323,8 @@ const HomePage = () => {
                      src={partner.imgSrc} 
                      alt={partner.alt} 
                      className="h-16 w-auto"
+                     width="128"
+                     height="64"
                      loading="lazy"
                      decoding="async"
                    />
@@ -362,7 +369,7 @@ const HomePage = () => {
                   rel="noopener noreferrer"
                   title="Instagram widget"
                 >
-                  <img src="https://embedsocial.com/cdn/icon/embedsocial-logo.webp" alt="EmbedSocial" loading="lazy" decoding="async" />
+                  <img src="https://embedsocial.com/cdn/icon/embedsocial-logo.webp" alt="EmbedSocial" width="64" height="64" loading="lazy" decoding="async" />
                   <div className="es-widget-branding-text">Instagram widget</div>
                 </a>
               </div>

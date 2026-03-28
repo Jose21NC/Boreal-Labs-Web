@@ -2,8 +2,6 @@ import { initializeApp } from "firebase/app";
 import { getAuth, signInAnonymously } from "firebase/auth";
 import { getFirestore, setLogLevel } from "firebase/firestore";
 import { getStorage } from 'firebase/storage';
-// getAnalytics es opcional, pero puedes mantenerlo si lo usas
-import { getAnalytics } from "firebase/analytics";
 
 // --- ¡ADVERTENCIA DE SEGURIDAD! ---
 // NUNCA dejes tus claves secretas escritas directamente en el código
@@ -24,7 +22,6 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
-const analytics = getAnalytics(app); // Analytics
 const storage = getStorage(app);
 
 // Evita ruido en consola; activar solo si VITE_FIRESTORE_DEBUG=true en desarrollo.
@@ -66,4 +63,4 @@ authenticate();
 
 // Exporta las instancias que usaremos en la app
 // Exporta storage también para poder resolver download URLs desde Storage
-export { db, auth, analytics, storage };
+export { db, auth, storage };

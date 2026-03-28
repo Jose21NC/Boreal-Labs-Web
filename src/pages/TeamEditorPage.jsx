@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Helmet } from 'react-helmet';
+import { Helmet } from 'react-helmet-async';
 import { motion } from 'framer-motion';
 import { Linkedin, Mail, Instagram, Smartphone, Link as LinkIcon } from 'lucide-react';
 import Cropper from 'react-easy-crop';

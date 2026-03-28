@@ -49,9 +49,6 @@ function App() {
           <Helmet>
             <title>Boreal Labs - Juventud que Innova Transforma crea Nicaragua</title>
             <meta name="description" content="Boreal Labs is a Nicaraguan youth-led non-profit fostering innovation and entrepreneurship through workshops, talks, and events." />
-            <link rel="preconnect" href="https://fonts.googleapis.com" />
-            <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="true" />
-            <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700;900&display=swap" rel="stylesheet" />
           </Helmet>
           {/* --- FIN CÓDIGO RESTAURADO --- */}
 

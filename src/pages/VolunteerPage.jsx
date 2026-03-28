@@ -11,23 +11,23 @@ import { Label } from '@/components/ui/label';
 import { useToast } from '@/components/ui/use-toast';
 
 // Importación de fotos reales
-import headerVolunt from '../images/volunt_fotos/header_volunt.jpg';
-import bannerHosp from '../images/volunt_fotos/banner_hosp.jpg';
-import hosp1 from '../images/volunt_fotos/hosp_1.jpg';
-import hosp2 from '../images/volunt_fotos/hosp_2.jpg';
-import limpieza1 from '../images/volunt_fotos/limpieza_1.jpg';
-import ambiental1 from '../images/volunt_fotos/ambiental_1.jpg';
-import ambiental2 from '../images/volunt_fotos/ambiental_2.jpg';
-import logoVoluntariado from '../images/volunt_fotos/logo_voluntariado.png';
-import manos from '../images/volunt_fotos/manos.png';
-import ninos1 from '../images/volunt_fotos/ninos_1.jpg';
-import ninos2 from '../images/volunt_fotos/ninos_2.jpg';
-import ninos3 from '../images/volunt_fotos/ninos_3.jpg';
-import ninos4 from '../images/volunt_fotos/ninos_4.jpg';
-import refugio1 from '../images/volunt_fotos/refugio_1.jpg';
-import refugio2 from '../images/volunt_fotos/refugio_2.jpg';
-import volunt3 from '../images/volunt_fotos/volunt_3.jpg';
-import entregaCert from '../images/volunt_fotos/entrega_cert.jpg';
+import headerVolunt from '../images/volunt_fotos/header_volunt.webp';
+import bannerHosp from '../images/volunt_fotos/banner_hosp.webp';
+import hosp1 from '../images/volunt_fotos/hosp_1.webp';
+import hosp2 from '../images/volunt_fotos/hosp_2.webp';
+import limpieza1 from '../images/volunt_fotos/limpieza_1.webp';
+import ambiental1 from '../images/volunt_fotos/ambiental_1.webp';
+import ambiental2 from '../images/volunt_fotos/ambiental_2.webp';
+import logoVoluntariado from '../images/volunt_fotos/logo_voluntariado.webp';
+import manos from '../images/volunt_fotos/manos.webp';
+import ninos1 from '../images/volunt_fotos/ninos_1.webp';
+import ninos2 from '../images/volunt_fotos/ninos_2.webp';
+import ninos3 from '../images/volunt_fotos/ninos_3.webp';
+import ninos4 from '../images/volunt_fotos/ninos_4.webp';
+import refugio1 from '../images/volunt_fotos/refugio_1.webp';
+import refugio2 from '../images/volunt_fotos/refugio_2.webp';
+import volunt3 from '../images/volunt_fotos/volunt_3.webp';
+import entregaCert from '../images/volunt_fotos/entrega_cert.webp';
 
 import cartaLlamadoPdf from '../pdf/Carta de Llamado a la Jornada Voluntaria 2026.pdf';
 

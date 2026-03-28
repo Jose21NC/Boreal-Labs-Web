@@ -1,5 +1,5 @@
 import React from 'react';
-import { Helmet } from 'react-helmet';
+import { Helmet } from 'react-helmet-async';
 import { motion } from 'framer-motion';
 import { Heart, Target, Zap, Globe } from 'lucide-react';
 
@@ -50,13 +50,13 @@ const AboutPage = () => {
   // --- MODIFICACIÓN 2: DATOS PARA EL CARRUSEL ---
   // ¡CAMBIA ESTAS RUTAS DE IMÁGENES Y ALT TEXTS!
   const carouselImages = [
-    { src: 'src/images/carrusel/b.jpg', alt: 'Evento de Boreal Labs 1' },
+    { src: 'src/images/carrusel/b.webp', alt: 'Evento de Boreal Labs 1' },
     { src: 'src/images/carrusel/c.webp', alt: 'Taller de innovación' },
     { src: 'src/images/carrusel/d.webp', alt: 'Miembros del equipo colaborando' },
-    { src: 'src/images/carrusel/e.jpg', alt: 'Charla inspiradora con un ponente' },
+    { src: 'src/images/carrusel/e.webp', alt: 'Charla inspiradora con un ponente' },
     { src: 'src/images/carrusel/f.webp', alt: 'Jóvenes participando en un hackathon' },
-    { src: 'src/images/carrusel/g.jpg', alt: 'Graduación de un programa de emprendimiento' },
-    { src: 'src/images/carrusel/h.jpg', alt: 'Sesión de networking' },
+    { src: 'src/images/carrusel/g.webp', alt: 'Graduación de un programa de emprendimiento' },
+    { src: 'src/images/carrusel/h.webp', alt: 'Sesión de networking' },
     { src: 'src/images/carrusel/i.webp', alt: 'Jóvenes desarrollando proyectos' },
   ];
 
@@ -90,7 +90,7 @@ const AboutPage = () => {
               viewport={{ once: true }}
               transition={{ duration: 0.8 }}
             >
-              <img alt="Foto de miembros de Boreal Labs" className="rounded-2xl shadow-2xl" src="src/images/quienes.png" />
+              <img alt="Foto de miembros de Boreal Labs" className="rounded-2xl shadow-2xl" src="src/images/quienes.webp" />
             </motion.div>
 
             <motion.div
