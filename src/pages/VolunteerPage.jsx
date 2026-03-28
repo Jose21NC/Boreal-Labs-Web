@@ -226,7 +226,7 @@ const VolunteerPage = () => {
                 Llevando aliento y apoyo <span className="text-boreal-aqua">donde se necesita</span>
               </h2>
               <p className="text-gray-300 text-lg leading-relaxed mb-6">
-                Creemos que el verdadero liderazgo genera acciones en favor de los demás. La <strong>Jornada Voluntaria 2026</strong> concentra los esfuerzos de nuestra comunidad para aportar de forma integral a la sociedad, en asilos, hospitales y barrios empobrecidos.
+                Creemos que el verdadero liderazgo genera acciones en favor de los demás. La <strong>Jornada Voluntaria 2026</strong> concentra los esfuerzos de nuestra comunidad para aportar de forma integral a la sociedad, en asilos, hospitales y comunidades prioritarias.
               </p>
               <div className="space-y-6 mt-8">
                 <div className="flex gap-4">
@@ -381,8 +381,8 @@ const VolunteerPage = () => {
         </div>
       </ScrollAnimatedSection>
 
-      {/* Galería Visual / Masonry */}
-      <ScrollAnimatedSection className="py-20 relative overflow-hidden">
+      {/* Galería Visual */}
+      <section className="py-20 relative overflow-hidden">
         <div className="absolute right-0 top-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-boreal-aqua/10 blur-[150px] rounded-full pointer-events-none" />
         <div className="container mx-auto px-6 md:px-12 lg:px-20 relative z-10">
           <h2 className="text-3xl md:text-4xl font-bold mb-12 text-center flex items-center justify-center gap-4">
@@ -390,107 +390,107 @@ const VolunteerPage = () => {
             Archivo Fotográfico
           </h2>
           
-          <div className="columns-1 sm:columns-2 lg:columns-3 gap-6 space-y-6">
-            <div className="break-inside-avoid relative group rounded-2xl overflow-hidden shadow-xl border border-white/10">
-              <img src={ninos1} alt="Niños sonrisas" className="w-full object-cover" />
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className="relative group rounded-2xl overflow-hidden shadow-xl border border-white/10 h-72 sm:h-64 lg:h-72">
+              <img src={ninos1} alt="Niños sonrisas" className="w-full h-full object-cover" />
               <div className="absolute inset-0 bg-boreal-dark/80 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                 <span className="text-white font-bold tracking-wider relative z-10">Actividades Educativas</span>
               </div>
             </div>
             
-            <div className="break-inside-avoid relative group rounded-2xl overflow-hidden shadow-xl border border-white/10">
-              <img src={hosp2} alt="Hospital" className="w-full object-cover" />
+            <div className="relative group rounded-2xl overflow-hidden shadow-xl border border-white/10 h-72 sm:h-64 lg:h-72">
+              <img src={hosp2} alt="Hospital" className="w-full h-full object-cover" />
               <div className="absolute inset-0 bg-boreal-dark/80 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                 <span className="text-white font-bold tracking-wider relative z-10">Apoyo en Hospitales</span>
               </div>
             </div>
 
-            <div className="break-inside-avoid relative group rounded-2xl overflow-hidden shadow-xl border border-white/10">
-              <img src={limpieza1} alt="Limpieza ambiental" className="w-full object-cover" />
+            <div className="relative group rounded-2xl overflow-hidden shadow-xl border border-white/10 h-72 sm:h-64 lg:h-72">
+              <img src={limpieza1} alt="Limpieza ambiental" className="w-full h-full object-cover" />
               <div className="absolute inset-0 bg-boreal-dark/80 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                 <span className="text-white font-bold tracking-wider relative z-10">Compromiso Ecológico</span>
               </div>
             </div>
 
-            <div className="break-inside-avoid relative group rounded-2xl overflow-hidden shadow-xl border border-white/10">
-              <img src={entregaCert} alt="Entrega de certificados" className="w-full object-cover" />
+            <div className="relative group rounded-2xl overflow-hidden shadow-xl border border-white/10 h-72 sm:h-64 lg:h-72">
+              <img src={entregaCert} alt="Entrega de certificados" className="w-full h-full object-cover" />
               <div className="absolute inset-0 bg-boreal-dark/80 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                 <span className="text-white font-bold tracking-wider relative z-10">Entrega de Reconocimientos</span>
               </div>
             </div>
 
-            <div className="break-inside-avoid relative group rounded-2xl overflow-hidden shadow-xl border border-white/10">
-              <img src={refugio1} alt="Animales refugios" className="w-full object-cover" />
+            <div className="relative group rounded-2xl overflow-hidden shadow-xl border border-white/10 h-72 sm:h-64 lg:h-72">
+              <img src={refugio1} alt="Animales refugios" className="w-full h-full object-cover" />
               <div className="absolute inset-0 bg-boreal-dark/80 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                 <span className="text-white font-bold tracking-wider relative z-10">Ayuda en Refugios de Animales</span>
               </div>
             </div>
             
-            <div className="break-inside-avoid relative group rounded-2xl overflow-hidden shadow-xl border border-white/10">
-              <img src={ninos3} alt="Niños actividades" className="w-full object-cover" />
+            <div className="relative group rounded-2xl overflow-hidden shadow-xl border border-white/10 h-72 sm:h-64 lg:h-72">
+              <img src={ninos3} alt="Niños actividades" className="w-full h-full object-cover" />
               <div className="absolute inset-0 bg-boreal-dark/80 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                 <span className="text-white font-bold tracking-wider relative z-10">Donativos a Niños</span>
               </div>
             </div>
 
-             <div className="break-inside-avoid relative group rounded-2xl overflow-hidden shadow-xl border border-white/10">
-              <img src={ambiental2} alt="Ambiental" className="w-full object-cover" />
+             <div className="relative group rounded-2xl overflow-hidden shadow-xl border border-white/10 h-72 sm:h-64 lg:h-72">
+              <img src={ambiental2} alt="Ambiental" className="w-full h-full object-cover" />
               <div className="absolute inset-0 bg-boreal-dark/80 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                 <span className="text-white font-bold tracking-wider relative z-10">Reforestación</span>
               </div>
             </div>
             
-            <div className="break-inside-avoid relative group rounded-2xl overflow-hidden shadow-xl border border-white/10 flex items-center justify-center bg-white/5">
-              <img src={manos} alt="Manos unidas" className="w-full object-cover p-2" />
+            <div className="relative group rounded-2xl overflow-hidden shadow-xl border border-white/10 flex items-center justify-center bg-white/5 h-72 sm:h-64 lg:h-72">
+              <img src={manos} alt="Manos unidas" className="w-full h-full object-cover p-2" />
               <div className="absolute inset-0 bg-boreal-dark/80 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                 <span className="text-white font-bold tracking-wider relative z-10">Comunidad Unida</span>
               </div>
             </div>
 
-            <div className="break-inside-avoid relative group rounded-2xl overflow-hidden shadow-xl border border-white/10">
-              <img src={bannerHosp} alt="Actividades en hospital" className="w-full object-cover" />
+            <div className="relative group rounded-2xl overflow-hidden shadow-xl border border-white/10 h-72 sm:h-64 lg:h-72">
+              <img src={bannerHosp} alt="Actividades en hospital" className="w-full h-full object-cover" />
               <div className="absolute inset-0 bg-boreal-dark/80 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                 <span className="text-white font-bold tracking-wider relative z-10">Entrega de presentes 2025</span>
               </div>
             </div>
 
-            <div className="break-inside-avoid relative group rounded-2xl overflow-hidden shadow-xl border border-white/10">
-              <img src={hosp1} alt="Hospital" className="w-full object-cover" />
+            <div className="relative group rounded-2xl overflow-hidden shadow-xl border border-white/10 h-72 sm:h-64 lg:h-72">
+              <img src={hosp1} alt="Hospital" className="w-full h-full object-cover" />
               <div className="absolute inset-0 bg-boreal-dark/80 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                 <span className="text-white font-bold tracking-wider relative z-10">Voluntariado Centrado en la Persona</span>
               </div>
             </div>
 
-            <div className="break-inside-avoid relative group rounded-2xl overflow-hidden shadow-xl border border-white/10">
-              <img src={ninos2} alt="Niños sonriendo" className="w-full object-cover" />
+            <div className="relative group rounded-2xl overflow-hidden shadow-xl border border-white/10 h-72 sm:h-64 lg:h-72">
+              <img src={ninos2} alt="Niños sonriendo" className="w-full h-full object-cover" />
               <div className="absolute inset-0 bg-boreal-dark/80 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                 <span className="text-white font-bold tracking-wider relative z-10">Actividades Educativas</span>
               </div>
             </div>
 
-            <div className="break-inside-avoid relative group rounded-2xl overflow-hidden shadow-xl border border-white/10">
-              <img src={ninos4} alt="Niños compartiendo" className="w-full object-cover" />
+            <div className="relative group rounded-2xl overflow-hidden shadow-xl border border-white/10 h-72 sm:h-64 lg:h-72">
+              <img src={ninos4} alt="Niños compartiendo" className="w-full h-full object-cover" />
               <div className="absolute inset-0 bg-boreal-dark/80 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                 <span className="text-white font-bold tracking-wider relative z-10">Convivencia Infantil</span>
               </div>
             </div>
 
-            <div className="break-inside-avoid relative group rounded-2xl overflow-hidden shadow-xl border border-white/10">
-              <img src={refugio2} alt="Apoyo a refugios" className="w-full object-cover" />
+            <div className="relative group rounded-2xl overflow-hidden shadow-xl border border-white/10 h-72 sm:h-64 lg:h-72">
+              <img src={refugio2} alt="Apoyo a refugios" className="w-full h-full object-cover" />
               <div className="absolute inset-0 bg-boreal-dark/80 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                 <span className="text-white font-bold tracking-wider relative z-10">Rescate Animal</span>
               </div>
             </div>
 
-             <div className="break-inside-avoid relative group rounded-2xl overflow-hidden shadow-xl border border-white/10">
-              <img src={volunt3} alt="Equipo Boreal Labs" className="w-full object-cover" />
+             <div className="relative group rounded-2xl overflow-hidden shadow-xl border border-white/10 h-72 sm:h-64 lg:h-72">
+              <img src={volunt3} alt="Equipo Boreal Labs" className="w-full h-full object-cover" />
               <div className="absolute inset-0 bg-boreal-dark/80 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                 <span className="text-white font-bold tracking-wider relative z-10">Equipo de Voluntarios</span>
               </div>
             </div>
 
-            <div className="break-inside-avoid relative group rounded-2xl overflow-hidden shadow-xl border border-white/10">
-              <img src={ambiental1} alt="Reforestacion equipo" className="w-full object-cover object-top" />
+            <div className="relative group rounded-2xl overflow-hidden shadow-xl border border-white/10 h-72 sm:h-64 lg:h-72">
+              <img src={ambiental1} alt="Reforestacion equipo" className="w-full h-full object-cover object-top" />
               <div className="absolute inset-0 bg-boreal-dark/80 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                 <span className="text-white font-bold tracking-wider relative z-10">Preservando la Naturaleza</span>
               </div>
@@ -498,7 +498,7 @@ const VolunteerPage = () => {
 
           </div>
         </div>
-      </ScrollAnimatedSection>
+      </section>
 
       {/* Cierre / Call to action */}
       {/* Última sección */}

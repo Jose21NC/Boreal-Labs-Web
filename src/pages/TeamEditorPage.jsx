@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Helmet } from 'react-helmet';
 import { motion } from 'framer-motion';
 import { Linkedin, Mail, Instagram, Smartphone, Link as LinkIcon } from 'lucide-react';
@@ -13,10 +13,13 @@ import { getDownloadURL, ref as storageRef, uploadBytes } from 'firebase/storage
 const ACCESS_CODE_ENABLED = true;
 const TEAM_EDITOR_ACCESS_CODE = 'Staff_BOREAL2026*';
 const ACCESS_SESSION_KEY = 'team_editor_unlocked';
+const MAX_IMAGE_SIZE_MB = 8;
+const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 
 const TEAM_TAG_OPTIONS = [
   'Directiva General',
   'Operaciones',
+  'Finanzas',
   'Redes',
   'Voluntariado',
   'Secretaria General',
@@ -26,6 +29,7 @@ const TEAM_TAG_OPTIONS = [
 const TAG_STYLES = {
   'Directiva General': 'border-sky-400/50 bg-sky-500/15 text-sky-200',
   Operaciones: 'border-emerald-400/50 bg-emerald-500/15 text-emerald-200',
+  Finanzas: 'border-lime-400/50 bg-lime-500/15 text-lime-200',
   Redes: 'border-fuchsia-400/50 bg-fuchsia-500/15 text-fuchsia-200',
   Voluntariado: 'border-amber-400/50 bg-amber-500/15 text-amber-200',
   'Secretaria General': 'border-indigo-400/50 bg-indigo-500/15 text-indigo-200',
@@ -95,6 +99,18 @@ const initialsFromName = (value) => {
   return `${tokens[0][0] || ''}${tokens[1][0] || ''}`.toUpperCase();
 };
 
+const validateImageFile = (file) => {
+  if (!file) return 'No se selecciono ningun archivo.';
+  if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
+    return 'Formato no compatible. Usa JPG, PNG o WEBP.';
+  }
+  const maxBytes = MAX_IMAGE_SIZE_MB * 1024 * 1024;
+  if (file.size > maxBytes) {
+    return `La imagen supera ${MAX_IMAGE_SIZE_MB}MB.`;
+  }
+  return '';
+};
+
 const getCroppedFileFromPixels = async (imageSrc, pixelCrop, originalName) => {
   const image = await new Promise((resolve, reject) => {
     const img = new Image();
@@ -107,6 +123,9 @@ const getCroppedFileFromPixels = async (imageSrc, pixelCrop, originalName) => {
   canvas.width = pixelCrop.width;
   canvas.height = pixelCrop.height;
   const ctx = canvas.getContext('2d');
+  if (!ctx) {
+    throw new Error('No se pudo inicializar el editor de imagen.');
+  }
 
   ctx.drawImage(
     image,
@@ -121,6 +140,9 @@ const getCroppedFileFromPixels = async (imageSrc, pixelCrop, originalName) => {
   );
 
   const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.92));
+  if (!blob) {
+    throw new Error('No se pudo procesar la imagen.');
+  }
   const safeName = String(originalName || 'perfil').replace(/\.[^/.]+$/, '');
   return new File([blob], `${safeName}-cropped.jpg`, { type: 'image/jpeg' });
 };
@@ -147,6 +169,9 @@ const TeamEditorPage = () => {
   const [crop, setCrop] = useState({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(1);
   const [croppedAreaPixels, setCroppedAreaPixels] = useState(null);
+  const [isCropping, setIsCropping] = useState(false);
+  const [imageError, setImageError] = useState('');
+  const [imageInputKey, setImageInputKey] = useState(0);
 
   const [formData, setFormData] = useState({
     name: '',
@@ -192,10 +217,23 @@ const TeamEditorPage = () => {
   };
 
   const handleImageChange = (event) => {
+    setErrorMessage('');
+    setImageError('');
     const file = event.target.files?.[0] || null;
 
     if (!file) {
       return;
+    }
+
+    const validationError = validateImageFile(file);
+    if (validationError) {
+      setImageError(validationError);
+      setImageInputKey((prev) => prev + 1);
+      return;
+    }
+
+    if (imageToCrop.url) {
+      URL.revokeObjectURL(imageToCrop.url);
     }
 
     const preview = URL.createObjectURL(file);
@@ -222,12 +260,24 @@ const TeamEditorPage = () => {
     setShowImageCropperModal(false);
   };
 
+  const handleRemoveSelectedImage = () => {
+    if (imagePreviewUrl) {
+      URL.revokeObjectURL(imagePreviewUrl);
+    }
+    setImageFile(null);
+    setImagePreviewUrl('');
+    setImageError('');
+    setImageInputKey((prev) => prev + 1);
+  };
+
   const handleApplyImageCrop = async () => {
     if (!imageToCrop.file || !imageToCrop.url || !croppedAreaPixels) {
       return;
     }
 
     try {
+      setIsCropping(true);
+      setImageError('');
       const cropped = await getCroppedFileFromPixels(imageToCrop.url, croppedAreaPixels, imageToCrop.file.name);
       const preview = URL.createObjectURL(cropped);
 
@@ -242,9 +292,23 @@ const TeamEditorPage = () => {
       setShowImageCropperModal(false);
     } catch (error) {
       console.error('Error recortando imagen de perfil:', error);
+      setImageError('No se pudo recortar la imagen. Intenta con otra foto en JPG, PNG o WEBP.');
       setErrorMessage('No se pudo recortar la imagen. Intenta seleccionar otra.');
+    } finally {
+      setIsCropping(false);
     }
   };
+
+  useEffect(() => {
+    return () => {
+      if (imagePreviewUrl) {
+        URL.revokeObjectURL(imagePreviewUrl);
+      }
+      if (imageToCrop.url) {
+        URL.revokeObjectURL(imageToCrop.url);
+      }
+    };
+  }, [imagePreviewUrl, imageToCrop.url]);
 
   const handleSubmit = async (event) => {
     event.preventDefault();
@@ -376,10 +440,15 @@ const TeamEditorPage = () => {
             </p>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-              <form onSubmit={handleSubmit} className="space-y-4">
+              <form onSubmit={handleSubmit} className="space-y-6">
+                <div className="rounded-xl border border-white/10 bg-white/5 p-4">
+                  <p className="text-white font-semibold">Paso 1. Datos basicos</p>
+                  <p className="text-xs text-gray-400 mt-1">Completa nombre y cargo tal como deseas mostrarlo en la pagina publica.</p>
+                </div>
+
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <Label htmlFor="name" className="text-gray-200 mb-1 block">Nombre completo</Label>
+                    <Label htmlFor="name" className="text-gray-200 mb-1 block">Nombre completo *</Label>
                     <Input
                       id="name"
                       name="name"
@@ -394,14 +463,19 @@ const TeamEditorPage = () => {
                     )}
                   </div>
                   <div>
-                    <Label htmlFor="role" className="text-gray-200 mb-1 block">Cargo</Label>
-                    <Input id="role" name="role" value={formData.role} onChange={handleInputChange} required />
+                    <Label htmlFor="role" className="text-gray-200 mb-1 block">Cargo *</Label>
+                    <Input id="role" name="role" value={formData.role} onChange={handleInputChange} placeholder="Ejemplo: Coordinadora de Finanzas" required />
                   </div>
+                </div>
+
+                <div className="rounded-xl border border-white/10 bg-white/5 p-4">
+                  <p className="text-white font-semibold">Paso 2. Organizacion interna</p>
+                  <p className="text-xs text-gray-400 mt-1">Define grupo y etiqueta para ubicar correctamente al miembro.</p>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <Label htmlFor="teamSection" className="text-gray-200 mb-1 block">Grupo</Label>
+                    <Label htmlFor="teamSection" className="text-gray-200 mb-1 block">Grupo *</Label>
                     <select
                       id="teamSection"
                       name="teamSection"
@@ -414,7 +488,7 @@ const TeamEditorPage = () => {
                     </select>
                   </div>
                   <div>
-                    <Label htmlFor="teamTag" className="text-gray-200 mb-1 block">Etiqueta</Label>
+                    <Label htmlFor="teamTag" className="text-gray-200 mb-1 block">Etiqueta *</Label>
                     <select
                       id="teamTag"
                       name="teamTag"
@@ -432,7 +506,7 @@ const TeamEditorPage = () => {
                 </div>
 
                 <div>
-                  <Label htmlFor="description" className="text-gray-200 mb-1 block">Descripcion</Label>
+                  <Label htmlFor="description" className="text-gray-200 mb-1 block">Descripcion *</Label>
                   <textarea
                     id="description"
                     name="description"
@@ -440,14 +514,34 @@ const TeamEditorPage = () => {
                     onChange={handleInputChange}
                     required
                     rows={4}
+                    placeholder="Breve descripcion del perfil y su aporte al equipo."
                     className="w-full px-3 py-2 rounded-md border bg-transparent text-white"
                   />
                 </div>
 
+                <div className="rounded-xl border border-white/10 bg-white/5 p-4">
+                  <p className="text-white font-semibold">Paso 3. Foto de perfil</p>
+                  <p className="text-xs text-gray-400 mt-1">Formatos permitidos: JPG, PNG, WEBP. Tamano maximo: {MAX_IMAGE_SIZE_MB}MB.</p>
+                </div>
+
                 <div>
                   <Label htmlFor="imageFile" className="text-gray-200 mb-1 block">Imagen de perfil</Label>
-                  <Input id="imageFile" type="file" accept="image/*" onChange={handleImageChange} />
-                  <p className="mt-1 text-xs text-gray-400">Podras editar/recortar la imagen antes de guardarla.</p>
+                  <Input key={imageInputKey} id="imageFile" type="file" accept="image/jpeg,image/png,image/webp" onChange={handleImageChange} />
+                  <p className="mt-1 text-xs text-gray-400">Antes de guardar, podras recortarla en formato circular.</p>
+                  {imageFile && (
+                    <div className="mt-2 flex items-center justify-between gap-3 rounded-md border border-white/10 bg-black/20 px-3 py-2">
+                      <p className="text-xs text-gray-300 truncate">Seleccionada: {imageFile.name}</p>
+                      <Button type="button" variant="outline" onClick={handleRemoveSelectedImage} className="text-xs border-white/20 text-white hover:bg-white/10">
+                        Quitar
+                      </Button>
+                    </div>
+                  )}
+                  {imageError && <p className="mt-2 text-xs text-red-300">{imageError}</p>}
+                </div>
+
+                <div className="rounded-xl border border-white/10 bg-white/5 p-4">
+                  <p className="text-white font-semibold">Paso 4. Contacto y redes (opcional)</p>
+                  <p className="text-xs text-gray-400 mt-1">Puedes agregar uno o varios canales de contacto.</p>
                 </div>
 
                 <div>
@@ -514,10 +608,10 @@ const TeamEditorPage = () => {
 
                 <Button
                   type="submit"
-                  disabled={isSubmitting || !nameIsValid || Boolean(whatsappError)}
+                  disabled={isSubmitting || isCropping || !nameIsValid || Boolean(whatsappError)}
                   className="w-full bg-gradient-to-r from-boreal-blue to-boreal-purple text-white"
                 >
-                  {isSubmitting ? 'Guardando...' : 'Agregar miembro'}
+                  {isSubmitting ? 'Guardando...' : 'Guardar miembro'}
                 </Button>
               </form>
 
@@ -656,8 +750,8 @@ const TeamEditorPage = () => {
                     <Button type="button" variant="outline" onClick={handleCancelImageCrop}>
                       Cancelar
                     </Button>
-                    <Button type="button" onClick={handleApplyImageCrop} className="bg-boreal-aqua text-black hover:bg-emerald-400">
-                      Aplicar recorte
+                    <Button type="button" disabled={isCropping} onClick={handleApplyImageCrop} className="bg-boreal-aqua text-black hover:bg-emerald-400">
+                      {isCropping ? 'Procesando...' : 'Aplicar recorte'}
                     </Button>
                   </div>
                 </div>

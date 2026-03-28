@@ -1,4 +1,4 @@
-import React, { useState, createContext } from 'react';
+import React, { Suspense, lazy, useState, createContext } from 'react';
 import ErrorBoundary from '@/components/ErrorBoundary'; // Assuming you have this component
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 // Se importa HelmetProvider y Helmet (si necesitas Helmet global)
@@ -7,20 +7,21 @@ import { Toaster } from '@/components/ui/toaster';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import ScrollToTop from '@/components/ScrollToTop';
-import HomePage from '@/pages/HomePage';
-import AboutPage from '@/pages/AboutPage';
-import TeamPage from '@/pages/TeamPage';
-import TeamEditorPage from '@/pages/TeamEditorPage';
-import EventsPage from '@/pages/EventsPage';
-import VolunteerPage from '@/pages/VolunteerPage';
-import VolunteerAttendancePage from '@/pages/VolunteerAttendancePage';
-import VolunteerPersonalPage from '@/pages/VolunteerPersonalPage';
-import NotFoundPage from '@/pages/NotFoundPage'; 
-import LayoutEditor from '@/pages/LayoutEditor';
-import PaginaValidacion from '@/pages/PaginaValidacion';
-import AdminPanel from '@/pages/AdminPanel';
-import VolunteerAdminPanel from '@/pages/VolunteerAdminPanel';
 import AdminGate from '@/components/AdminGate';
+
+const HomePage = lazy(() => import('@/pages/HomePage'));
+const AboutPage = lazy(() => import('@/pages/AboutPage'));
+const TeamPage = lazy(() => import('@/pages/TeamPage'));
+const TeamEditorPage = lazy(() => import('@/pages/TeamEditorPage'));
+const EventsPage = lazy(() => import('@/pages/EventsPage'));
+const VolunteerPage = lazy(() => import('@/pages/VolunteerPage'));
+const VolunteerAttendancePage = lazy(() => import('@/pages/VolunteerAttendancePage'));
+const VolunteerPersonalPage = lazy(() => import('@/pages/VolunteerPersonalPage'));
+const NotFoundPage = lazy(() => import('@/pages/NotFoundPage'));
+const LayoutEditor = lazy(() => import('@/pages/LayoutEditor'));
+const PaginaValidacion = lazy(() => import('@/pages/PaginaValidacion'));
+const AdminPanel = lazy(() => import('@/pages/AdminPanel'));
+const VolunteerAdminPanel = lazy(() => import('@/pages/VolunteerAdminPanel'));
 
 // Se importa el proveedor de reCAPTCHA
 // Google reCAPTCHA v3 removed - using only reCAPTCHA v2 where needed
@@ -41,7 +42,7 @@ function App() {
     // Se envuelve todo con HelmetProvider
     <HelmetProvider>
       <RecaptchaContext.Provider value={{ recaptchaTokenV2, setRecaptchaTokenV2, recaptchaSiteKey }}>
-        <Router>
+        <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
           {/* Fuerza scroll al tope en cada navegación */}
           <ScrollToTop behavior="smooth" />
           {/* --- CÓDIGO RESTAURADO: Helmet original --- */}
@@ -58,32 +59,40 @@ function App() {
             <Navbar />
             <main className="flex-grow">
               <ErrorBoundary> {/* ErrorBoundary envuelve las Rutas */}
-                <Routes>
-                  <Route path="/" element={<HomePage />} />
-                  {/* Rutas en español */}
-                  <Route path="/nosotros" element={<AboutPage />} />
-                  <Route path="/equipo" element={<TeamPage />} />
-                  <Route path="/equipo/editar" element={<TeamEditorPage />} />
-                  <Route path="/eventos" element={<EventsPage />} />
-                  <Route path="/voluntariado" element={<VolunteerPage />} />
-                  <Route path="/voluntariado/asistencia" element={<VolunteerAttendancePage />} />
-                  <Route path="/voluntariado/personal" element={<VolunteerPersonalPage />} />
+                <Suspense
+                  fallback={(
+                    <div className="min-h-[50vh] flex items-center justify-center text-boreal-aqua text-lg">
+                      Cargando...
+                    </div>
+                  )}
+                >
+                  <Routes>
+                    <Route path="/" element={<HomePage />} />
+                    {/* Rutas en español */}
+                    <Route path="/nosotros" element={<AboutPage />} />
+                    <Route path="/equipo" element={<TeamPage />} />
+                    <Route path="/equipo/editar" element={<TeamEditorPage />} />
+                    <Route path="/eventos" element={<EventsPage />} />
+                    <Route path="/voluntariado" element={<VolunteerPage />} />
+                    <Route path="/voluntariado/asistencia" element={<VolunteerAttendancePage />} />
+                    <Route path="/voluntariado/personal" element={<VolunteerPersonalPage />} />
 
-                  {/* Admin */}
-                  <Route path="/admin" element={<AdminGate><AdminPanel /></AdminGate>} />
-                  <Route path="/admin/layout" element={<AdminGate><LayoutEditor /></AdminGate>} />
-                  <Route path="/voluntariado/admin" element={<AdminGate><VolunteerAdminPanel /></AdminGate>} />
+                    {/* Admin */}
+                    <Route path="/admin" element={<AdminGate><AdminPanel /></AdminGate>} />
+                    <Route path="/admin/layout" element={<AdminGate><LayoutEditor /></AdminGate>} />
+                    <Route path="/voluntariado/admin" element={<AdminGate><VolunteerAdminPanel /></AdminGate>} />
 
-                  {/* Redirecciones desde rutas antiguas en inglés */}
-                  <Route path="/about" element={<Navigate to="/nosotros" replace />} />
-                  <Route path="/team" element={<Navigate to="/equipo" replace />} />
-                  <Route path="/events" element={<Navigate to="/eventos" replace />} />
-                  <Route path="/volunteer" element={<Navigate to="/voluntariado" replace />} />
-                  <Route path="/validar-certificado" element={<PaginaValidacion />} />
-                  <Route path="/validacion" element={<PaginaValidacion />} />
+                    {/* Redirecciones desde rutas antiguas en inglés */}
+                    <Route path="/about" element={<Navigate to="/nosotros" replace />} />
+                    <Route path="/team" element={<Navigate to="/equipo" replace />} />
+                    <Route path="/events" element={<Navigate to="/eventos" replace />} />
+                    <Route path="/volunteer" element={<Navigate to="/voluntariado" replace />} />
+                    <Route path="/validar-certificado" element={<PaginaValidacion />} />
+                    <Route path="/validacion" element={<PaginaValidacion />} />
 
-                  <Route path="*" element={<NotFoundPage />} /> {/* Ruta para página no encontrada */}
-                </Routes>
+                    <Route path="*" element={<NotFoundPage />} /> {/* Ruta para página no encontrada */}
+                  </Routes>
+                </Suspense>
               </ErrorBoundary>
             </main>
             <ConditionalFooter />

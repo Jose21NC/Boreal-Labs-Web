@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { Helmet } from 'react-helmet';
+import React, { useEffect, useRef, useState } from 'react';
+import { Helmet } from 'react-helmet-async';
 import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
 // Se agregó el ícono de 'Instagram'
@@ -22,6 +22,11 @@ const ScrollAnimatedSection = ({ children, className }) => {
 };
 
 const HomePage = () => {
+  const siteUrl = 'https://borealabs.org';
+  const canonicalUrl = `${siteUrl}/`;
+  const instagramRef = useRef(null);
+  const [shouldLoadInstagramWidget, setShouldLoadInstagramWidget] = useState(false);
+
   // URL del video controlada desde Firestore con fallback
   const [youtubeUrl, setYoutubeUrl] = useState(defaultLinks.youtubeVideoUrl);
   // Estado para la configuración de la UI (Impacto y Aliados)
@@ -69,20 +74,50 @@ const HomePage = () => {
     ...item,
     icon: iconMap[item.icon] || Heart // Por defecto Heart si no se encuentra
   }));
+  const hasCertificatesImpact = impacts.some((item) => {
+    const metric = String(item.metric || '').toLowerCase();
+    const description = String(item.description || '').toLowerCase();
+    return metric.includes('280') && description.includes('certificado');
+  });
+  const impactsWithCertificates = hasCertificatesImpact
+    ? impacts
+    : [
+        ...impacts,
+        {
+          metric: '280',
+          description: 'certificados digitales emitidos',
+          icon: Award,
+        },
+      ];
 
   const partners = homeConfig.partners;
 
   useEffect(() => {
-    // Inyectar script de EmbedSocial si no existe
-    if (typeof document !== 'undefined') {
-      if (!document.getElementById('EmbedSocialHashtagScript')) {
-        const js = document.createElement('script');
-        js.id = 'EmbedSocialHashtagScript';
-        js.src = 'https://embedsocial.com/cdn/ht.js';
-        document.getElementsByTagName('head')[0].appendChild(js);
-      }
+    if (!instagramRef.current || shouldLoadInstagramWidget) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) {
+          setShouldLoadInstagramWidget(true);
+          observer.disconnect();
+        }
+      },
+      { rootMargin: '300px 0px' }
+    );
+    observer.observe(instagramRef.current);
+    return () => observer.disconnect();
+  }, [shouldLoadInstagramWidget]);
+
+  useEffect(() => {
+    if (!shouldLoadInstagramWidget || typeof document === 'undefined') return;
+    if (!document.getElementById('EmbedSocialHashtagScript')) {
+      const js = document.createElement('script');
+      js.id = 'EmbedSocialHashtagScript';
+      js.src = 'https://embedsocial.com/cdn/ht.js';
+      js.async = true;
+      js.defer = true;
+      document.getElementsByTagName('head')[0].appendChild(js);
     }
-  }, []);
+  }, [shouldLoadInstagramWidget]);
 
 
   return (
@@ -93,6 +128,19 @@ const HomePage = () => {
           name="description" 
           content="Somos una comunidad juvenil que busca transformar el futuro de Nicaragua y latinoamerica a través de la innovación y el emprendimiento." 
         />
+        <meta name="robots" content="index, follow" />
+        <link rel="canonical" href={canonicalUrl} />
+
+        <meta property="og:type" content="website" />
+        <meta property="og:locale" content="es_NI" />
+        <meta property="og:site_name" content="Boreal Labs" />
+        <meta property="og:title" content="Boreal Labs | Juventud que innova, crea y transforma" />
+        <meta property="og:description" content="Comunidad juvenil que impulsa innovación y emprendimiento en Nicaragua y Latinoamérica." />
+        <meta property="og:url" content={canonicalUrl} />
+
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:title" content="Boreal Labs | Juventud que innova, crea y transforma" />
+        <meta name="twitter:description" content="Comunidad juvenil que impulsa innovación y emprendimiento en Nicaragua y Latinoamérica." />
       </Helmet>
 
       <div>
@@ -100,7 +148,7 @@ const HomePage = () => {
         <section className="relative min-h-screen flex items-center justify-center text-center text-white overflow-hidden">
           <div className="absolute inset-0 bg-boreal-dark z-10 opacity-60"></div>
           <div className="absolute inset-0 z-0">
-             <img alt="Grupo de jovenes en evento de lanzamiento de Boreal Labs" className="w-full h-full object-cover" src="src/images/headear.jpg" />
+             <img alt="Grupo de jovenes en evento de lanzamiento de Boreal Labs" className="w-full h-full object-cover" src="src/images/headear.jpg" fetchpriority="high" decoding="async" />
           </div>
           <motion.div
             className="relative z-20 max-w-4xl mx-auto px-4"
@@ -178,6 +226,8 @@ const HomePage = () => {
                  title="Video de Boreal Labs"
                  frameBorder="0" 
                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+                 loading="lazy"
+                 referrerPolicy="strict-origin-when-cross-origin"
                  allowFullScreen
                ></iframe>
              </div>
@@ -198,6 +248,8 @@ const HomePage = () => {
                 src="src/images/taller.png"
                 alt="Jóvenes de Boreal Labs en un taller" 
                 className="rounded-2xl shadow-xl object-cover w-full max-w-3xl h-auto"
+                loading="lazy"
+                decoding="async"
               />
             </div>
             <div className="mt-12">
@@ -241,7 +293,7 @@ const HomePage = () => {
                 <p className="text-lg text-gray-400 max-w-2xl mx-auto">Construyendo una comunidad, un joven a la vez.</p>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 text-center">
-              {impacts.map((impact, index) => (
+              {impactsWithCertificates.map((impact, index) => (
                 <div key={index} className="glass-effect rounded-2xl p-8">
                   <impact.icon className="w-12 h-12 mx-auto mb-4 text-boreal-aqua" />
                   <div className="text-4xl font-extrabold text-white">{impact.metric}</div>
@@ -266,6 +318,8 @@ const HomePage = () => {
                      src={partner.imgSrc} 
                      alt={partner.alt} 
                      className="h-16 w-auto"
+                     loading="lazy"
+                     decoding="async"
                    />
                    <span className="text-gray-400 text-sm font-semibold">{partner.name}</span>
                 </div>
@@ -276,7 +330,7 @@ const HomePage = () => {
 
         {/* --- SECCIÓN DE INSTAGRAM --- */}
         <ScrollAnimatedSection className="py-20 bg-boreal-dark">
-          <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div ref={instagramRef} className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="text-center mb-12">
               <h2 className="text-3xl md:text-4xl font-bold mb-4">
                 Síguenos en <span className="text-gradient">Instagram</span>
@@ -296,21 +350,27 @@ const HomePage = () => {
               </Button>
             </div>
             
-            <div
-              className="embedsocial-hashtag"
-              data-ref="25ea543c23c71d10a060d4c621620aaa5cd54958"
-            >
-              <a
-                className="feed-powered-by-es feed-powered-by-es-feed-img es-widget-branding"
-                href="https://embedsocial.com/social-media-aggregator/"
-                target="_blank"
-                rel="noopener noreferrer"
-                title="Instagram widget"
+            {shouldLoadInstagramWidget ? (
+              <div
+                className="embedsocial-hashtag"
+                data-ref="25ea543c23c71d10a060d4c621620aaa5cd54958"
               >
-                <img src="https://embedsocial.com/cdn/icon/embedsocial-logo.webp" alt="EmbedSocial" />
-                <div className="es-widget-branding-text">Instagram widget</div>
-              </a>
-            </div>
+                <a
+                  className="feed-powered-by-es feed-powered-by-es-feed-img es-widget-branding"
+                  href="https://embedsocial.com/social-media-aggregator/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  title="Instagram widget"
+                >
+                  <img src="https://embedsocial.com/cdn/icon/embedsocial-logo.webp" alt="EmbedSocial" loading="lazy" decoding="async" />
+                  <div className="es-widget-branding-text">Instagram widget</div>
+                </a>
+              </div>
+            ) : (
+              <div className="glass-effect rounded-2xl min-h-[320px] flex items-center justify-center text-gray-400">
+                Cargando feed de Instagram...
+              </div>
+            )}
 
 
           </div>

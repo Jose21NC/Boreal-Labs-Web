@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Helmet } from 'react-helmet';
+import React, { useState, useEffect, useMemo } from 'react';
+import { Helmet } from 'react-helmet-async';
 import { motion } from 'framer-motion';
 import { Linkedin, Mail, Instagram, Smartphone, Link as LinkIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -10,6 +10,7 @@ import { ref as storageRef, getDownloadURL } from 'firebase/storage';
 const TEAM_TAG_OPTIONS = [
   'Directiva General',
   'Operaciones',
+  'Finanzas',
   'Redes',
   'Voluntariado',
   'Secretaria General',
@@ -19,6 +20,7 @@ const TEAM_TAG_OPTIONS = [
 const TAG_STYLES = {
   'Directiva General': 'border-sky-400/50 bg-sky-500/15 text-sky-200',
   Operaciones: 'border-emerald-400/50 bg-emerald-500/15 text-emerald-200',
+  Finanzas: 'border-lime-400/50 bg-lime-500/15 text-lime-200',
   Redes: 'border-fuchsia-400/50 bg-fuchsia-500/15 text-fuchsia-200',
   Voluntariado: 'border-amber-400/50 bg-amber-500/15 text-amber-200',
   'Secretaria General': 'border-indigo-400/50 bg-indigo-500/15 text-indigo-200',
@@ -46,10 +48,16 @@ const normalizeTag = (member) => {
     return found;
   }
 
+  if (rawTag) {
+    return rawTag;
+  }
+
   return normalizeSection(member) === 'DIRECTIVA' ? 'Directiva General' : 'Operaciones';
 };
 
 const TeamPage = () => {
+  const siteUrl = 'https://borealabs.org';
+  const canonicalUrl = `${siteUrl}/equipo`;
   const [teamMembers, setTeamMembers] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -127,7 +135,6 @@ const TeamPage = () => {
           return out;
         }));
 
-        console.log('Miembros cargados desde Firestore (resueltas):', members);
         setTeamMembers(members);
       } catch (error) {
         console.error('Error al cargar miembros del equipo: ', error);
@@ -143,8 +150,88 @@ const TeamPage = () => {
     return () => clearTimeout(timer);
   }, []);
 
-  const directivaMembers = teamMembers.filter((member) => member.memberSection === 'DIRECTIVA');
-  const staffMembers = teamMembers.filter((member) => member.memberSection !== 'DIRECTIVA');
+  const tagPriority = useMemo(() => {
+    const counts = teamMembers.reduce((acc, member) => {
+      const tag = String(member.memberTag || '').trim();
+      if (!tag) return acc;
+      acc[tag] = (acc[tag] || 0) + 1;
+      return acc;
+    }, {});
+
+    const directivaTag = 'Directiva General';
+    const sortedTags = Object.keys(counts).sort((a, b) => {
+      if (a === directivaTag && b !== directivaTag) return -1;
+      if (b === directivaTag && a !== directivaTag) return 1;
+
+      const diff = counts[b] - counts[a];
+      if (diff !== 0) return diff;
+      return a.localeCompare(b, 'es');
+    });
+
+    return new Map(sortedTags.map((tag, index) => [tag, index]));
+  }, [teamMembers]);
+
+  const sortMembersByTag = (members) => (
+    [...members].sort((a, b) => {
+      const aTag = String(a.memberTag || '').trim();
+      const bTag = String(b.memberTag || '').trim();
+      const aPriority = tagPriority.has(aTag) ? tagPriority.get(aTag) : Number.MAX_SAFE_INTEGER;
+      const bPriority = tagPriority.has(bTag) ? tagPriority.get(bTag) : Number.MAX_SAFE_INTEGER;
+
+      if (aPriority !== bPriority) {
+        return aPriority - bPriority;
+      }
+
+      const aName = String(a.name || '').trim();
+      const bName = String(b.name || '').trim();
+      return aName.localeCompare(bName, 'es');
+    })
+  );
+
+  const directivaMembers = useMemo(
+    () => sortMembersByTag(teamMembers.filter((member) => member.memberSection === 'DIRECTIVA')),
+    [teamMembers, tagPriority]
+  );
+
+  const staffMembers = useMemo(
+    () => sortMembersByTag(teamMembers.filter((member) => member.memberSection !== 'DIRECTIVA')),
+    [teamMembers, tagPriority]
+  );
+
+  const staffStructuredData = useMemo(() => {
+    const itemListElement = staffMembers.map((member, index) => {
+      const sameAs = [
+        member.linkedinUrl,
+        member.instagramUrl,
+        member.whatsappUrl,
+        member.externalUrl,
+      ].filter(Boolean);
+
+      const person = {
+        '@type': 'Person',
+        name: member.name,
+      };
+
+      if (member.role) person.jobTitle = member.role;
+      if (member.description) person.description = member.description;
+      if (sameAs.length > 0) person.sameAs = sameAs;
+
+      return {
+        '@type': 'ListItem',
+        position: index + 1,
+        item: person,
+      };
+    });
+
+    return {
+      '@context': 'https://schema.org',
+      '@type': 'ItemList',
+      name: 'Miembros de STAFF - Boreal Labs',
+      itemListOrder: 'https://schema.org/ItemListOrderAscending',
+      numberOfItems: staffMembers.length,
+      itemListElement,
+    };
+  }, [staffMembers]);
 
   const renderMemberCard = (member, index) => (
     <motion.div
@@ -265,6 +352,14 @@ const TeamPage = () => {
       <Helmet>
         <title>Nuestro Equipo - Boreal Labs</title>
         <meta name="description" content="Conoce al apasionado equipo detrás de Boreal Labs, dedicado a empoderar a la juventud nicaragüense." />
+        <meta name="robots" content="index, follow" />
+        <link rel="canonical" href={canonicalUrl} />
+        <meta property="og:title" content="Nuestro Equipo - Boreal Labs" />
+        <meta property="og:description" content="Conoce al equipo y miembros de STAFF de Boreal Labs." />
+        <meta property="og:url" content={canonicalUrl} />
+        <script type="application/ld+json">
+          {JSON.stringify(staffStructuredData)}
+        </script>
       </Helmet>
 
       <div className="pt-32 pb-20 bg-boreal-dark">

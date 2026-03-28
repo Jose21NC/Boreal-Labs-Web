@@ -350,7 +350,6 @@ const EventsPage = () => {
           return { ...ev, capacity: capacityNum, registeredCount };
         }));
 
-        console.log("Eventos cargados:", eventsWithCounts);
         setEvents(eventsWithCounts);
 
       } catch (error) {
@@ -445,7 +444,6 @@ const EventsPage = () => {
     try {
       if (navigator.share) {
         await navigator.share(shareData);
-        console.log('Enlace compartido exitosamente');
       } else {
         await navigator.clipboard.writeText(eventUrl);
         toast({ title: "Enlace Copiado", description: `URL copiada: ${eventUrl}` });
