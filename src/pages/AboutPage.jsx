@@ -14,6 +14,16 @@ import 'swiper/css/navigation';
 // Puedes añadir tus estilos personalizados o sobrescribir los de Swiper aquí si es necesario
 // import './swiper-custom.css'; 
 
+import quienesImage from '@/images/quienes.webp';
+import carouselB from '@/images/carrusel/b.webp';
+import carouselC from '@/images/carrusel/c.webp';
+import carouselD from '@/images/carrusel/d.webp';
+import carouselE from '@/images/carrusel/e.webp';
+import carouselF from '@/images/carrusel/f.webp';
+import carouselG from '@/images/carrusel/g.webp';
+import carouselH from '@/images/carrusel/h.webp';
+import carouselI from '@/images/carrusel/i.webp';
+
 const AboutPage = () => {
   const values = [
     {
@@ -48,16 +58,15 @@ const AboutPage = () => {
   ];
 
   // --- MODIFICACIÓN 2: DATOS PARA EL CARRUSEL ---
-  // ¡CAMBIA ESTAS RUTAS DE IMÁGENES Y ALT TEXTS!
   const carouselImages = [
-    { src: 'src/images/carrusel/b.webp', alt: 'Evento de Boreal Labs 1' },
-    { src: 'src/images/carrusel/c.webp', alt: 'Taller de innovación' },
-    { src: 'src/images/carrusel/d.webp', alt: 'Miembros del equipo colaborando' },
-    { src: 'src/images/carrusel/e.webp', alt: 'Charla inspiradora con un ponente' },
-    { src: 'src/images/carrusel/f.webp', alt: 'Jóvenes participando en un hackathon' },
-    { src: 'src/images/carrusel/g.webp', alt: 'Graduación de un programa de emprendimiento' },
-    { src: 'src/images/carrusel/h.webp', alt: 'Sesión de networking' },
-    { src: 'src/images/carrusel/i.webp', alt: 'Jóvenes desarrollando proyectos' },
+    { src: carouselB, alt: 'Evento de Boreal Labs 1' },
+    { src: carouselC, alt: 'Taller de innovación' },
+    { src: carouselD, alt: 'Miembros del equipo colaborando' },
+    { src: carouselE, alt: 'Charla inspiradora con un ponente' },
+    { src: carouselF, alt: 'Jóvenes participando en un hackathon' },
+    { src: carouselG, alt: 'Graduación de un programa de emprendimiento' },
+    { src: carouselH, alt: 'Sesión de networking' },
+    { src: carouselI, alt: 'Jóvenes desarrollando proyectos' },
   ];
 
   return (
@@ -93,7 +102,7 @@ const AboutPage = () => {
               <img
                 alt="Foto de miembros de Boreal Labs"
                 className="rounded-2xl shadow-2xl"
-                src="src/images/quienes.webp"
+                src={quienesImage}
                 width="1280"
                 height="853"
                 loading="lazy"

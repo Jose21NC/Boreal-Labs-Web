@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 // --- MODIFICACIÓN 1: IMPORTS ---
 // Se eliminaron Facebook, Linkedin, Twitter y toast. Solo se conserva Instagram.
 import { Instagram, Linkedin, Mail, MapPin, Phone } from 'lucide-react';
+import logoBoreal from '@/images/logoBoreal.svg';
 
 const TiktokIcon = ({ className }) => (
   <svg
@@ -35,9 +36,12 @@ const Footer = () => {
             {/* Se reemplazó el texto 'Boreal Labs' por una imagen. */}
             {/* ¡Asegúrate de que la ruta '/boreal-logo.svg' sea la correcta! */}
             <img 
-              src="src/images/logoBoreal.svg"
+              src={logoBoreal}
               alt="Boreal Labs Logo" 
               className="h-12 w-auto" // Ajusta la altura (h-10) según necesites
+              width="192"
+              height="48"
+              decoding="async"
             />
             {/* --- MODIFICACIÓN 4: TEXTO EN ESPAÑOL --- */}
             <p className="mt-4 text-gray-400 text-sm">
