@@ -5,9 +5,25 @@ import { Link } from 'react-router-dom';
 // Se agregó el ícono de 'Instagram'
 import { ArrowRight, Zap, Mic, Heart, Award, School as University, Building, Instagram, Star, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { defaultLinks, subscribeLinks, normalizeYouTubeUrl, subscribeHomeConfig, defaultHomeConfig } from '@/lib/configService';
 import headerImage from '@/images/headear.webp';
 import workshopImage from '@/images/taller.webp';
+
+const YOUTUBE_EMBED_URL = 'https://www.youtube.com/embed/TU_ID_DEL_VIDEO';
+
+const FALLBACK_HOME_CONFIG = {
+  impacts: [
+    { icon: 'Heart', metric: '+650', description: 'Jóvenes impactados a nivel nacional.' },
+    { icon: 'Award', metric: '12', description: 'Eventos y talleres realizados con éxito.' },
+    { icon: 'University', metric: '7', description: 'Alianzas con universidades y centros de innovación.' }
+  ],
+  partners: [
+    { name: 'Universidad Americana (UAM)', alt: 'Logo UAM', imgSrc: 'https://logosnicas.com/wp-content/uploads/2022/08/universidad_americana_2020.png' },
+    { name: 'Universidad Nacional de Ingeniería', alt: 'Logo UNI', imgSrc: 'https://www.ualn.edu.ni/wp-content/uploads/2023/02/UNI.png' },
+    { name: 'Tecnologico Nacional (INATEC)', alt: 'Logo INATEC', imgSrc: 'https://www.tecnacional.edu.ni/media/uploads/2016/11/18/logo-inatec-2016.png' },
+    { name: 'Universidad Nacional Autonoma de Nicaragua, Managua - UNAN', alt: 'Logo UNAN', imgSrc: 'https://www.ualn.edu.ni/wp-content/uploads/2023/02/UNAN-MANAGUA.png' },
+    { name: 'Aspire Institute Inc.', alt: 'Logo Aspire', imgSrc: 'https://www.aspireleaders.org/wp-content/uploads/2025/04/Aspire-logotype_red_lg_transparent-1.png' },
+  ]
+};
 
 const ScrollAnimatedSection = ({ children, className }) => {
   return (
@@ -29,25 +45,7 @@ const HomePage = () => {
   const instagramRef = useRef(null);
   const [shouldLoadInstagramWidget, setShouldLoadInstagramWidget] = useState(false);
 
-  // URL del video controlada desde Firestore con fallback
-  const [youtubeUrl, setYoutubeUrl] = useState(defaultLinks.youtubeVideoUrl);
-  // Estado para la configuración de la UI (Impacto y Aliados)
-  const [homeConfig, setHomeConfig] = useState(defaultHomeConfig);
-
-  useEffect(() => {
-    // Suscribirse a cambios en siteConfig/links
-    const unsubscribeLinks = subscribeLinks((links) => {
-      setYoutubeUrl(normalizeYouTubeUrl(links.youtubeUrl || links.youtubeVideoUrl));
-    });
-    // Suscribirse a cambios en siteConfig/home
-    const unsubscribeHome = subscribeHomeConfig((config) => {
-      setHomeConfig(config);
-    });
-    return () => {
-      unsubscribeLinks && unsubscribeLinks();
-      unsubscribeHome && unsubscribeHome();
-    };
-  }, []);
+  const [homeConfig] = useState(FALLBACK_HOME_CONFIG);
   
   const programs = [
     {
@@ -75,7 +73,11 @@ const HomePage = () => {
   const impacts = homeConfig.impacts.map(item => ({
     ...item,
     icon: iconMap[item.icon] || Heart // Por defecto Heart si no se encuentra
-  }));
+  })).filter((item) => {
+    const metric = String(item.metric || '').trim();
+    const description = String(item.description || '').toLowerCase();
+    return !(metric === '8' && description.includes('emprendimiento'));
+  });
   const hasCertificatesImpact = impacts.some((item) => {
     const metric = String(item.metric || '').toLowerCase();
     const description = String(item.description || '').toLowerCase();
@@ -225,7 +227,7 @@ const HomePage = () => {
              <div className="relative overflow-hidden rounded-2xl shadow-xl" style={{ paddingBottom: '56.25%' }}>
                <iframe 
                  className="absolute top-0 left-0 w-full h-full"
-                 src={youtubeUrl}
+                 src={YOUTUBE_EMBED_URL}
                  title="Video de Boreal Labs"
                  frameBorder="0" 
                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
@@ -358,23 +360,25 @@ const HomePage = () => {
             </div>
             
             {shouldLoadInstagramWidget ? (
-              <div
-                className="embedsocial-hashtag"
-                data-ref="25ea543c23c71d10a060d4c621620aaa5cd54958"
-              >
-                <a
-                  className="feed-powered-by-es feed-powered-by-es-feed-img es-widget-branding"
-                  href="https://embedsocial.com/social-media-aggregator/"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  title="Instagram widget"
+              <div className="glass-effect rounded-2xl min-h-[520px] overflow-hidden">
+                <div
+                  className="embedsocial-hashtag"
+                  data-ref="25ea543c23c71d10a060d4c621620aaa5cd54958"
                 >
-                  <img src="https://embedsocial.com/cdn/icon/embedsocial-logo.webp" alt="EmbedSocial" width="64" height="64" loading="lazy" decoding="async" />
-                  <div className="es-widget-branding-text">Instagram widget</div>
-                </a>
+                  <a
+                    className="feed-powered-by-es feed-powered-by-es-feed-img es-widget-branding"
+                    href="https://embedsocial.com/social-media-aggregator/"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    title="Instagram widget"
+                  >
+                    <img src="https://embedsocial.com/cdn/icon/embedsocial-logo.webp" alt="EmbedSocial" width="64" height="64" loading="lazy" decoding="async" />
+                    <div className="es-widget-branding-text">Instagram widget</div>
+                  </a>
+                </div>
               </div>
             ) : (
-              <div className="glass-effect rounded-2xl min-h-[320px] flex items-center justify-center text-gray-400">
+              <div className="glass-effect rounded-2xl min-h-[520px] flex items-center justify-center text-gray-400">
                 Cargando feed de Instagram...
               </div>
             )}

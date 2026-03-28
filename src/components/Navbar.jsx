@@ -1,23 +1,20 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Menu, X, Wallet as WalletIcon } from 'lucide-react'; // Se eliminó 'Rocket' porque ya no se usa
 import { Button } from '@/components/ui/button';
-import { defaultLinks, subscribeLinks } from '@/lib/configService';
 import logoBoreal from '@/images/logoBoreal.svg';
+
+const FALLBACK_LINKS = {
+  walletUrl: 'https://wallet.borealabs.org',
+  communityUrl: 'https://chat.whatsapp.com/HAaxnHFYsuaBltQ812XhRW?mode=wwc',
+};
 
 const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false);
-  const [walletUrl, setWalletUrl] = useState(defaultLinks.walletUrl);
-  const [communityUrl, setCommunityUrl] = useState(defaultLinks.communityUrl);
+  const walletUrl = FALLBACK_LINKS.walletUrl;
+  const communityUrl = FALLBACK_LINKS.communityUrl;
   const location = useLocation();
-  useEffect(() => {
-    const unsub = subscribeLinks((links) => {
-      setWalletUrl(links.walletUrl || defaultLinks.walletUrl);
-      setCommunityUrl(links.communityUrl || defaultLinks.communityUrl);
-    });
-    return () => unsub && unsub();
-  }, []);
 
 
   const navLinks = [
@@ -48,7 +45,10 @@ const Navbar = () => {
             <img 
               src={logoBoreal} 
               alt="Boreal Labs" 
-              className="h-12 w-auto" 
+              className="h-12 w-auto"
+              width="192"
+              height="48"
+              decoding="async"
             />
           </Link>
           {/* --- FIN MODIFICACIÓN 1 --- */}

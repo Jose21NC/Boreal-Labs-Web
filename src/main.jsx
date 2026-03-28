@@ -23,7 +23,9 @@ const printBorealConsoleGreeting = () => {
   );
 };
 
-printBorealConsoleGreeting();
+if (import.meta.env.DEV) {
+  printBorealConsoleGreeting();
+}
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <App />

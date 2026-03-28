@@ -7,10 +7,9 @@ import { getAuth, signOut } from 'firebase/auth';
 import { useToast } from '@/components/ui/use-toast';
 import { useNavigate } from 'react-router-dom';
 import Cropper from 'react-easy-crop';
-import { Users, LogOut, CheckCircle, Download, Calendar, Activity, XCircle, Search, Trash2, Menu, Plus, Minus, SlidersHorizontal, BadgeDollarSign, Eye } from 'lucide-react';
+import { Users, LogOut, CheckCircle, Calendar, Activity, XCircle, Search, Trash2, Menu, Plus, Minus, SlidersHorizontal, BadgeDollarSign, Eye } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Helmet } from 'react-helmet-async';
-import * as XLSX from 'xlsx';
 
 const VolunteerAdminPanel = () => {
     const [volunteers, setVolunteers] = useState([]);
@@ -471,31 +470,6 @@ const VolunteerAdminPanel = () => {
         } catch (error) {
             toast({ title: 'Error', description: 'Problema al cerrar sesión.', variant: 'destructive' });
         }
-    };
-
-    const handleExportExcel = () => {
-        if (volunteers.length === 0) return;
-        const exportData = volunteers.map((v, i) => ({
-            '#': i + 1,
-            'Nombre': v.fullName || '',
-            'Edad': v.edad || '',
-            'Correo': v.email || '',
-            'WhatsApp': v.whatsapp || '',
-            'Ciudad': v.ciudad || '',
-            'Talla': v.talla || '',
-            'Procedencia': v.procedencia || '',
-            'Comentarios': getAdditionalComments(v),
-            'Créditos': v.creditos || 0,
-            'Turnos Fijos': Array.isArray(v.turnos) ? v.turnos.join(', ') : (v.turnos || ''),
-            'Horarios Personalizados': getPersonalizedSlots(v).join(', '),
-            'Fecha Registro': v.fechaRegistro && typeof v.fechaRegistro.toDate === 'function' ? v.fechaRegistro.toDate().toLocaleString() : ''
-        }));
-        const ws = XLSX.utils.json_to_sheet(exportData);
-        ws['!cols'] = [{ wch: 5 }, { wch: 25 }, { wch: 10 }, { wch: 25 }, { wch: 15 }, { wch: 15 }, { wch: 10 }, { wch: 20 }, { wch: 10 }, { wch: 25 }, { wch: 30 }, { wch: 20 }];
-        const wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, 'Voluntarios');
-        XLSX.writeFile(wb, 'Voluntarios_2026.xlsx');
-        toast({ title: 'Exportación exitosa', description: 'El archivo Excel se descargó.' });
     };
 
     // Bulk Delete Feature
@@ -1445,14 +1419,6 @@ const VolunteerAdminPanel = () => {
                                                         <Trash2 className="w-4 h-4 mr-2" /> Eliminar ({selectedVols.length})
                                                     </Button>
                                                 )}
-                                                <Button 
-                                                    onClick={handleExportExcel} 
-                                                    disabled={volunteers.length === 0}
-                                                    className="bg-boreal-aqua hover:bg-emerald-500 text-black font-semibold rounded-lg"
-                                                >
-                                                    <Download className="w-4 h-4 md:mr-2" />
-                                                    <span className="hidden md:inline">Exportar Excel</span>
-                                                </Button>
                                             </div>
                                         </div>
                                     </div>

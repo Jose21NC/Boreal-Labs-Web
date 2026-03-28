@@ -1,13 +1,22 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import path from 'path'
+import { ViteImageOptimizer } from 'vite-plugin-image-optimizer'
 
 // https://vitejs.dev/config/
 export default defineConfig({
   // Permite publicar assets en un CDN si se define VITE_ASSET_BASE.
   // Ejemplo: VITE_ASSET_BASE=https://cdn.tudominio.com/
   base: process.env.VITE_ASSET_BASE || '/',
-  plugins: [react()],
+  plugins: [
+    react(),
+    ViteImageOptimizer({
+      png: { quality: 80 },
+      jpeg: { quality: 80 },
+      jpg: { quality: 80 },
+      webp: { quality: 80 },
+    })
+  ],
   build: {
     target: 'es2018',
     cssCodeSplit: true,

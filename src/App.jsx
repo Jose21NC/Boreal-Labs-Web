@@ -7,7 +7,6 @@ import { Toaster } from '@/components/ui/toaster';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import ScrollToTop from '@/components/ScrollToTop';
-import AdminGate from '@/components/AdminGate';
 
 const HomePage = lazy(() => import('@/pages/HomePage'));
 const AboutPage = lazy(() => import('@/pages/AboutPage'));
@@ -22,6 +21,7 @@ const LayoutEditor = lazy(() => import('@/pages/LayoutEditor'));
 const PaginaValidacion = lazy(() => import('@/pages/PaginaValidacion'));
 const AdminPanel = lazy(() => import('@/pages/AdminPanel'));
 const VolunteerAdminPanel = lazy(() => import('@/pages/VolunteerAdminPanel'));
+const AdminGate = lazy(() => import('@/components/AdminGate'));
 
 // Se importa el proveedor de reCAPTCHA
 // Google reCAPTCHA v3 removed - using only reCAPTCHA v2 where needed

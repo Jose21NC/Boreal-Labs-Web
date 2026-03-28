@@ -90,7 +90,15 @@ const AboutPage = () => {
               viewport={{ once: true }}
               transition={{ duration: 0.8 }}
             >
-              <img alt="Foto de miembros de Boreal Labs" className="rounded-2xl shadow-2xl" src="src/images/quienes.webp" />
+              <img
+                alt="Foto de miembros de Boreal Labs"
+                className="rounded-2xl shadow-2xl"
+                src="src/images/quienes.webp"
+                width="1280"
+                height="853"
+                loading="lazy"
+                decoding="async"
+              />
             </motion.div>
 
             <motion.div
@@ -187,6 +195,10 @@ const AboutPage = () => {
                     src={image.src} 
                     alt={image.alt} 
                     className="w-full h-80 object-cover rounded-xl" // Ajusta h-80 a la altura deseada
+                    width="1280"
+                    height="853"
+                    loading="lazy"
+                    decoding="async"
                   />
                 </SwiperSlide>
               ))}

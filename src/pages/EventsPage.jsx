@@ -527,7 +527,16 @@ const EventsPage = () => {
                       {/* Imagen Opcional del Evento */}
                         {(event.resolvedImage || event.image) && (
                          <div className="mb-4 overflow-hidden rounded-lg aspect-video relative">
-                           <img src={event.resolvedImage || event.image} alt={`Imagen de ${event.title}`} className="w-full h-full object-cover"/>
+                           <img
+                             src={event.resolvedImage || event.image}
+                             alt={`Imagen de ${event.title}`}
+                             className="w-full h-full object-cover"
+                             width="1280"
+                             height="720"
+                             loading="lazy"
+                             decoding="async"
+                             fetchPriority="low"
+                           />
                            {(isEventPast(event) || isSoldOut(event)) && (
                              <>
                                <div className="absolute inset-0 bg-black/60 backdrop-blur-[1px] pointer-events-none" />
