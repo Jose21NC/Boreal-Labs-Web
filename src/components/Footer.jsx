@@ -1,5 +1,4 @@
 import React from 'react';
-import { motion } from 'framer-motion';
 // --- MODIFICACIÓN 1: IMPORTS ---
 // Se eliminaron Facebook, Linkedin, Twitter y toast. Solo se conserva Instagram.
 import { Instagram, Linkedin, Mail, MapPin, Phone } from 'lucide-react';
@@ -74,39 +73,33 @@ const Footer = () => {
             <div className="flex space-x-4">
               {/* --- MODIFICACIÓN 5: SOLO INSTAGRAM --- */}
               {/* Se eliminó el .map() y se dejó un solo enlace <a> a Instagram */}
-              <motion.a
+              <a
                 href="https://instagram.com/boreal.labs" // <-- ¡CAMBIA ESTA URL POR LA DE TU INSTAGRAM!
                 target="_blank"
                 rel="noopener noreferrer"
-                whileHover={{ scale: 1.1, y: -2 }}
-                whileTap={{ scale: 0.95 }}
-                className="bg-white/10 hover:bg-white/20 p-3 rounded-lg transition-colors"
+                className="bg-white/10 hover:bg-white/20 p-3 rounded-lg transition-colors hover:-translate-y-0.5"
                 aria-label="Instagram"
               >
                 <Instagram className="w-5 h-5 text-boreal-aqua" />
-              </motion.a>
-              <motion.a
+              </a>
+              <a
                 href="https://www.tiktok.com/@boreal.labs"
                 target="_blank"
                 rel="noopener noreferrer"
-                whileHover={{ scale: 1.1, y: -2 }}
-                whileTap={{ scale: 0.95 }}
-                className="bg-white/10 hover:bg-white/20 p-3 rounded-lg transition-colors"
+                className="bg-white/10 hover:bg-white/20 p-3 rounded-lg transition-colors hover:-translate-y-0.5"
                 aria-label="TikTok"
               >
                 <TiktokIcon className="w-5 h-5 text-boreal-aqua" />
-              </motion.a>
-              <motion.a
+              </a>
+              <a
                 href="https://www.linkedin.com/company/boreal-labs/"
                 target="_blank"
                 rel="noopener noreferrer"
-                whileHover={{ scale: 1.1, y: -2 }}
-                whileTap={{ scale: 0.95 }}
-                className="bg-white/10 hover:bg-white/20 p-3 rounded-lg transition-colors"
+                className="bg-white/10 hover:bg-white/20 p-3 rounded-lg transition-colors hover:-translate-y-0.5"
                 aria-label="LinkedIn"
               >
                 <Linkedin className="w-5 h-5 text-boreal-aqua" />
-              </motion.a>
+              </a>
             </div>
           </div>
         </div>

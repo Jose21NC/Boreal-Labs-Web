@@ -1,0 +1,8 @@
+User-agent: *
+Allow: /
+Disallow: /admin
+Disallow: /admin/
+Disallow: /equipo/editar
+Disallow: /voluntariado/admin
+
+Sitemap: https://borealabs.org/sitemap.xml

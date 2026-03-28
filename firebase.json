@@ -11,7 +11,7 @@
     ],
     "headers": [
       {
-        "source": "**/*.@(js|css|mjs)",
+        "source": "/assets/**",
         "headers": [
           {
             "key": "Cache-Control",
@@ -20,7 +20,7 @@
         ]
       },
       {
-        "source": "**/*.@(webp|png|jpg|jpeg|gif|svg|ico|woff|woff2)",
+        "source": "**/*.@(webp|png|jpg|jpeg|gif|svg|ico|woff|woff2|js|css|mjs)",
         "headers": [
           {
             "key": "Cache-Control",

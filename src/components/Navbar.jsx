@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { motion, AnimatePresence } from 'framer-motion';
 import { Menu, X, Wallet as WalletIcon } from 'lucide-react'; // Se eliminó 'Rocket' porque ya no se usa
 import { Button } from '@/components/ui/button';
 import logoBoreal from '@/images/logoBoreal.svg';
@@ -67,10 +66,7 @@ const Navbar = () => {
                   {link.name}
                 </span>
                 {isActive(link.path) && (
-                  <motion.div
-                    layoutId="navbar-indicator"
-                    className="absolute -bottom-1 left-0 right-0 h-0.5 bg-gradient-to-r from-boreal-aqua to-boreal-blue"
-                  />
+                  <div className="absolute -bottom-1 left-0 right-0 h-0.5 bg-gradient-to-r from-boreal-aqua to-boreal-blue" />
                 )}
               </Link>
             ))}
@@ -105,6 +101,9 @@ const Navbar = () => {
               size="icon"
               onClick={() => setIsOpen(!isOpen)}
               className="text-white"
+              aria-label={isOpen ? 'Cerrar menú de navegación' : 'Abrir menú de navegación'}
+              aria-expanded={isOpen}
+              aria-controls="mobile-nav-menu"
             >
               {isOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
             </Button>
@@ -112,14 +111,8 @@ const Navbar = () => {
         </div>
       </div>
 
-      <AnimatePresence>
-        {isOpen && (
-          <motion.div
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: 'auto' }}
-            exit={{ opacity: 0, height: 0 }}
-            className="md:hidden glass-effect border-t border-white/10"
-          >
+      {isOpen && (
+          <div id="mobile-nav-menu" className="md:hidden glass-effect border-t border-white/10">
             <div className="px-4 py-6 space-y-4">
               {navLinks.map((link) => (
                 <Link
@@ -157,9 +150,8 @@ const Navbar = () => {
               </Link>
               {/* --- FIN MODIFICACIÓN 3 --- */}
             </div>
-          </motion.div>
+          </div>
         )}
-      </AnimatePresence>
     </nav>
   );
 };

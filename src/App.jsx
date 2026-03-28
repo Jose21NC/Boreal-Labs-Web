@@ -7,8 +7,8 @@ import { Toaster } from '@/components/ui/toaster';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import ScrollToTop from '@/components/ScrollToTop';
+import HomePage from '@/pages/HomePage';
 
-const HomePage = lazy(() => import('@/pages/HomePage'));
 const AboutPage = lazy(() => import('@/pages/AboutPage'));
 const TeamPage = lazy(() => import('@/pages/TeamPage'));
 const TeamEditorPage = lazy(() => import('@/pages/TeamEditorPage'));

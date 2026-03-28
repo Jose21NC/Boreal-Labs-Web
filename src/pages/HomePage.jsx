@@ -1,42 +1,41 @@
-import React, { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Helmet } from 'react-helmet-async';
-import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
 // Se agregó el ícono de 'Instagram'
 import { ArrowRight, Zap, Mic, Heart, Award, School as University, Building, Instagram, Star, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import headerImage from '@/images/headear.webp';
+import headerImageMobile from '@/images/headear-mobile.webp';
+import headerImageMobile480 from '@/images/headear-mobile-480.webp';
 import workshopImage from '@/images/taller.webp';
-
-const YOUTUBE_EMBED_URL = 'https://www.youtube.com/embed/TU_ID_DEL_VIDEO';
+import workshopImage768 from '@/images/taller-768.webp';
+import workshopImageMobile from '@/images/taller-mobile.webp';
+import workshopImageMobile480 from '@/images/taller-mobile-480.webp';
+import partnerUam from '@/images/partners/uam.webp';
+import partnerUni from '@/images/partners/uni.webp';
+import partnerInatec from '@/images/partners/inatec.webp';
+import partnerUnanNuevo from '@/images/partners/unanNuevo.webp';
+import partnerAspire from '@/images/partners/aspire.webp';
+import partnerTedx from '@/images/partners/logo-white.webp';
 
 const FALLBACK_HOME_CONFIG = {
   impacts: [
-    { icon: 'Heart', metric: '+650', description: 'Jóvenes impactados a nivel nacional.' },
+    { icon: 'Heart', metric: '+850', description: 'Jóvenes impactados a nivel nacional.' },
     { icon: 'Award', metric: '12', description: 'Eventos y talleres realizados con éxito.' },
     { icon: 'University', metric: '7', description: 'Alianzas con universidades y centros de innovación.' }
   ],
   partners: [
-    { name: 'Universidad Americana (UAM)', alt: 'Logo UAM', imgSrc: 'https://logosnicas.com/wp-content/uploads/2022/08/universidad_americana_2020.png' },
-    { name: 'Universidad Nacional de Ingeniería', alt: 'Logo UNI', imgSrc: 'https://www.ualn.edu.ni/wp-content/uploads/2023/02/UNI.png' },
-    { name: 'Tecnologico Nacional (INATEC)', alt: 'Logo INATEC', imgSrc: 'https://www.tecnacional.edu.ni/media/uploads/2016/11/18/logo-inatec-2016.png' },
-    { name: 'Universidad Nacional Autonoma de Nicaragua, Managua - UNAN', alt: 'Logo UNAN', imgSrc: 'https://www.ualn.edu.ni/wp-content/uploads/2023/02/UNAN-MANAGUA.png' },
-    { name: 'Aspire Institute Inc.', alt: 'Logo Aspire', imgSrc: 'https://www.aspireleaders.org/wp-content/uploads/2025/04/Aspire-logotype_red_lg_transparent-1.png' },
+    { name: 'Universidad Americana (UAM)', alt: 'Logo UAM', imgSrc: partnerUam, width: 256, height: 91 },
+    { name: 'Universidad Nacional de Ingeniería', alt: 'Logo UNI', imgSrc: partnerUni, width: 207, height: 128 },
+    { name: 'Tecnologico Nacional (INATEC)', alt: 'Logo INATEC', imgSrc: partnerInatec, width: 218, height: 128 },
+    { name: 'Universidad Nacional Autonoma de Nicaragua, Managua - UNAN', alt: 'Logo UNAN', imgSrc: partnerUnanNuevo, width: 181, height: 128 },
+    { name: 'Aspire Institute Inc.', alt: 'Logo Aspire', imgSrc: partnerAspire, width: 256, height: 97 },
+    { name: 'TEDx Avenida Bolivar', alt: 'Logo TEDx Avenida Bolivar', imgSrc: partnerTedx, width: 256, height: 89 },
   ]
 };
 
 const ScrollAnimatedSection = ({ children, className }) => {
-  return (
-    <motion.section
-      className={className}
-      initial={{ opacity: 0, y: 50 }}
-      whileInView={{ opacity: 1, y: 0 }}
-      viewport={{ once: true, amount: 0.3 }}
-      transition={{ duration: 0.8 }}
-    >
-      {children}
-    </motion.section>
-  );
+  return <section className={className}>{children}</section>;
 };
 
 const HomePage = () => {
@@ -145,7 +144,16 @@ const HomePage = () => {
         <meta name="twitter:card" content="summary_large_image" />
         <meta name="twitter:title" content="Boreal Labs | Juventud que innova, crea y transforma" />
         <meta name="twitter:description" content="Comunidad juvenil que impulsa innovación y emprendimiento en Nicaragua y Latinoamérica." />
-        <link rel="preload" as="image" href={headerImage} fetchpriority="high" />
+        <link
+          rel="preload"
+          as="image"
+          href={headerImageMobile}
+          media="(max-width: 768px)"
+          imagesrcset={`${headerImageMobile480} 480w, ${headerImageMobile} 800w`}
+          imagesizes="100vw"
+          fetchpriority="high"
+        />
+        <link rel="preload" as="image" href={headerImage} media="(min-width: 769px)" fetchpriority="high" />
       </Helmet>
 
       <div>
@@ -153,15 +161,17 @@ const HomePage = () => {
         <section className="relative min-h-screen flex items-center justify-center text-center text-white overflow-hidden">
           <div className="absolute inset-0 bg-boreal-dark z-10 opacity-60"></div>
           <div className="absolute inset-0 z-0">
-             <img alt="Grupo de jovenes en evento de lanzamiento de Boreal Labs" className="w-full h-full object-cover" src={headerImage} width="1920" height="1080" fetchpriority="high" decoding="async" />
+             <picture>
+              <source
+                media="(max-width: 768px)"
+                srcSet={`${headerImageMobile480} 480w, ${headerImageMobile} 800w`}
+                sizes="100vw"
+              />
+              <img alt="Grupo de jovenes en evento de lanzamiento de Boreal Labs" className="w-full h-full object-cover" src={headerImage} width="1920" height="1080" fetchpriority="high" decoding="async" />
+             </picture>
           </div>
-          <motion.div
-            className="relative z-20 max-w-4xl mx-auto px-4"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 1.0, delay: 0.2 }}
-          >
-            <h1 className="text-4xl md:text-6xl font-black tracking-tight">
+          <div className="relative z-20 max-w-4xl mx-auto px-4 min-h-[350px] md:min-h-[380px] flex flex-col items-center justify-center">
+            <h1 className="text-4xl md:text-6xl font-black tracking-tight leading-tight">
               #Juventud{' '}
               <span>
                 que
@@ -193,51 +203,20 @@ const HomePage = () => {
               <span className="text-boreal-aqua">Nicaragua</span>
             </h1>
             
-            <motion.p 
-              className="mt-6 text-lg md:text-xl max-w-2xl mx-auto text-white"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ duration: 1.0, delay: 0.8 }}
-            >
+            <p className="mt-6 text-lg md:text-xl max-w-2xl mx-auto text-white">
               Somos una comunidad juvenil apasionada que busca transformar activamente el futuro de Nicaragua y Latinoamérica a través de la innovación y el emprendimiento.
-            </motion.p>
+            </p>
 
-            <motion.div 
-              className="mt-8 flex justify-center"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 1.0, delay: 1.2 }}
-            >
+            <div className="mt-8 flex justify-center">
               <Link to="/eventos">
                 <Button size="lg" className="bg-gradient-to-r from-boreal-blue to-boreal-purple hover:opacity-90 text-white px-8 py-6 text-lg font-bold">
                   Ver Próximos Eventos
                   <ArrowRight className="ml-2 w-5 h-5" />
                 </Button>
               </Link>
-            </motion.div>
-          </motion.div>
-        </section>
-
-        {/* --- SECCIÓN VIDEO --- */}
-        <ScrollAnimatedSection className="py-20 bg-boreal-dark">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-             <h2 className="text-3xl md:text-4xl font-bold text-center mb-12">
-               Conoce <span className="text-gradient">Nuestra Esencia</span>
-             </h2>
-             <div className="relative overflow-hidden rounded-2xl shadow-xl" style={{ paddingBottom: '56.25%' }}>
-               <iframe 
-                 className="absolute top-0 left-0 w-full h-full"
-                 src={YOUTUBE_EMBED_URL}
-                 title="Video de Boreal Labs"
-                 frameBorder="0" 
-                 allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
-                 loading="lazy"
-                 referrerPolicy="strict-origin-when-cross-origin"
-                 allowFullScreen
-               ></iframe>
-             </div>
+            </div>
           </div>
-        </ScrollAnimatedSection>
+        </section>
 
         {/* --- SECCIÓN "UNIENDO MENTES" --- */}
         <ScrollAnimatedSection className="py-20 bg-boreal-dark">
@@ -249,15 +228,24 @@ const HomePage = () => {
               Boreal Labs es una organización sin fines de lucro, liderada por jóvenes, que articula esfuerzos y crea espacios para el desarrollo de habilidades en innovación y emprendimiento en la juventud nicaragüense.
             </p>
             <div className="mt-12 flex justify-center">
-              <img 
-                src={workshopImage}
-                alt="Jóvenes de Boreal Labs en un taller" 
-                className="rounded-2xl shadow-xl object-cover w-full max-w-3xl h-auto"
-                width="1280"
-                height="720"
-                loading="lazy"
-                decoding="async"
-              />
+              <picture>
+                <source
+                  media="(max-width: 768px)"
+                  srcSet={`${workshopImageMobile480} 480w, ${workshopImageMobile} 800w`}
+                  sizes="(max-width: 768px) 92vw, 768px"
+                />
+                <img 
+                  src={workshopImage768}
+                  srcSet={`${workshopImage768} 768w, ${workshopImage} 1280w`}
+                  sizes="(max-width: 768px) 92vw, 768px"
+                  alt="Jóvenes de Boreal Labs en un taller" 
+                  className="rounded-2xl shadow-xl object-cover w-full max-w-3xl h-auto"
+                  width="1280"
+                  height="720"
+                  loading="lazy"
+                  decoding="async"
+                />
+              </picture>
             </div>
             <div className="mt-12">
               <Link to="/nosotros">
@@ -320,13 +308,13 @@ const HomePage = () => {
             </div>
             <div className="flex flex-wrap justify-center items-start gap-x-12 md:gap-x-16 gap-y-8">
               {partners.map((partner, index) => (
-                <div key={index} className="flex flex-col items-center text-center gap-y-3 w-32">
+                <div key={index} className="flex flex-col items-center text-center gap-y-3 w-40">
                    <img 
                      src={partner.imgSrc} 
                      alt={partner.alt} 
-                     className="h-16 w-auto"
-                     width="128"
-                     height="64"
+                     className="h-16 w-auto object-contain"
+                     width={partner.width || 128}
+                     height={partner.height || 64}
                      loading="lazy"
                      decoding="async"
                    />

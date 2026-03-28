@@ -1,5 +1,11 @@
 import { db } from '@/firebase';
 import { doc, getDoc, onSnapshot } from 'firebase/firestore';
+import partnerUam from '@/images/partners/uam.webp';
+import partnerUni from '@/images/partners/uni.webp';
+import partnerInatec from '@/images/partners/inatec.webp';
+import partnerUnanNuevo from '@/images/partners/unanNuevo.webp';
+import partnerAspire from '@/images/partners/aspire.webp';
+import partnerTedx from '@/images/partners/logo-white.webp';
 
 // Colección y documento donde centralizamos enlaces y configuraciones editables
 const CONFIG_COLLECTION = 'siteConfig';
@@ -8,7 +14,7 @@ const HOME_DOC = 'home'; // Nuevo documento para info de la página de inicio
 
 // Valores por defecto para evitar fallos si el documento aún no existe
 export const defaultLinks = {
-  youtubeVideoUrl: 'https://www.youtube.com/embed/TU_ID_DEL_VIDEO',
+  youtubeVideoUrl: '',
   walletUrl: 'https://wallet.borealabs.org',
   communityUrl: 'https://chat.whatsapp.com/HAaxnHFYsuaBltQ812XhRW?mode=wwc',
   instagramUrl: 'https://instagram.com/boreal.labs',
@@ -80,17 +86,18 @@ export async function getLink(key, fallback) {
 // Configuración por defecto para la Home (Impacto y Aliados)
 export const defaultHomeConfig = {
   impacts: [
-    { icon: 'Heart', metric: '+650', description: 'Jóvenes impactados a nivel nacional.' },
+    { icon: 'Heart', metric: '+850', description: 'Jóvenes impactados a nivel nacional.' },
     { icon: 'Award', metric: '12', description: 'Eventos y talleres realizados con éxito.' },
     { icon: 'University', metric: '7', description: 'Alianzas con universidades y centros de innovación.' },
     { icon: 'Zap', metric: '8', description: 'Proyectos de emprendimiento en desarrollo.' }
   ],
   partners: [
-    { name: 'Universidad Americana (UAM)', alt: 'Logo UAM', imgSrc: 'https://logosnicas.com/wp-content/uploads/2022/08/universidad_americana_2020.png' },
-    { name: 'Universidad Nacional de Ingeniería', alt: 'Logo UNI', imgSrc: 'https://www.ualn.edu.ni/wp-content/uploads/2023/02/UNI.png' },
-    { name: 'Tecnologico Nacional (INATEC)', alt: 'Logo INATEC', imgSrc: 'https://www.tecnacional.edu.ni/media/uploads/2016/11/18/logo-inatec-2016.png' },
-    { name: 'Universidad Nacional Autonoma de Nicaragua, Managua - UNAN', alt: 'Logo UNAN', imgSrc: 'https://www.ualn.edu.ni/wp-content/uploads/2023/02/UNAN-MANAGUA.png' },
-    { name: 'Aspire Institute Inc.', alt: 'Logo Aspire', imgSrc: 'https://www.aspireleaders.org/wp-content/uploads/2025/04/Aspire-logotype_red_lg_transparent-1.png' },
+    { name: 'Universidad Americana (UAM)', alt: 'Logo UAM', imgSrc: partnerUam, width: 256, height: 91 },
+    { name: 'Universidad Nacional de Ingeniería', alt: 'Logo UNI', imgSrc: partnerUni, width: 207, height: 128 },
+    { name: 'Tecnologico Nacional (INATEC)', alt: 'Logo INATEC', imgSrc: partnerInatec, width: 218, height: 128 },
+    { name: 'Universidad Nacional Autonoma de Nicaragua, Managua - UNAN', alt: 'Logo UNAN', imgSrc: partnerUnanNuevo, width: 181, height: 128 },
+    { name: 'Aspire Institute Inc.', alt: 'Logo Aspire', imgSrc: partnerAspire, width: 256, height: 97 },
+    { name: 'TEDx Avenida Bolivar', alt: 'Logo TEDx Avenida Bolivar', imgSrc: partnerTedx, width: 256, height: 89 },
   ]
 };
 

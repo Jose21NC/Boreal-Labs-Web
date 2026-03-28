@@ -11,15 +11,15 @@ export default defineConfig({
   plugins: [
     react(),
     ViteImageOptimizer({
-      png: { quality: 80 },
-      jpeg: { quality: 80 },
-      jpg: { quality: 80 },
-      webp: { quality: 80 },
+      png: { quality: 75 },
+      jpeg: { quality: 72 },
+      jpg: { quality: 72 },
+      webp: { quality: 68 },
     })
   ],
   build: {
     target: 'es2018',
-    cssCodeSplit: true,
+    cssCodeSplit: false,
     rollupOptions: {
       output: {
         manualChunks(id) {
@@ -29,7 +29,6 @@ export default defineConfig({
           if (id.includes('framer-motion')) return 'vendor-motion';
           if (id.includes('react-router')) return 'vendor-router';
           if (id.includes('react-helmet-async')) return 'vendor-helmet';
-          if (id.includes('xlsx')) return 'vendor-xlsx';
           return 'vendor';
         },
       },
