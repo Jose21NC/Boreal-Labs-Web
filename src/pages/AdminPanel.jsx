@@ -76,6 +76,37 @@ const AdminPanel = () => {
     const [savingEvent, setSavingEvent] = useState(false);
     const [deleteEventOpen, setDeleteEventOpen] = useState(false);
     const [deletingEvent, setDeletingEvent] = useState(false);
+
+    // --- ESTADOS PARA COLUMNAS DINÁMICAS Y BUSCADOR ---
+    const [visibleColumns, setVisibleColumns] = useState(() => {
+        try {
+            const saved = localStorage.getItem('admin:visibleColumns');
+            return saved ? JSON.parse(saved) : {
+                whatsapp: false,
+                university: false,
+                country: false,
+                department: false,
+                comunidad: false,
+            };
+        } catch {
+            return {
+                whatsapp: false,
+                university: false,
+                country: false,
+                department: false,
+                comunidad: false,
+            };
+        }
+    });
+
+    const [searchTerm, setSearchTerm] = useState('');
+
+    useEffect(() => {
+        try {
+            localStorage.setItem('admin:visibleColumns', JSON.stringify(visibleColumns));
+        } catch {}
+    }, [visibleColumns]);
+
     const [participantOpen, setParticipantOpen] = useState(false);
     const [activeParticipant, setActiveParticipant] = useState(null);
     const [editParticipantOpen, setEditParticipantOpen] = useState(false);
@@ -293,7 +324,27 @@ const AdminPanel = () => {
     const organizeByEvent = (data, manual = []) => {
         const events = {};
         data.forEach(registration => {
-            const { eventName, tipoAsistencia, userEmail, userName, statusAsistencia, id, tipo, modalidad, customEventName } = registration;
+            const {
+                eventName,
+                tipoAsistencia,
+                userEmail,
+                userName,
+                statusAsistencia,
+                id,
+                tipo,
+                modalidad,
+                customEventName,
+                userWhatsapp,
+                whatsapp,
+                userUniversity,
+                university,
+                userCountry,
+                country,
+                userDepartment,
+                department,
+                isCommunityMember,
+                registrationDate
+            } = registration;
             const key = eventName || 'Sin evento';
             if (!events[key]) {
                 events[key] = [];
@@ -307,6 +358,12 @@ const AdminPanel = () => {
                 tipoAsistencia, // compatibilidad con datos antiguos
                 statusAsistencia,
                 customEventName,
+                userWhatsapp: userWhatsapp || whatsapp || '',
+                userUniversity: userUniversity || university || '',
+                userCountry: userCountry || country || '',
+                userDepartment: userDepartment || department || '',
+                isCommunityMember: isCommunityMember || false,
+                registrationDate: registrationDate || null,
             });
         });
         manual.forEach((evt) => {
@@ -353,8 +410,25 @@ const AdminPanel = () => {
 
     const currentList = useMemo(() => {
         const list = eventData[selectedEvent] || [];
-        return [...list].sort((a, b) => (a.userName || '').localeCompare(b.userName || ''));
-    }, [eventData, selectedEvent]);
+        const queryText = (searchTerm || '').toLowerCase().trim();
+        const filtered = list.filter((reg) => {
+            if (!queryText) return true;
+            return (
+                (reg.userName || '').toLowerCase().includes(queryText) ||
+                (reg.userEmail || '').toLowerCase().includes(queryText) ||
+                (reg.userCountry || '').toLowerCase().includes(queryText) ||
+                (reg.userUniversity || '').toLowerCase().includes(queryText) ||
+                (reg.cargo || '').toLowerCase().includes(queryText) ||
+                (reg.userCargo || '').toLowerCase().includes(queryText) ||
+                (reg.motivo || '').toLowerCase().includes(queryText) ||
+                (reg.whyAttend || '').toLowerCase().includes(queryText) ||
+                String(reg.edad || reg.userAge || '').includes(queryText) ||
+                (reg.userWhatsapp || '').toLowerCase().includes(queryText) ||
+                (reg.userDepartment || '').toLowerCase().includes(queryText)
+            );
+        });
+        return [...filtered].sort((a, b) => (a.userName || '').localeCompare(b.userName || ''));
+    }, [eventData, selectedEvent, searchTerm]);
 
     const stats = useMemo(() => {
         const list = eventData[selectedEvent] || [];
@@ -1357,6 +1431,82 @@ const AdminPanel = () => {
                         <p>No hay registros para este evento.</p>
                     ) : (
                         <>
+                        {/* Buscador y Selector de Columnas Visibles */}
+                        <div className="bg-white/5 rounded-lg border border-white/10 p-4 mb-4 mt-2 space-y-4">
+                            <div className="flex flex-col md:flex-row gap-3 items-center justify-between">
+                                <div className="w-full md:max-w-md relative">
+                                    <Input
+                                        type="text"
+                                        placeholder="Buscar por nombre, email, país, universidad, whatsapp..."
+                                        value={searchTerm}
+                                        onChange={(e) => setSearchTerm(e.target.value)}
+                                        className="bg-boreal-dark/60 border-white/10 text-white placeholder-neutral-500 text-sm h-10 w-full pl-3 pr-10"
+                                    />
+                                    {searchTerm && (
+                                        <button
+                                            type="button"
+                                            onClick={() => setSearchTerm('')}
+                                            className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-white text-xs"
+                                        >
+                                            ✕
+                                        </button>
+                                    )}
+                                </div>
+                                <span className="text-xs opacity-60 self-end md:self-center">
+                                    Mostrando {currentList.length} de {stats.total} registros
+                                </span>
+                            </div>
+                            <div className="border-t border-white/5 pt-3">
+                                <span className="text-xs opacity-75 font-semibold block mb-2 text-boreal-aqua">👁️ Mostrar columnas adicionales:</span>
+                                <div className="flex flex-wrap gap-x-6 gap-y-2 text-xs">
+                                    <label className="flex items-center gap-2 cursor-pointer select-none text-neutral-300 hover:text-white">
+                                        <input
+                                            type="checkbox"
+                                            checked={visibleColumns.whatsapp}
+                                            onChange={(e) => setVisibleColumns(prev => ({ ...prev, whatsapp: e.target.checked }))}
+                                            className="rounded border-white/20 bg-boreal-dark text-boreal-purple focus:ring-0 focus:ring-offset-0"
+                                        />
+                                        <span>📞 WhatsApp / Teléfono</span>
+                                    </label>
+                                    <label className="flex items-center gap-2 cursor-pointer select-none text-neutral-300 hover:text-white">
+                                        <input
+                                            type="checkbox"
+                                            checked={visibleColumns.university}
+                                            onChange={(e) => setVisibleColumns(prev => ({ ...prev, university: e.target.checked }))}
+                                            className="rounded border-white/20 bg-boreal-dark text-boreal-purple focus:ring-0 focus:ring-offset-0"
+                                        />
+                                        <span>🏫 Universidad</span>
+                                    </label>
+                                    <label className="flex items-center gap-2 cursor-pointer select-none text-neutral-300 hover:text-white">
+                                        <input
+                                            type="checkbox"
+                                            checked={visibleColumns.country}
+                                            onChange={(e) => setVisibleColumns(prev => ({ ...prev, country: e.target.checked }))}
+                                            className="rounded border-white/20 bg-boreal-dark text-boreal-purple focus:ring-0 focus:ring-offset-0"
+                                        />
+                                        <span>🌍 País</span>
+                                    </label>
+                                    <label className="flex items-center gap-2 cursor-pointer select-none text-neutral-300 hover:text-white">
+                                        <input
+                                            type="checkbox"
+                                            checked={visibleColumns.department}
+                                            onChange={(e) => setVisibleColumns(prev => ({ ...prev, department: e.target.checked }))}
+                                            className="rounded border-white/20 bg-boreal-dark text-boreal-purple focus:ring-0 focus:ring-offset-0"
+                                        />
+                                        <span>🗺️ Departamento</span>
+                                    </label>
+                                    <label className="flex items-center gap-2 cursor-pointer select-none text-neutral-300 hover:text-white">
+                                        <input
+                                            type="checkbox"
+                                            checked={visibleColumns.comunidad}
+                                            onChange={(e) => setVisibleColumns(prev => ({ ...prev, comunidad: e.target.checked }))}
+                                            className="rounded border-white/20 bg-boreal-dark text-boreal-purple focus:ring-0 focus:ring-offset-0"
+                                        />
+                                        <span>👥 Miembro Boreal</span>
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
                         {/* Vista móvil: tarjetas */}
                         <div className="sm:hidden space-y-3">
                             {currentList.map((reg, idx) => {
@@ -1379,6 +1529,22 @@ const AdminPanel = () => {
                                                 <div className="text-[11px] opacity-60">#{idx + 1}</div>
                                                 <div className="font-semibold truncate">{reg.userName || '-'}</div>
                                                 <div className="text-xs break-all opacity-80">{reg.userEmail}</div>
+                                                {visibleColumns.whatsapp && reg.userWhatsapp && (
+                                                    <div className="text-xs opacity-75 mt-0.5 text-neutral-300">📞 {reg.userWhatsapp}</div>
+                                                )}
+                                                {visibleColumns.university && (reg.userUniversity || reg.cargo) && (
+                                                    <div className="text-xs opacity-75 mt-0.5 text-neutral-300">
+                                                        {selectedEvent === 'TEDx Avenida Bolívar' ? '💼' : '🏫'} {reg.userUniversity || reg.cargo}
+                                                    </div>
+                                                )}
+                                                {visibleColumns.country && reg.userCountry && (
+                                                    <div className="text-xs opacity-75 mt-0.5 text-neutral-300">🌍 {reg.userCountry} {reg.userDepartment ? `(${reg.userDepartment})` : ''}</div>
+                                                )}
+                                                {visibleColumns.comunidad && (
+                                                    <div className="text-xs opacity-75 mt-0.5 text-neutral-300">
+                                                        👥 Miembro: {reg.isCommunityMember ? 'Sí' : 'No'}
+                                                    </div>
+                                                )}
                                             </div>
                                             {selectionMode && (
                                                 <input
@@ -1434,6 +1600,11 @@ const AdminPanel = () => {
                                         <th className="px-4 py-3 text-left font-semibold">#</th>
                                         <th className="px-4 py-3 text-left font-semibold">Nombre</th>
                                         <th className="px-4 py-3 text-left font-semibold">Email</th>
+                                        {visibleColumns.whatsapp && <th className="px-4 py-3 text-left font-semibold">WhatsApp</th>}
+                                        {visibleColumns.university && <th className="px-4 py-3 text-left font-semibold">{selectedEvent === 'TEDx Avenida Bolívar' ? 'Cargo o Profesión' : 'Universidad'}</th>}
+                                        {visibleColumns.country && <th className="px-4 py-3 text-left font-semibold">País</th>}
+                                        {visibleColumns.department && <th className="px-4 py-3 text-left font-semibold">Departamento</th>}
+                                        {visibleColumns.comunidad && <th className="px-4 py-3 text-left font-semibold">Miembro</th>}
                                         <th className="px-4 py-3 text-left font-semibold">Modalidad / Tipo</th>
                                         <th className="px-4 py-3 text-left font-semibold">Asistencia</th>
                                     </tr>
@@ -1462,6 +1633,37 @@ const AdminPanel = () => {
                                         cells.push(
                                             <td key="email" className="px-4 py-2 break-all">{reg.userEmail}</td>
                                         );
+                                        if (visibleColumns.whatsapp) {
+                                            cells.push(
+                                                <td key="whatsapp" className="px-4 py-2 truncate max-w-[150px]" title={reg.userWhatsapp || '-'}>{reg.userWhatsapp || '-'}</td>
+                                            );
+                                        }
+                                        if (visibleColumns.university) {
+                                            cells.push(
+                                                <td key="university" className="px-4 py-2 truncate max-w-[200px]" title={reg.userUniversity || reg.cargo || '-'}>{reg.userUniversity || reg.cargo || '-'}</td>
+                                            );
+                                        }
+                                        if (visibleColumns.country) {
+                                            cells.push(
+                                                <td key="country" className="px-4 py-2 truncate max-w-[120px]" title={reg.userCountry || '-'}>{reg.userCountry || '-'}</td>
+                                            );
+                                        }
+                                        if (visibleColumns.department) {
+                                            cells.push(
+                                                <td key="department" className="px-4 py-2 truncate max-w-[150px]" title={reg.userDepartment || '-'}>{reg.userDepartment || '-'}</td>
+                                            );
+                                        }
+                                        if (visibleColumns.comunidad) {
+                                            cells.push(
+                                                <td key="comunidad" className="px-4 py-2">
+                                                    {reg.isCommunityMember ? (
+                                                        <span className="text-xs px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">Sí</span>
+                                                    ) : (
+                                                        <span className="text-xs px-2 py-0.5 rounded bg-white/5 text-neutral-400 border border-white/5">No</span>
+                                                    )}
+                                                </td>
+                                            );
+                                        }
                                         cells.push(
                                             <td key="tipo" className="px-4 py-2">
                                                 <div className="flex flex-wrap items-center gap-2">
@@ -1996,6 +2198,25 @@ const AdminPanel = () => {
                         <div className="space-y-2 text-sm">
                             <div><span className="opacity-70">Nombre:</span> <strong>{activeParticipant.userName || '-'}</strong></div>
                             <div><span className="opacity-70">Correo:</span> <strong>{activeParticipant.userEmail || '-'}</strong></div>
+                            <div><span className="opacity-70">WhatsApp / Teléfono:</span> <strong>{activeParticipant.userWhatsapp || '-'}</strong></div>
+                            <div><span className="opacity-70">{activeParticipant.eventName === 'TEDx Avenida Bolívar' ? 'Cargo o Profesión:' : 'Universidad:'}</span> <strong>{activeParticipant.userUniversity || activeParticipant.cargo || activeParticipant.userCargo || '-'}</strong></div>
+                            {activeParticipant.eventName !== 'TEDx Avenida Bolívar' && (
+                                <div><span className="opacity-70">País:</span> <strong>{activeParticipant.userCountry || '-'}</strong></div>
+                            )}
+                            {activeParticipant.eventName === 'TEDx Avenida Bolívar' ? (
+                                <div><span className="opacity-70">Edad:</span> <strong>{activeParticipant.edad || activeParticipant.userAge || '-'}</strong></div>
+                            ) : (
+                                <div><span className="opacity-70">Departamento:</span> <strong>{activeParticipant.userDepartment || '-'}</strong></div>
+                            )}
+                            {activeParticipant.eventName !== 'TEDx Avenida Bolívar' && (
+                                <div><span className="opacity-70">Miembro Comunidad Boreal:</span> <strong>{activeParticipant.isCommunityMember ? 'Sí' : 'No'}</strong></div>
+                            )}
+                            {(activeParticipant.motivo || activeParticipant.whyAttend) && (
+                                <div className="mt-2 p-2 rounded bg-white/5 border border-white/10">
+                                    <span className="opacity-75 block font-semibold mb-1 text-xs">¿Por qué te gustaría asistir?</span>
+                                    <p className="text-xs text-neutral-300 italic leading-relaxed">"{activeParticipant.motivo || activeParticipant.whyAttend}"</p>
+                                </div>
+                            )}
                             <div><span className="opacity-70">Tipo:</span> <strong>{(activeParticipant.tipo || activeParticipant.tipoAsistencia || 'participante')}</strong></div>
                             <div><span className="opacity-70">Modalidad:</span> <strong>{normalizeModalidad(activeParticipant.modalidad) === 'virtual' ? 'Virtual' : 'Presencial'}</strong></div>
                             <div><span className="opacity-70">Asistencia:</span> <strong>{isPresent(activeParticipant.statusAsistencia) ? 'Presente' : 'Ausente'}</strong></div>

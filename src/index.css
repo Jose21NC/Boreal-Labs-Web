@@ -1,3 +1,33 @@
+/* Agrandir Font - Self-hosted */
+@font-face {
+  font-family: 'Agrandir';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/fonts/agrandir-regular.woff') format('woff');
+}
+@font-face {
+  font-family: 'Agrandir';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('/fonts/agrandir-bold.woff') format('woff');
+}
+@font-face {
+  font-family: 'Agrandir';
+  font-style: normal;
+  font-weight: 800;
+  font-display: swap;
+  src: url('/fonts/agrandir-heavy.woff') format('woff');
+}
+@font-face {
+  font-family: 'Agrandir';
+  font-style: normal;
+  font-weight: 900;
+  font-display: swap;
+  src: url('/fonts/agrandir-black.woff') format('woff');
+}
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -54,7 +84,7 @@
   }
   
   .glass-effect {
-    @apply bg-white/5 backdrop-blur-lg border border-white/10;
+    @apply bg-white/5 border border-white/10;
   }
   .no-x-scroll { overflow-x: hidden; }
   @supports (-webkit-touch-callout: none) {

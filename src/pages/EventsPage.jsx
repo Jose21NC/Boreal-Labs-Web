@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useContext } from 'react';
+import React, { useState, useEffect, useRef, useContext, useMemo } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Calendar, MapPin, Users, Clock, Share2, Copy, X as XIcon, CheckCircle } from 'lucide-react'; // Icono Share2 añadido
@@ -36,6 +36,13 @@ const categoryDisplayNames = {
   'conference': 'Conferencia',
   'networking': 'Networking',
   'competition': 'Competencia',
+};
+
+const isEventPast = (ev) => {
+  if (!ev?.date) return false;
+  const endOfDay = new Date(ev.date);
+  endOfDay.setHours(23, 59, 59, 999);
+  return endOfDay < new Date();
 };
 
 // Componente del formulario (ahora dentro de EventsPage)
@@ -236,6 +243,7 @@ const EventsPage = () => {
   const [loading, setLoading] = useState(true);
   const [showConfirmation, setShowConfirmation] = useState(false);
   const [confirmationMsg, setConfirmationMsg] = useState('');
+  const [visibleCount, setVisibleCount] = useState(10);
   const { toast } = useToast(); // Toast para el botón de compartir
 
   // Sonido de confirmación ligero (Web Audio API)
@@ -327,7 +335,8 @@ const EventsPage = () => {
         const eventsWithCounts = await Promise.all(fetchedEvents.map(async (ev) => {
           let registeredCount = 0;
           try {
-            if (ev.id) {
+            // Optimización: No cargar conteo si el evento ya pasó
+            if (ev.id && !isEventPast(ev)) {
               const rq = query(collection(db, 'registrations'), where('eventId', '==', ev.id));
               try {
                 const agg = await getCountFromServer(rq);
@@ -387,13 +396,6 @@ const EventsPage = () => {
     return normLabel;
   };
 
-  const isEventPast = (ev) => {
-    if (!ev?.date) return false;
-    const endOfDay = new Date(ev.date);
-    endOfDay.setHours(23, 59, 59, 999);
-    return endOfDay < new Date();
-  };
-
   const isSoldOut = (ev) => {
     // Permite forzar estado desde Firestore: soldOut | isFull | cupoLleno
     if (ev?.soldOut === true || ev?.isFull === true || ev?.cupoLleno === true) return true;
@@ -402,31 +404,38 @@ const EventsPage = () => {
     return Number.isFinite(cap) && count >= cap;
   };
 
-  // 1) Filtrar los de "visible" explícito a false
-  const visibleEvents = events.filter(ev => ev.visible !== false);
+  const filteredEvents = useMemo(() => {
+    // 1) Filtrar los de "visible" explícito a false
+    const visibleEvents = events.filter(ev => ev.visible !== false);
 
-  // 2) Filtrar por categoría
-  const categoryEvents = filter === 'all'
-    ? visibleEvents
-    : visibleEvents.filter(ev => {
-      const evCat = ev.category || ev.categoryName || ev.categoryLabel || '';
-      const evKey = categoryKeyFromLabel(evCat);
-      return normalize(evKey) === normalize(filter);
+    // 2) Filtrar por categoría
+    const categoryEvents = filter === 'all'
+      ? visibleEvents
+      : visibleEvents.filter(ev => {
+        const evCat = ev.category || ev.categoryName || ev.categoryLabel || '';
+        const evKey = categoryKeyFromLabel(evCat);
+        return normalize(evKey) === normalize(filter);
+      });
+
+    // 3) Ordenar: (futuro y con cupo) -> (pasado o lleno) -> conservando orden de fecha
+    return categoryEvents.sort((a, b) => {
+      const aPriority = !isEventPast(a) && !isSoldOut(a);
+      const bPriority = !isEventPast(b) && !isSoldOut(b);
+
+      if (aPriority && !bPriority) return -1;
+      if (!aPriority && bPriority) return 1;
+
+      // Si empatan, ya vienen medianamente ordenados de Firestore o podemos refinar:
+      const dateA = a.date ? new Date(a.date).getTime() : 0;
+      const dateB = b.date ? new Date(b.date).getTime() : 0;
+      return dateA - dateB;
     });
+  }, [events, filter]);
 
-  // 3) Ordenar: (futuro y con cupo) -> (pasado o lleno) -> conservando orden de fecha
-  const filteredEvents = categoryEvents.sort((a, b) => {
-    const aPriority = !isEventPast(a) && !isSoldOut(a);
-    const bPriority = !isEventPast(b) && !isSoldOut(b);
-
-    if (aPriority && !bPriority) return -1;
-    if (!aPriority && bPriority) return 1;
-
-    // Si empatan, ya vienen medianamente ordenados de Firestore o podemos refinar:
-    const dateA = a.date ? new Date(a.date).getTime() : 0;
-    const dateB = b.date ? new Date(b.date).getTime() : 0;
-    return dateA - dateB;
-  });
+  // Resetear la cuenta visible cuando cambia el filtro
+  useEffect(() => {
+    setVisibleCount(10);
+  }, [filter]);
 
   // Función para cerrar el modal
   const handleCloseModal = () => {
@@ -510,15 +519,14 @@ const EventsPage = () => {
           {!loading && (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
               <AnimatePresence>
-                {filteredEvents.map((event, index) => (
+                {filteredEvents.slice(0, visibleCount).map((event, index) => (
                   <motion.div
                     key={event.id}
-                    layout
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: -20 }}
-                    transition={{ duration: 0.5, delay: index * 0.05 }}
-                    className={`glass-effect rounded-2xl p-8 transition-all group flex flex-col relative ${
+                    transition={{ duration: 0.5, delay: Math.min(index, 15) * 0.05 }}
+                    className={`bg-white/5 border border-white/10 rounded-2xl p-8 transition-all group flex flex-col relative ${
                       isEventPast(event) || isSoldOut(event) ? 'opacity-95' : 'hover:bg-white/10'
                     }`}
                   >
@@ -539,7 +547,7 @@ const EventsPage = () => {
                            />
                            {(isEventPast(event) || isSoldOut(event)) && (
                              <>
-                               <div className="absolute inset-0 bg-black/60 backdrop-blur-[1px] pointer-events-none" />
+                               <div className="absolute inset-0 bg-black/60 pointer-events-none" />
                                <div className="absolute inset-0 flex items-center justify-center">
                                  <span
                                    className={`inline-flex items-center gap-3 px-5 py-2.5 rounded-full text-base font-extrabold tracking-wide shadow-lg ring-1 ring-white/20 ${
@@ -646,6 +654,17 @@ const EventsPage = () => {
                   </motion.div>
                 ))}
               </AnimatePresence>
+            </div>
+          )}
+
+          {!loading && filteredEvents.length > visibleCount && (
+            <div className="text-center mt-12">
+              <Button
+                onClick={() => setVisibleCount((prev) => prev + 10)}
+                className="bg-transparent border border-boreal-aqua text-boreal-aqua hover:bg-boreal-aqua/10 px-8 py-2 font-bold"
+              >
+                Cargar más eventos
+              </Button>
             </div>
           )}
 

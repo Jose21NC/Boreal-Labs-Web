@@ -15,6 +15,10 @@ const Navbar = () => {
   const communityUrl = FALLBACK_LINKS.communityUrl;
   const location = useLocation();
 
+  if (location.pathname.toLowerCase() === '/tedx' || location.pathname.toLowerCase() === '/voxlab') {
+    return null;
+  }
+
 
   const navLinks = [
     { name: 'Inicio', path: '/' },
@@ -28,7 +32,7 @@ const Navbar = () => {
   const isActive = (path) => location.pathname === path;
 
   return (
-    <nav className="fixed top-0 left-0 right-0 z-50 glass-effect">
+    <nav className="fixed top-0 left-0 right-0 z-50 glass-effect backdrop-blur-lg bg-boreal-dark/80">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-20">
           
@@ -112,7 +116,7 @@ const Navbar = () => {
       </div>
 
       {isOpen && (
-          <div id="mobile-nav-menu" className="md:hidden glass-effect border-t border-white/10">
+          <div id="mobile-nav-menu" className="md:hidden glass-effect backdrop-blur-lg bg-boreal-dark/95 border-t border-white/10">
             <div className="px-4 py-6 space-y-4">
               {navLinks.map((link) => (
                 <Link

@@ -22,6 +22,8 @@ const PaginaValidacion = lazy(() => import('@/pages/PaginaValidacion'));
 const AdminPanel = lazy(() => import('@/pages/AdminPanel'));
 const VolunteerAdminPanel = lazy(() => import('@/pages/VolunteerAdminPanel'));
 const AdminGate = lazy(() => import('@/components/AdminGate'));
+const TEDxPage = lazy(() => import('@/pages/TEDxPage'));
+const VoxlabPage = lazy(() => import('@/pages/VoxlabPage'));
 
 // Se importa el proveedor de reCAPTCHA
 // Google reCAPTCHA v3 removed - using only reCAPTCHA v2 where needed
@@ -79,6 +81,15 @@ function App() {
                     <Route path="/admin/layout" element={<AdminGate><LayoutEditor /></AdminGate>} />
                     <Route path="/voluntariado/admin" element={<AdminGate><VolunteerAdminPanel /></AdminGate>} />
 
+                    {/* TEDx */}
+                    <Route path="/TEDx" element={<TEDxPage />} />
+                    <Route path="/tedx" element={<Navigate to="/TEDx" replace />} />
+
+                    {/* Voxlab */}
+                    <Route path="/voxlab" element={<VoxlabPage />} />
+                    <Route path="/Voxlab" element={<Navigate to="/voxlab" replace />} />
+                    <Route path="/VOXLAB" element={<Navigate to="/voxlab" replace />} />
+
                     {/* Redirecciones desde rutas antiguas en inglés */}
                     <Route path="/about" element={<Navigate to="/nosotros" replace />} />
                     <Route path="/team" element={<Navigate to="/equipo" replace />} />
@@ -107,6 +118,11 @@ export default App;
 function ConditionalFooter() {
   const location = useLocation();
   const path = location.pathname || '';
+  
+  if (path.toLowerCase() === '/tedx' || path.toLowerCase() === '/voxlab') {
+    return null;
+  }
+  
   const hideOnMobile = path.startsWith('/admin') || path === '/validacion' || path === '/validar-certificado';
   if (hideOnMobile) {
     return (

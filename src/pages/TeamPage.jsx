@@ -79,17 +79,19 @@ const TeamPage = () => {
     }
 
     return (
-      <div className="mb-4 overflow-hidden rounded-full w-32 h-32 mx-auto border-2 border-boreal-blue/50 bg-white/5 flex items-center justify-center">
+      <div className="relative mb-4 overflow-hidden rounded-full w-32 h-32 mx-auto border-2 border-boreal-blue/50 bg-white/5 flex items-center justify-center">
         {imgLoading && (
-          <div className="animate-pulse w-full h-full flex items-center justify-center">
+          <div className="absolute inset-0 animate-pulse flex items-center justify-center bg-white/5 z-10">
             <div className="w-8 h-8 rounded-full bg-white/10" />
           </div>
         )}
         {!imgError ? (
           <img
             alt={`${member.name} - ${member.role}`}
-            className={`w-full h-full object-cover ${imgLoading ? 'hidden' : 'block'}`}
+            className={`w-full h-full object-cover transition-opacity duration-300 ${imgLoading ? 'opacity-0' : 'opacity-100'}`}
             src={imageSrc}
+            loading="lazy"
+            decoding="async"
             onLoad={() => setImgLoading(false)}
             onError={() => { setImgError(true); setImgLoading(false); }}
           />
@@ -239,7 +241,7 @@ const TeamPage = () => {
       initial={{ opacity: 0, y: 20 }}
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true }}
-      transition={{ duration: 0.6, delay: index * 0.08 }}
+      transition={{ duration: 0.6, delay: Math.min(index, 15) * 0.05 }}
       className="glass-effect rounded-2xl p-4 text-center hover:bg-white/10 transition-all group transform hover:-translate-y-1"
     >
       <MemberAvatar member={member} />

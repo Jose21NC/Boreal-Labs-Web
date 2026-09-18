@@ -42,3 +42,7 @@ google-cloud-cli.tar.gz
 
 # firebase local state
 .firebase/
+
+# local scripts & credentials
+*.exp
+scratch.js

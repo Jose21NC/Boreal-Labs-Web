@@ -17,6 +17,7 @@ module.exports = {
     extend: {
       fontFamily: {
         sans: ['Montserrat', 'sans-serif'],
+        agrandir: ['Agrandir', 'sans-serif'],
       },
       colors: {
         'boreal-dark': '#010b1d',
