@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Clock, Bell, Share2, ArrowLeft, Check, Sparkles, Flame } from 'lucide-react';
+import { Clock, Bell, Share2, ArrowLeft, Check, Sparkles, Flame, Loader2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { db } from '@/firebase';
+import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import voxiSleepingImg from '@/voxlab/voxi.png';
 import outlineVoxImg from '@/voxlab/outlinevox.png';
 
@@ -39,6 +41,7 @@ export default function VoxlabPage() {
   const [timeLeft, setTimeLeft] = useState(calculateTimeLeft);
   const [email, setEmail] = useState('');
   const [subscribed, setSubscribed] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [copied, setCopied] = useState(false);
   const [isSleeping, setIsSleeping] = useState(true);
 
@@ -49,12 +52,33 @@ export default function VoxlabPage() {
     return () => clearInterval(timer);
   }, [calculateTimeLeft]);
 
-  const handleSubscribe = (e) => {
+  const handleSubscribe = async (e) => {
     e.preventDefault();
-    if (email && email.includes('@')) {
+    const trimmedEmail = email.trim().toLowerCase();
+    if (!trimmedEmail || !trimmedEmail.includes('@')) return;
+
+    setIsSubmitting(true);
+
+    try {
+      // Guardar registro en la colección 'voxlab_waitlist' de Firebase Firestore
+      await addDoc(collection(db, 'voxlab_waitlist'), {
+        email: trimmedEmail,
+        createdAt: serverTimestamp(),
+        source: 'voxlab_landing',
+        userAgent: navigator.userAgent || '',
+      });
+
       setSubscribed(true);
       setEmail('');
       setTimeout(() => setSubscribed(false), 5000);
+    } catch (error) {
+      console.error('Error al guardar correo en Firestore:', error);
+      // Fallback para no bloquear la experiencia de usuario si falla Firestore
+      setSubscribed(true);
+      setEmail('');
+      setTimeout(() => setSubscribed(false), 5000);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -397,18 +421,29 @@ export default function VoxlabPage() {
               <input
                 type="email"
                 required
+                disabled={isSubmitting}
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="Ingresa tu correo electrónico..."
-                className="flex-1 px-5 py-3.5 rounded-2xl bg-white border-4 border-[#D94426] text-[#3D1107] placeholder-[#D94426]/60 font-bold focus:outline-none focus:ring-4 focus:ring-[#D94426]/30 shadow-md text-base"
+                className="flex-1 px-5 py-3.5 rounded-2xl bg-white border-4 border-[#D94426] text-[#3D1107] placeholder-[#D94426]/60 font-bold focus:outline-none focus:ring-4 focus:ring-[#D94426]/30 shadow-md text-base disabled:opacity-70"
                 aria-label="Correo electrónico"
               />
               <button
                 type="submit"
-                className="px-6 py-3.5 bg-[#D94426] hover:bg-[#C8391D] text-white font-black rounded-2xl border-4 border-white shadow-[0_6px_0_#921E07] transition-transform active:translate-y-1 active:shadow-none flex items-center justify-center gap-2 whitespace-nowrap text-base"
+                disabled={isSubmitting}
+                className="px-6 py-3.5 bg-[#D94426] hover:bg-[#C8391D] disabled:bg-[#C8391D]/80 text-white font-black rounded-2xl border-4 border-white shadow-[0_6px_0_#921E07] transition-transform active:translate-y-1 active:shadow-none flex items-center justify-center gap-2 whitespace-nowrap text-base disabled:cursor-not-allowed"
               >
-                <Bell className="w-5 h-5" />
-                Avisarme
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                    Guardando...
+                  </>
+                ) : (
+                  <>
+                    <Bell className="w-5 h-5" />
+                    Avisarme
+                  </>
+                )}
               </button>
             </form>
           )}
