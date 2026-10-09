@@ -23,6 +23,15 @@
   <FilesMatch "\.(js|mjs|css|svg|png|jpg|jpeg|gif|webp|ico|woff|woff2|ttf|otf)$">
     Header set Cache-Control "public, max-age=31536000, immutable"
   </FilesMatch>
+
+  <!-- APKs: el nombre no lleva hash, as que NO pueden ser immutable.
+       Un max-age corto evita re-descargar 53 MB en cada visita. -->
+  <FilesMatch "\.apk$">
+    Header set Cache-Control "public, max-age=3600, must-revalidate"
+    <!-- Algunos mime.types no reconocen .apk; fijalo para que el
+         navegador no lo trate como text/html. -->
+    Header set Content-Type "application/vnd.android.package-archive"
+  </FilesMatch>
 </IfModule>
 
 <IfModule mod_expires.c>
