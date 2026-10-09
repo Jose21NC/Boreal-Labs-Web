@@ -58,12 +58,12 @@ export default function VoxlabPage() {
   return (
     <div className="min-h-screen bg-[#F5A623] text-[#3D1107] font-agrandir relative overflow-hidden">
       <Helmet>
-        <title>Voxi App - Practica tu pitch | Boreal Labs</title>
+        <title>Voxlab - Practica tu pitch | Boreal Labs</title>
         <meta
           name="description"
-          content="Descarga Voxi, la app de Boreal Labs para practicar oratoria, analizar tus grabaciones y seguir tu ruta de aprendizaje."
+          content="Descarga Voxlab, la app de Boreal Labs para practicar oratoria, analizar tus grabaciones y seguir tu ruta de aprendizaje."
         />
-        <meta property="og:title" content="Voxi App - Practica tu pitch" />
+        <meta property="og:title" content="Voxlab - Practica tu pitch" />
         <meta
           property="og:description"
           content="Practica, analiza y sigue tu ruta de aprendizaje con Voxi. Disponible para Android."
@@ -316,7 +316,7 @@ export default function VoxlabPage() {
               Empieza hoy
             </h2>
             <p className="text-[#6E2211] font-bold text-lg mb-7 max-w-xl mx-auto">
-              Descarga Voxi, crea tu cuenta gratis y practica tu primera presentacion en minutos.
+              Descarga Voxlab, crea tu cuenta gratis y practica tu primera presentacion en minutos.
             </p>
 
             <InstallButton
@@ -340,10 +340,6 @@ export default function VoxlabPage() {
             <span>Hecho por</span>
             <span className="bg-white/80 px-2.5 py-0.5 rounded-full text-[#D94426] font-black border border-[#D94426]">
               @voxlab.ni
-            </span>
-            <span>&</span>
-            <span className="bg-white/80 px-2.5 py-0.5 rounded-full text-[#D94426] font-black border border-[#D94426]">
-              Boreal Labs
             </span>
           </p>
         </motion.footer>
