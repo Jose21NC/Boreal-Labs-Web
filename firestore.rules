@@ -1,0 +1,98 @@
+rules_version = '2';
+// BORRADOR revisado contra el código (no desplegado). Comparar con las reglas vivas antes de publicar.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isAdmin() {
+      // Mantener sincronizado con VITE_ADMIN_EMAILS, storage.rules y functions/.env (en minúsculas).
+      let adminEmails = ['contacto@borealabs.org', 'admin@borealabs.org', 'jose@borealabs.org'];
+      return request.auth != null
+        && request.auth.token.firebase.sign_in_provider != 'anonymous'
+        && (request.auth.token.get('admin', false) == true
+            || request.auth.token.get('email', '') in adminEmails);
+    }
+
+    function validEmail(e) {
+      return e is string && e.size() <= 200 && e.matches('^[^@\\s/]+@[^@\\s/]+\\.[^@\\s/]+$');
+    }
+
+    function str(field, max) {
+      let d = request.resource.data;
+      return !(field in d) || (d[field] is string && d[field].size() <= max);
+    }
+
+    // Lectura pública
+    match /events/{id} {
+      allow read: if true;
+      allow write: if isAdmin();
+      // Contador de cupos sin Cloud Functions: el registro público suma +1 en el mismo batch
+      // que crea su registration (lastRegistrationId), y nunca por encima de capacity.
+      allow update: if request.resource.data.diff(resource.data).affectedKeys().hasOnly(['registeredCount', 'lastRegistrationId'])
+        && request.resource.data.registeredCount == resource.data.get('registeredCount', 0) + 1
+        && (!(resource.data.get('capacity', null) is int) || request.resource.data.registeredCount <= resource.data.capacity)
+        && !exists(/databases/$(database)/documents/registrations/$(request.resource.data.lastRegistrationId))
+        && existsAfter(/databases/$(database)/documents/registrations/$(request.resource.data.lastRegistrationId))
+        && getAfter(/databases/$(database)/documents/registrations/$(request.resource.data.lastRegistrationId)).data.eventId == id;
+    }
+    match /teamMembers/{id} { allow read: if true; allow write: if isAdmin(); }
+    match /siteConfig/{id}  { allow read: if true; allow write: if isAdmin(); }
+    match /certificados/{id} { allow read: if true; allow write: if isAdmin(); }
+
+    // Registro público a eventos (EventsPage.jsx). Sin list público: ver conteo.
+    match /registrations/{id} {
+      allow create: if request.resource.data.keys().hasOnly([
+          'eventName','eventId','userName','userEmail','userWhatsapp','userUniversity',
+          'userCountry','userDepartment','isCommunityMember','tipoAsistencia',
+          'recaptchaTokenV2','registrationDate'])
+        && request.resource.data.eventId is string && request.resource.data.eventId.size() <= 200
+        && validEmail(request.resource.data.userEmail)
+        // ID = eventId_correo: impide registros duplicados (un create sobre un doc existente se rechaza).
+        && id == request.resource.data.eventId + '_' + request.resource.data.userEmail
+        && exists(/databases/$(database)/documents/events/$(request.resource.data.eventId))
+        && str('eventName', 300) && str('userName', 200) && str('userWhatsapp', 50)
+        && str('userUniversity', 300) && str('userCountry', 100) && str('userDepartment', 100)
+        && str('tipoAsistencia', 100) && str('recaptchaTokenV2', 4000)
+        && request.resource.data.registrationDate == request.time;
+      allow read, update, delete: if isAdmin();
+    }
+
+    // Inscripción de voluntarios (VolunteerPage.jsx)
+    match /voluntarios2026/{id} {
+      allow create: if request.resource.data.keys().hasOnly([
+          'fullName','edad','email','whatsapp','ciudad','talla','procedencia',
+          'comentariosAdicionales','creditos','turnos','horariosPersonalizados','fechaRegistro'])
+        && request.resource.data.get('creditos', 0) == 0
+        && validEmail(request.resource.data.email)
+        // ID = correo: una inscripción por persona.
+        && id == request.resource.data.email
+        && str('fullName', 200) && str('edad', 10) && str('whatsapp', 50) && str('ciudad', 100)
+        && str('talla', 20) && str('procedencia', 300) && str('comentariosAdicionales', 2000)
+        && (!('turnos' in request.resource.data) || request.resource.data.turnos.size() <= 50)
+        && request.resource.data.fechaRegistro == request.time;
+      allow read, update, delete: if isAdmin();
+    }
+
+    // Bitácora de asistencia (VolunteerAttendancePage.jsx)
+    match /volunteerAttendanceLogs/{id} {
+      allow create: if request.resource.data.keys().hasOnly([
+          'fullName','email','activityName','attendanceDate','startTime','endTime',
+          'startAtIso','endAtIso','proofImageUrl','proofImagePath','originalImageName',
+          'originalImageSizeBytes','uploadedImageSizeBytes','compressionApplied',
+          'registeredHours','pendingCredits','creditsFormula','creditsProcessed','createdAt'])
+        && request.resource.data.creditsProcessed == false
+        && validEmail(request.resource.data.email)
+        && str('fullName', 200) && str('activityName', 300) && str('attendanceDate', 20)
+        && str('startTime', 10) && str('endTime', 10) && str('startAtIso', 40) && str('endAtIso', 40)
+        && str('proofImageUrl', 2000) && str('proofImagePath', 500) && str('originalImageName', 300)
+        && str('creditsFormula', 100)
+        && request.resource.data.createdAt == request.time;
+      // hasOnly excluye approved, creditos, creditsAssigned*, creditsGranted, creditStatus: los créditos los asigna solo el admin.
+      allow read, update, delete: if isAdmin();
+    }
+
+    // Todo lo demás (adminEvents, eventTemplates, userPoints/**, etc.): solo admin.
+    match /{document=**} {
+      allow read, write: if isAdmin();
+    }
+  }
+}

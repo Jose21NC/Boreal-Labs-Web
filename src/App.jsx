@@ -22,7 +22,6 @@ const PaginaValidacion = lazy(() => import('@/pages/PaginaValidacion'));
 const AdminPanel = lazy(() => import('@/pages/AdminPanel'));
 const VolunteerAdminPanel = lazy(() => import('@/pages/VolunteerAdminPanel'));
 const AdminGate = lazy(() => import('@/components/AdminGate'));
-const TEDxPage = lazy(() => import('@/pages/TEDxPage'));
 const VoxlabPage = lazy(() => import('@/pages/VoxlabPage'));
 
 // Se importa el proveedor de reCAPTCHA
@@ -70,7 +69,7 @@ function App() {
                     {/* Rutas en español */}
                     <Route path="/nosotros" element={<AboutPage />} />
                     <Route path="/equipo" element={<TeamPage />} />
-                    <Route path="/equipo/editar" element={<TeamEditorPage />} />
+                    <Route path="/equipo/editar" element={<AdminGate><TeamEditorPage /></AdminGate>} />
                     <Route path="/eventos" element={<EventsPage />} />
                     <Route path="/voluntariado" element={<VolunteerPage />} />
                     <Route path="/voluntariado/asistencia" element={<VolunteerAttendancePage />} />
@@ -81,9 +80,6 @@ function App() {
                     <Route path="/admin/layout" element={<AdminGate><LayoutEditor /></AdminGate>} />
                     <Route path="/voluntariado/admin" element={<AdminGate><VolunteerAdminPanel /></AdminGate>} />
 
-                    {/* TEDx */}
-                    <Route path="/TEDx" element={<TEDxPage />} />
-                    <Route path="/tedx" element={<Navigate to="/TEDx" replace />} />
 
                     {/* Voxlab */}
                     <Route path="/voxlab" element={<VoxlabPage />} />
@@ -119,7 +115,7 @@ function ConditionalFooter() {
   const location = useLocation();
   const path = location.pathname || '';
   
-  if (path.toLowerCase() === '/tedx' || path.toLowerCase() === '/voxlab') {
+  if (path.toLowerCase() === '/voxlab') {
     return null;
   }
   

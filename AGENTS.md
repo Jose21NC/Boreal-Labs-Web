@@ -24,8 +24,9 @@ No hay `.env` commiteado (`.git` y `.gitignore` excluyen `.env` y `.env*.local`)
 | `VITE_FIREBASE_*` (7 claves) | Config de Firebase. Sin ellas Firestore/Auth/Storage no funcionan. |
 | `VITE_ENABLE_ANON_AUTH` | **Opt-in.** La auth anónima solo corre si vale exactamente `'true'`. Por defecto NO hay sesión, así que las reglas de Firestore que exigen `request.auth != null` bloquean las lecturas. |
 | `VITE_FIRESTORE_DEBUG` | `'true'` en DEV ⇒ `setLogLevel('debug')`. Silencioso por defecto. |
-| `VITE_ADMIN_EMAILS` | Lista separada por comas que habilita `/admin*` (`src/components/AdminGate.jsx`). Sin ella no hay acceso admin. |
+| `VITE_ADMIN_EMAILS` | Lista separada por comas que habilita `/admin*` (`src/components/AdminGate.jsx`, email/contraseña o Google). Si falta, usa la lista por defecto del código. Debe coincidir con `isAdmin()` en `firestore.rules`/`storage.rules` y `ADMIN_EMAILS` en `functions/index.js`. |
 | `VITE_RECAPTCHA_SITE_KEY` | reCAPTCHA v2. v3 fue removido intencionalmente — no reintroducirlo. |
+| `VITE_APPCHECK_SITE_KEY` | Opt-in. Clave reCAPTCHA Enterprise para Firebase App Check (`src/firebase.jsx`). Sin ella App Check no se inicializa; no activar "Enforce" en la consola hasta definirla. |
 | `VITE_ASSET_BASE` | Cambia el `base` de Vite para servir assets desde un CDN. Default `/`. |
 
 ## Firebase es opcional (no la rompas)
@@ -73,7 +74,7 @@ Dos caminos, solo uno está automatizado:
 - Entrada: `src/main.jsx` → `src/App.jsx` (`BrowserRouter`, `HelmetProvider`, contexto de reCAPTCHA, `Navbar`/`Footer`, `ScrollToTop`).
 - Alias `@` → `src` (`vite.config.js`).
 - Rutas en español con redirect desde las de inglés (`/about`→`/nosotros`, `/team`→`/equipo`, `/events`→`/eventos`). Voxlab expone `/voxlab` y redirige `/Voxlab` y `/VOXLAB`.
-- `src/pages/AdminPanel.jsx` (128 KB), `VolunteerAdminPanel.jsx` (173 KB) y `EventsPage.jsx` son archivos enormes generados/expandidos a mano. Editarlos con cuidado; hay varios scripts `fix_*.py` y `patcher*.cjs` sueltos en la raíz que son parches puntuales ya aplicados, no herramientas mantenidas.
+- `src/pages/AdminPanel.jsx` (128 KB), `VolunteerAdminPanel.jsx` (173 KB) y `EventsPage.jsx` son archivos enormes generados/expandidos a mano. Editarlos con cuidado.
 - `src/lib/configService.js` lee configuración editable desde Firestore (`siteConfig/links`, `siteConfig/home`) con defaults y `onSnapshot`. Todo consumidor debe tolerar que el doc no exista.
 - `functions/` es un proyecto Node separado para Cloud Functions (`generateCertificates`, región `us-central1`, `VALIDATION_URL_BASE`). Se despliega aparte del frontend.
 - `src/index.css` self-hostea la fuente **Agrandir**; `font-agrandir` en Tailwind depende de ella. Si algo se ve con otra tipografía, revisar ese archivo primero.

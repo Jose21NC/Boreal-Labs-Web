@@ -158,8 +158,8 @@ const HomePage = () => {
 
       <div>
         {/* --- SECCIÓN HERO --- */}
-        <section className="relative min-h-screen flex items-center justify-center text-center text-white overflow-hidden">
-          <div className="absolute inset-0 bg-boreal-dark z-10 opacity-60"></div>
+        <section className="relative min-h-[100svh] flex items-center justify-center text-center text-white overflow-hidden">
+          <div className="absolute inset-0 z-10 bg-gradient-to-b from-boreal-dark/75 via-boreal-dark/60 to-boreal-dark"></div>
           <div className="absolute inset-0 z-0">
              <picture>
               <source
@@ -171,7 +171,7 @@ const HomePage = () => {
              </picture>
           </div>
           <div className="relative z-20 max-w-4xl mx-auto px-4 min-h-[350px] md:min-h-[380px] flex flex-col items-center justify-center">
-            <h1 className="text-4xl md:text-6xl font-black tracking-tight leading-tight">
+            <h1 className="text-4xl sm:text-5xl md:text-7xl font-black tracking-tighter leading-[1.05]">
               #Juventud{' '}
               <span>
                 que
@@ -203,25 +203,25 @@ const HomePage = () => {
               <span className="text-boreal-aqua">Nicaragua</span>
             </h1>
             
-            <p className="mt-6 text-lg md:text-xl max-w-2xl mx-auto text-white">
+            <p className="mt-6 text-lg md:text-xl max-w-[60ch] mx-auto text-gray-100 leading-relaxed">
               Somos una comunidad juvenil apasionada que busca transformar activamente el futuro de Nicaragua y Latinoamérica a través de la innovación y el emprendimiento.
             </p>
 
             <div className="mt-8 flex justify-center">
-              <Link to="/eventos">
-                <Button size="lg" className="bg-gradient-to-r from-boreal-blue to-boreal-purple hover:opacity-90 text-white px-8 py-6 text-lg font-bold">
+              <Button asChild size="lg" className="bg-gradient-to-r from-boreal-blue to-boreal-purple hover:opacity-90 text-white px-8 py-6 text-lg font-bold">
+                <Link to="/eventos">
                   Ver Próximos Eventos
-                  <ArrowRight className="ml-2 w-5 h-5" />
-                </Button>
-              </Link>
+                  <ArrowRight className="ml-2 w-5 h-5" aria-hidden="true" />
+                </Link>
+              </Button>
             </div>
           </div>
         </section>
 
         {/* --- SECCIÓN "UNIENDO MENTES" --- */}
-        <ScrollAnimatedSection className="py-20 bg-boreal-dark">
+        <ScrollAnimatedSection className="py-20 md:py-28 bg-boreal-dark">
           <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-            <h2 className="text-3xl md:text-4xl font-bold">
+            <h2 className="text-3xl md:text-5xl font-bold tracking-tight">
               Uniendo <span className="text-gradient">Mentes Brillantes</span> para un Futuro Innovador
             </h2>
             <p className="mt-4 text-lg text-gray-400 max-w-3xl mx-auto">
@@ -248,30 +248,28 @@ const HomePage = () => {
               </picture>
             </div>
             <div className="mt-12">
-              <Link to="/nosotros">
-                <Button variant="outline" className="border-2 border-boreal-aqua text-boreal-aqua hover:bg-boreal-aqua/10 hover:text-boreal-aqua px-8 py-4 text-base font-semibold">
-                  Conoce Nuestra Historia
-                </Button>
-              </Link>
+              <Button asChild variant="outline" size="lg" className="border-2 border-boreal-aqua bg-transparent text-boreal-aqua hover:bg-boreal-aqua/10 hover:text-boreal-aqua px-8 text-base font-semibold">
+                <Link to="/nosotros">Conoce Nuestra Historia</Link>
+              </Button>
             </div>
           </div>
         </ScrollAnimatedSection>
         
         {/* --- SECCIÓN PILARES --- */}
-        <ScrollAnimatedSection className="py-20 bg-boreal-blue/5">
+        <ScrollAnimatedSection className="py-20 md:py-28 bg-boreal-blue/5">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="text-center mb-16">
-              <h2 className="text-3xl md:text-4xl font-bold mb-4">Nuestros Pilares</h2>
+              <h2 className="text-3xl md:text-5xl font-bold tracking-tight mb-4">Nuestros Pilares</h2>
               <p className="text-lg text-gray-400 max-w-2xl mx-auto">Creamos experiencias de aprendizaje únicas para potenciar tu talento.</p>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
               {programs.map((program, index) => (
-                <div key={index} className="glass-effect rounded-2xl p-8 text-center hover:bg-white/10 transition-all transform hover:-translate-y-2">
+                <div key={index} className="glass-effect rounded-2xl p-8 text-center border border-white/10 transition-[transform,background-color,border-color] duration-300 hover:-translate-y-1 hover:bg-white/10 hover:border-boreal-aqua/30">
                   <div className="bg-gradient-to-br from-boreal-blue to-boreal-purple w-16 h-16 rounded-xl flex items-center justify-center mx-auto mb-6">
                     <program.icon className="w-8 h-8 text-white" />
                   </div>
                   <h3 className="text-xl font-bold mb-3 text-white">{program.title}</h3>
-                  <p className="text-gray-400">{program.description}</p>
+                  <p className="text-gray-400 leading-relaxed">{program.description}</p>
                 </div>
               ))}
             </div>
@@ -279,19 +277,19 @@ const HomePage = () => {
         </ScrollAnimatedSection>
 
         {/* --- SECCIÓN IMPACTO --- */}
-        <ScrollAnimatedSection className="py-20 bg-boreal-dark">
+        <ScrollAnimatedSection className="py-20 md:py-28 bg-boreal-dark">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="text-center mb-16">
-                <h2 className="text-3xl md:text-4xl font-bold mb-4">
+                <h2 className="text-3xl md:text-5xl font-bold tracking-tight mb-4">
                   Nuestro <span className="text-gradient">Impacto en Números</span>
                 </h2>
                 <p className="text-lg text-gray-400 max-w-2xl mx-auto">Construyendo una comunidad, un joven a la vez.</p>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 text-center">
               {impactsWithCertificates.map((impact, index) => (
-                <div key={index} className="glass-effect rounded-2xl p-8">
+                <div key={index} className="glass-effect rounded-2xl p-8 border border-white/10">
                   <impact.icon className="w-12 h-12 mx-auto mb-4 text-boreal-aqua" />
-                  <div className="text-4xl font-extrabold text-white">{impact.metric}</div>
+                  <div className="text-4xl md:text-5xl font-extrabold tracking-tight tabular-nums text-white">{impact.metric}</div>
                   <p className="mt-2 text-gray-400">{impact.description}</p>
                 </div>
               ))}
@@ -300,25 +298,25 @@ const HomePage = () => {
         </ScrollAnimatedSection>
 
         {/* --- SECCIÓN ALIADOS --- */}
-        <ScrollAnimatedSection className="py-20 bg-boreal-blue/5">
+        <ScrollAnimatedSection className="py-20 md:py-28 bg-boreal-blue/5">
           <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="text-center mb-12">
-              <h2 className="text-3xl md:text-4xl font-bold mb-4">Nuestros Aliados Estratégicos</h2>
+              <h2 className="text-3xl md:text-5xl font-bold tracking-tight mb-4">Nuestros Aliados Estratégicos</h2>
               <p className="text-lg text-gray-400">Colaborando con los mejores para potenciar el talento nicaragüense.</p>
             </div>
-            <div className="flex flex-wrap justify-center items-start gap-x-12 md:gap-x-16 gap-y-8">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 md:gap-5">
               {partners.map((partner, index) => (
-                <div key={index} className="flex flex-col items-center text-center gap-y-3 w-40">
+                <div key={index} className="flex flex-col items-center justify-center text-center gap-y-3 rounded-2xl border border-white/10 bg-white/[0.03] p-4 transition-colors hover:border-white/20 hover:bg-white/[0.06]">
                    <img 
                      src={partner.imgSrc} 
                      alt={partner.alt} 
-                     className="h-16 w-auto object-contain"
+                     className="h-14 w-full max-w-[8rem] object-contain"
                      width={partner.width || 128}
                      height={partner.height || 64}
                      loading="lazy"
                      decoding="async"
                    />
-                   <span className="text-gray-400 text-sm font-semibold">{partner.name}</span>
+                   <span className="text-gray-400 text-xs sm:text-sm font-semibold leading-snug">{partner.name}</span>
                 </div>
               ))}
             </div>
@@ -326,10 +324,10 @@ const HomePage = () => {
         </ScrollAnimatedSection>
 
         {/* --- SECCIÓN DE INSTAGRAM --- */}
-        <ScrollAnimatedSection className="py-20 bg-boreal-dark">
+        <ScrollAnimatedSection className="py-20 md:py-28 bg-boreal-dark">
           <div ref={instagramRef} className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="text-center mb-12">
-              <h2 className="text-3xl md:text-4xl font-bold mb-4">
+              <h2 className="text-3xl md:text-5xl font-bold tracking-tight mb-4">
                 Síguenos en <span className="text-gradient">Instagram</span>
               </h2>
               <p className="text-lg text-gray-400 max-w-2xl mx-auto mb-8">
@@ -376,19 +374,17 @@ const HomePage = () => {
         </ScrollAnimatedSection>
 
         {/* --- SECCIÓN CALL TO ACTION --- */}
-        <ScrollAnimatedSection className="text-center py-20 bg-boreal-dark">
-          <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 glass-effect rounded-2xl p-12">
-            <h2 className="text-3xl md:text-4xl font-bold mb-4">
+        <ScrollAnimatedSection className="text-center py-20 md:py-28 bg-boreal-dark">
+          <div className="mx-4 sm:mx-6 lg:mx-auto max-w-4xl glass-effect rounded-3xl border border-white/10 bg-gradient-to-br from-boreal-blue/15 via-transparent to-boreal-aqua/10 px-6 py-10 md:p-14">
+            <h2 className="text-3xl md:text-5xl font-bold tracking-tight mb-4">
               ¿Listo para ser parte del <span className="text-gradient">cambio</span>?
             </h2>
             <p className="text-lg text-gray-300 max-w-2xl mx-auto mb-8">
               Únete a nuestra comunidad de jóvenes innovadores. Participa en nuestros eventos, conecta con mentores y lleva tus ideas al siguiente nivel.
             </p>
-            <Link to="https://chat.whatsapp.com/HAaxnHFYsuaBltQ812XhRW?mode=wwc">
-              <Button size="lg" className="bg-gradient-to-r from-boreal-aqua to-boreal-blue text-boreal-dark px-8 py-6 text-lg font-bold">
-                ¡Únete a la Comunidad!
-              </Button>
-            </Link>
+            <Button asChild size="lg" className="bg-gradient-to-r from-boreal-aqua to-boreal-blue text-boreal-dark px-8 py-6 text-lg font-bold">
+              <a href="https://chat.whatsapp.com/HAaxnHFYsuaBltQ812XhRW?mode=wwc" target="_blank" rel="noopener noreferrer">¡Únete a la Comunidad!</a>
+            </Button>
           </div>
         </ScrollAnimatedSection>
       </div>

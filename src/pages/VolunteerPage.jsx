@@ -1,5 +1,6 @@
 import { db } from '../firebase';
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { useFormGuard, EMAIL_RE } from '@/lib/antiSpam';
 import React, { useState } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { motion } from 'framer-motion';
@@ -103,20 +104,30 @@ const VolunteerPage = () => {
   };
 
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const { isBot, honeypot } = useFormGuard();
   const handleFormSubmit = async (e) => {
     e.preventDefault();
     if (selectedShifts.length === 0) {
       toast({ title: "Atención", description: "Por favor selecciona al menos un turno.", variant: "destructive" });
       return;
     }
-    
+    const emailValue = document.getElementById('email').value.trim().toLowerCase();
+    if (!EMAIL_RE.test(emailValue)) {
+      toast({ title: "Correo inválido", description: "Revisa que tu correo esté bien escrito.", variant: "destructive" });
+      return;
+    }
+    if (isBot()) {
+      toast({ title: 'Espera un momento', description: 'Revisa tus datos e intenta enviar de nuevo en unos segundos.', variant: 'destructive' });
+      return;
+    }
+
     setIsSubmitting(true);
     
     try {
       const data = {
         fullName: document.getElementById('fullName').value,
         edad: document.getElementById('edad').value,
-        email: document.getElementById('email').value,
+        email: emailValue,
         whatsapp: document.getElementById('whatsapp').value,
         ciudad: document.getElementById('ciudad').value,
         talla: document.getElementById('talla').value,
@@ -128,7 +139,8 @@ const VolunteerPage = () => {
         fechaRegistro: serverTimestamp(),
       };
       
-      await addDoc(collection(db, 'voluntarios2026'), data);
+      // ID = correo: una segunda inscripción con el mismo correo es rechazada por las reglas.
+      await setDoc(doc(db, 'voluntarios2026', emailValue), data);
       
       setIsSuccess(true);
       playSuccessSound();
@@ -140,7 +152,9 @@ const VolunteerPage = () => {
       console.error("Error guardando voluntario:", error);
       toast({
         title: "Error",
-        description: "Hubo un problema al enviar tu inscripción. Intenta de nuevo.",
+        description: error?.code === 'permission-denied'
+          ? "Este correo ya está inscrito."
+          : "Hubo un problema al enviar tu inscripción. Intenta de nuevo.",
         variant: "destructive"
       });
     } finally {
@@ -565,6 +579,7 @@ const VolunteerPage = () => {
           </DialogHeader>
 
           <form onSubmit={handleFormSubmit} className="space-y-6 mt-6">
+            {honeypot}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-2">
                 <Label htmlFor="fullName" className="text-gray-200">Nombre Completo *</Label>

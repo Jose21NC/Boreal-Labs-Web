@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useContext, useMemo } from 'react';
 import { Helmet } from 'react-helmet-async';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, MotionConfig } from 'framer-motion';
 import { Calendar, MapPin, Users, Clock, Share2, Copy, X as XIcon, CheckCircle } from 'lucide-react'; // Icono Share2 añadido
 import { Button } from '@/components/ui/button';
 import {
@@ -27,7 +27,8 @@ import ReCAPTCHA from 'react-google-recaptcha';
 import { RecaptchaContext } from '@/App.jsx';
 // --- MODIFICACIÓN 1: Imports de Firebase ---
 import { db, storage } from '@/firebase.jsx'; // Asegúrate que la ruta sea correcta
-import { collection, getDocs, query, orderBy, addDoc, serverTimestamp, where, getCountFromServer } from 'firebase/firestore';
+import { collection, getDocs, query, orderBy, serverTimestamp, doc, writeBatch, increment } from 'firebase/firestore';
+import { useFormGuard, EMAIL_RE } from '@/lib/antiSpam';
 import { ref as storageRef, getDownloadURL } from 'firebase/storage';
 
 // Objeto para traducir las categorías
@@ -79,6 +80,7 @@ const EventRegistrationForm = ({ event, onSuccess, onShowConfirmation }) => {
   const recaptchaRef = useRef(null);
   const { toast } = useToast();
   const { setRecaptchaTokenV2, recaptchaSiteKey } = useContext(RecaptchaContext);
+  const { isBot, honeypot } = useFormGuard();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -100,14 +102,27 @@ const EventRegistrationForm = ({ event, onSuccess, onShowConfirmation }) => {
       return;
     }
 
+    if (!EMAIL_RE.test(email.trim())) {
+      toast({ title: "Correo inválido", description: "Revisa que tu correo esté bien escrito.", variant: "destructive" });
+      return;
+    }
+    if (isBot()) {
+      toast({ title: 'Espera un momento', description: 'Revisa tus datos e intenta enviar de nuevo en unos segundos.', variant: 'destructive' });
+      return;
+    }
+
     setLoading(true);
 
     try {
-      await addDoc(collection(db, 'registrations'), {
+      // Registro + contador de cupos en un solo batch; firestore.rules valida el +1 y el tope de capacity.
+      // ID determinista evento+correo: un segundo registro con el mismo correo es rechazado por las reglas.
+      const regRef = doc(db, 'registrations', `${event.id}_${email.trim().toLowerCase()}`);
+      const batch = writeBatch(db);
+      batch.set(regRef, {
         eventName: event.title,
         eventId: event.id,
         userName: name,
-        userEmail: email.toLowerCase(),
+        userEmail: email.trim().toLowerCase(),
         userWhatsapp: whatsapp,
         userUniversity: university,
         userCountry: country,
@@ -117,6 +132,8 @@ const EventRegistrationForm = ({ event, onSuccess, onShowConfirmation }) => {
         recaptchaTokenV2: recaptchaV2Token || null,
         registrationDate: serverTimestamp(),
       });
+      batch.update(doc(db, 'events', event.id), { registeredCount: increment(1), lastRegistrationId: regRef.id });
+      await batch.commit();
 
       toast({
         title: "¡Registro Exitoso!",
@@ -146,7 +163,9 @@ const EventRegistrationForm = ({ event, onSuccess, onShowConfirmation }) => {
       console.error("Error al registrar: ", error);
       toast({
         title: "Error en el registro",
-        description: "Hubo un problema al enviar tu registro. Intenta de nuevo.",
+        description: error?.code === 'permission-denied'
+          ? "Es posible que ya estés registrado con este correo o que no queden cupos."
+          : "Hubo un problema al enviar tu registro. Intenta de nuevo.",
         variant: "destructive",
       });
     } finally {
@@ -156,6 +175,7 @@ const EventRegistrationForm = ({ event, onSuccess, onShowConfirmation }) => {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4 pr-2"> {/* El contenedor modal controla el scroll */}
+      {honeypot}
       <div className="space-y-2">
         <Label htmlFor="reg-name" className="text-gray-300">Nombre Completo</Label>
         <Input id="reg-name" value={name} onChange={(e) => setName(e.target.value)} disabled={loading} className="bg-gray-800 border-gray-700 text-white"/>
@@ -331,25 +351,9 @@ const EventsPage = () => {
 
         return out;
       }));
-        // Obtener conteo de registros por evento (para validar capacidad)
-        const eventsWithCounts = await Promise.all(fetchedEvents.map(async (ev) => {
-          let registeredCount = 0;
-          try {
-            // Optimización: No cargar conteo si el evento ya pasó
-            if (ev.id && !isEventPast(ev)) {
-              const rq = query(collection(db, 'registrations'), where('eventId', '==', ev.id));
-              try {
-                const agg = await getCountFromServer(rq);
-                registeredCount = agg.data().count || 0;
-              } catch (_) {
-                // Fallback si getCountFromServer no está disponible
-                const docs = await getDocs(rq);
-                registeredCount = docs.size;
-              }
-            }
-          } catch (e) {
-            console.warn('No se pudo obtener conteo de registros para', ev.id, e);
-          }
+        // El conteo vive en el propio evento (registeredCount); no se listan registrations desde el público.
+        const eventsWithCounts = fetchedEvents.map((ev) => {
+          const registeredCount = Number(ev.registeredCount) || 0;
           // Normalizar capacity a número
           let capacityNum = ev.capacity;
           if (typeof capacityNum === 'string') {
@@ -357,7 +361,7 @@ const EventsPage = () => {
             capacityNum = Number.isFinite(n) ? n : undefined;
           }
           return { ...ev, capacity: capacityNum, registeredCount };
-        }));
+        });
 
         setEvents(eventsWithCounts);
 
@@ -466,7 +470,7 @@ const EventsPage = () => {
 
 
   return (
-    <>
+    <MotionConfig reducedMotion="user">
       <Helmet>
         <title>Actividades - Boreal Labs</title>
         <meta name="description" content="Descubre los próximos talleres, conferencias y eventos de networking en Boreal Labs. Únete para aprender y crecer." />
@@ -808,7 +812,7 @@ const EventsPage = () => {
         */}
         </div>
         
-      </>
+      </MotionConfig>
     );
   };
 export default EventsPage;

@@ -1,6 +1,6 @@
 import React from 'react';
 import { Helmet } from 'react-helmet-async';
-import { motion } from 'framer-motion';
+import { motion, MotionConfig } from 'framer-motion';
 import { Heart, Target, Zap, Globe } from 'lucide-react';
 
 // --- MODIFICACIÓN 1: IMPORTS DE SWIPER ---
@@ -70,7 +70,7 @@ const AboutPage = () => {
   ];
 
   return (
-    <>
+    <MotionConfig reducedMotion="user">
       <Helmet>
         <title>Sobre Nosotros - Boreal Labs</title>
         <meta name="description" content="Conoce la misión de Boreal Labs de empoderar a la juventud nicaragüense a través de la innovación y el emprendimiento." />
@@ -84,7 +84,7 @@ const AboutPage = () => {
             transition={{ duration: 0.8 }}
             className="text-center mb-20"
           >
-            <h1 className="text-5xl md:text-6xl font-black mb-6">
+            <h1 className="text-4xl sm:text-5xl md:text-7xl font-black tracking-tighter leading-[1.05] mb-6">
               Nuestra <span className="text-gradient">Historia</span>
             </h1>
             <p className="text-xl text-gray-300 max-w-3xl mx-auto">
@@ -117,7 +117,7 @@ const AboutPage = () => {
               transition={{ duration: 0.8 }}
               className="space-y-6"
             >
-              <h2 className="text-3xl md:text-4xl font-bold text-white">Quiénes Somos</h2>
+              <h2 className="text-3xl md:text-4xl font-bold tracking-tight text-white">Quiénes Somos</h2>
               <p className="text-lg text-gray-300">
                 Boreal Labs es una organización sin fines de lucro liderada por jóvenes en Nicaragua, dedicada a fomentar la innovación y el emprendimiento. Creemos que cada joven tiene el potencial de crear un cambio positivo en su comunidad.
               </p>
@@ -134,7 +134,7 @@ const AboutPage = () => {
             transition={{ duration: 0.6 }}
             className="mb-20"
           >
-            <h2 className="text-4xl md:text-5xl font-bold text-center mb-4">
+            <h2 className="text-4xl md:text-5xl font-bold tracking-tight text-center mb-4">
               Nuestra <span className="text-gradient">Misión</span>
             </h2>
             <p className="text-xl text-gray-300 text-center max-w-4xl mx-auto mb-16">
@@ -169,7 +169,7 @@ const AboutPage = () => {
             transition={{ duration: 0.8 }}
             className="mb-20" // Margen inferior para separar de la siguiente sección
           >
-            <h2 className="text-4xl md:text-5xl font-bold text-center mb-12">
+            <h2 className="text-4xl md:text-5xl font-bold tracking-tight text-center mb-12">
               Nuestros <span className="text-gradient">Momentos</span>
             </h2>
 
@@ -222,7 +222,7 @@ const AboutPage = () => {
             viewport={{ once: true }}
             transition={{ duration: 0.6 }}
           >
-            <h2 className="text-4xl md:text-5xl font-bold text-center mb-16">
+            <h2 className="text-4xl md:text-5xl font-bold tracking-tight text-center mb-16">
               Nuestro <span className="text-gradient">Viaje</span>
             </h2>
 
@@ -257,7 +257,7 @@ const AboutPage = () => {
           </motion.div>
         </div>
       </div>
-    </>
+    </MotionConfig>
   );
 };
 
