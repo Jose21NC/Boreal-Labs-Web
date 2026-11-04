@@ -23,7 +23,7 @@ const Navbar = () => {
     return () => window.removeEventListener('scroll', onScroll);
   }, []);
 
-  if (location.pathname.toLowerCase() === '/voxlab') {
+  if (location.pathname.toLowerCase() === '/voxlab' || location.pathname.startsWith('/admin')) {
     return null;
   }
 

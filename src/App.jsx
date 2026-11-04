@@ -22,6 +22,7 @@ const PaginaValidacion = lazy(() => import('@/pages/PaginaValidacion'));
 const AdminPanel = lazy(() => import('@/pages/AdminPanel'));
 const VolunteerAdminPanel = lazy(() => import('@/pages/VolunteerAdminPanel'));
 const AdminGate = lazy(() => import('@/components/AdminGate'));
+const AdminApp = lazy(() => import('@/admin/AdminApp'));
 const VoxlabPage = lazy(() => import('@/pages/VoxlabPage'));
 
 // Se importa el proveedor de reCAPTCHA
@@ -76,9 +77,12 @@ function App() {
                     <Route path="/voluntariado/personal" element={<VolunteerPersonalPage />} />
 
                     {/* Admin */}
-                    <Route path="/admin" element={<AdminGate><AdminPanel /></AdminGate>} />
-                    <Route path="/admin/layout" element={<AdminGate><LayoutEditor /></AdminGate>} />
-                    <Route path="/voluntariado/admin" element={<AdminGate><VolunteerAdminPanel /></AdminGate>} />
+                    <Route path="/admin/*" element={<AdminGate><AdminApp /></AdminGate>} />
+                    <Route path="/voluntariado/admin" element={<Navigate to="/admin/voluntariado" replace />} />
+                    {/* TEMPORAL durante el refactor: paneles anteriores para comparar. */}
+                    <Route path="/admin-legacy" element={<AdminGate><AdminPanel /></AdminGate>} />
+                    <Route path="/admin-legacy/layout" element={<AdminGate><LayoutEditor /></AdminGate>} />
+                    <Route path="/admin-legacy/voluntariado" element={<AdminGate><VolunteerAdminPanel /></AdminGate>} />
 
 
                     {/* Voxlab */}
@@ -115,11 +119,11 @@ function ConditionalFooter() {
   const location = useLocation();
   const path = location.pathname || '';
   
-  if (path.toLowerCase() === '/voxlab') {
+  if (path.toLowerCase() === '/voxlab' || path.startsWith('/admin')) {
     return null;
   }
   
-  const hideOnMobile = path.startsWith('/admin') || path === '/validacion' || path === '/validar-certificado';
+  const hideOnMobile = path === '/validacion' || path === '/validar-certificado';
   if (hideOnMobile) {
     return (
       <div className="hidden sm:block">

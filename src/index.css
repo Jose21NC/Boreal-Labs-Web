@@ -68,6 +68,39 @@
 
     --radius: 0.75rem;
   }
+
+  /* Panel admin: tokens propios (canales RGB para admitir opacidad, p. ej. bg-adm-accent/10). Oscuro por defecto. */
+  .admin-root {
+    --adm-bg: 6 12 26;
+    --adm-surface: 12 20 37;
+    --adm-surface-2: 20 30 52;
+    --adm-border: 36 48 72;
+    --adm-text: 230 236 245;
+    --adm-muted: 148 163 184;
+    --adm-accent: 105 230 175;
+    --adm-accent-fg: 3 22 14;
+    --adm-danger: 248 113 113;
+    --adm-warning: 251 191 36;
+    --adm-success: 74 222 128;
+    --adm-info: 96 165 250;
+    color-scheme: dark;
+  }
+
+  .admin-root[data-theme='light'] {
+    --adm-bg: 245 247 251;
+    --adm-surface: 255 255 255;
+    --adm-surface-2: 241 244 249;
+    --adm-border: 222 228 238;
+    --adm-text: 15 23 42;
+    --adm-muted: 92 106 128;
+    --adm-accent: 4 120 87;
+    --adm-accent-fg: 255 255 255;
+    --adm-danger: 200 30 30;
+    --adm-warning: 161 72 5;
+    --adm-success: 21 128 61;
+    --adm-info: 29 78 216;
+    color-scheme: light;
+  }
 }
 
 @layer base {
