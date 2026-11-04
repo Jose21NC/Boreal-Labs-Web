@@ -1,0 +1,31 @@
+rules_version = '2';
+// BORRADOR revisado contra el código (no desplegado).
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    function isAdmin() {
+      // Mismos correos que firestore.rules y VITE_ADMIN_EMAILS.
+      let adminEmails = ['contacto@borealabs.org', 'admin@borealabs.org', 'jose@borealabs.org'];
+      return request.auth != null
+        && request.auth.token.firebase.sign_in_provider != 'anonymous'
+        && (request.auth.token.get('admin', false) == true
+            || request.auth.token.get('email', '') in adminEmails);
+    }
+
+    // Comprobantes de asistencia: subida pública, solo crear, imagen < 5 MB.
+    match /attendance-proofs/{file} {
+      allow create: if request.resource.size < 5 * 1024 * 1024
+        && request.resource.contentType.matches('image/.*');
+      allow read, update, delete: if isAdmin();
+    }
+
+    // Imágenes que las páginas públicas resuelven con getDownloadURL (EventsPage, TeamPage).
+    match /events/{path=**}       { allow read: if true; allow write: if isAdmin(); }
+    match /team-members/{path=**} { allow read: if true; allow write: if isAdmin(); }
+
+    // cert-templates/, partner_logos/, certificates/ y el resto: solo admin.
+    match /{path=**} {
+      allow read, write: if isAdmin();
+    }
+  }
+}

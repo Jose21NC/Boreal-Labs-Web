@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { collection, getDocs, addDoc, serverTimestamp } from 'firebase/firestore';
+import { useFormGuard, EMAIL_RE } from '@/lib/antiSpam';
 import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { useNavigate } from 'react-router-dom';
 import { Camera, CalendarClock, CheckCircle2, ClipboardCheck, Clock3, Home, Sparkles, UploadCloud } from 'lucide-react';
@@ -188,6 +189,8 @@ function VolunteerAttendancePage() {
     }
   };
 
+  const { isBot, honeypot } = useFormGuard();
+
   const handleSubmit = async (event) => {
     event.preventDefault();
 
@@ -202,6 +205,15 @@ function VolunteerAttendancePage() {
         description: 'Completa todos los campos requeridos.',
         variant: 'destructive',
       });
+      return;
+    }
+
+    if (!EMAIL_RE.test(email)) {
+      toast({ title: 'Correo inválido', description: 'Revisa que tu correo esté bien escrito.', variant: 'destructive' });
+      return;
+    }
+    if (isBot()) {
+      toast({ title: 'Espera un momento', description: 'Revisa tus datos e intenta enviar de nuevo en unos segundos.', variant: 'destructive' });
       return;
     }
 
@@ -335,6 +347,7 @@ function VolunteerAttendancePage() {
           </div>
 
           <form onSubmit={handleSubmit} className="relative space-y-4 sm:space-y-5">
+            {honeypot}
             <div className="grid sm:grid-cols-2 gap-3 sm:gap-4 rounded-xl sm:rounded-2xl border border-white/10 bg-black/20 p-3 sm:p-4">
               <div className="space-y-1">
                 <Label htmlFor="full-name">Nombre completo</Label>

@@ -33,6 +33,10 @@
 @tailwind utilities;
 
 @layer base {
+  /* Titulares sin palabras huérfanas; párrafos con mejor corte */
+  h1, h2, h3 { text-wrap: balance; }
+  p { text-wrap: pretty; }
+
   :root {
     --background: 222 84% 4.9%;
     --foreground: 210 40% 98%;
@@ -67,6 +71,7 @@
 }
 
 @layer base {
+
   * {
     @apply border-border;
   }
@@ -76,6 +81,18 @@
     -webkit-text-size-adjust: 100%;
   }
   #root { width: 100%; max-width: 100%; overflow-x: hidden; }
+  /* Foco visible consistente para teclado en todo el sitio */
+  a:focus-visible, button:focus-visible, [role="button"]:focus-visible, summary:focus-visible {
+    @apply outline-none ring-2 ring-boreal-aqua ring-offset-2 ring-offset-boreal-dark;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
 }
 
 @layer utilities {

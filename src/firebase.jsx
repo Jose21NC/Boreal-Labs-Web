@@ -2,6 +2,7 @@ import { initializeApp } from "firebase/app";
 import { getAuth, signInAnonymously } from "firebase/auth";
 import { getFirestore, setLogLevel } from "firebase/firestore";
 import { getStorage } from 'firebase/storage';
+import { initializeAppCheck, ReCaptchaEnterpriseProvider } from 'firebase/app-check';
 
 // --- ¡ADVERTENCIA DE SEGURIDAD! ---
 // NUNCA dejes tus claves secretas escritas directamente en el código
@@ -36,6 +37,14 @@ let storage = null;
 
 if (isFirebaseConfigured) {
   app = initializeApp(firebaseConfig);
+  // App Check: Firestore/Storage rechazan clientes que no sean esta web (bots, scripts con la apiKey).
+  // Opt-in con VITE_APPCHECK_SITE_KEY (reCAPTCHA Enterprise); activar "Enforce" en la consola después de ver métricas.
+  if (import.meta.env.VITE_APPCHECK_SITE_KEY) {
+    initializeAppCheck(app, {
+      provider: new ReCaptchaEnterpriseProvider(import.meta.env.VITE_APPCHECK_SITE_KEY),
+      isTokenAutoRefreshEnabled: true,
+    });
+  }
   auth = getAuth(app);
   db = getFirestore(app);
   storage = getStorage(app);

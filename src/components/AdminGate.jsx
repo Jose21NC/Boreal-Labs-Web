@@ -3,13 +3,12 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from '@/components/ui/use-toast';
 import { auth } from '@/firebase';
-import { onAuthStateChanged, signInWithEmailAndPassword, signOut, setPersistence, browserLocalPersistence } from 'firebase/auth';
+import { onAuthStateChanged, signInWithEmailAndPassword, signInWithPopup, GoogleAuthProvider, signOut, setPersistence, browserLocalPersistence } from 'firebase/auth';
 
-// Gate de autenticación con Firebase Auth (email/contraseña) + allowlist de correos
-// VITE_ADMIN_EMAILS=correo1@dom.com,correo2@dom.com
+// Gate de autenticación con Firebase Auth (email/contraseña o Google) + allowlist de correos.
+// VITE_ADMIN_EMAILS sobreescribe la lista; mantenerla igual que firestore.rules y functions/index.js.
 
-const EMAILS_ENV = import.meta.env.VITE_ADMIN_EMAILS || '';
-const STORAGE_KEY = 'admin:isAuthed';
+const EMAILS_ENV = import.meta.env.VITE_ADMIN_EMAILS || 'contacto@borealabs.org,admin@borealabs.org,jose@borealabs.org';
 
 export default function AdminGate({ children }) {
   const [email, setEmail] = useState('');
@@ -20,13 +19,12 @@ export default function AdminGate({ children }) {
   const allowedEmails = useMemo(() => EMAILS_ENV.split(',').map(e => e.trim().toLowerCase()).filter(Boolean), []);
 
   useEffect(() => {
+    if (!auth) return;
     setPersistence(auth, browserLocalPersistence).catch(() => {});
     const unsub = onAuthStateChanged(auth, (user) => {
       if (user?.email && allowedEmails.includes(user.email.toLowerCase())) {
-        try { sessionStorage.setItem(STORAGE_KEY, 'true'); } catch {}
         setAuthed(true);
       } else {
-        try { sessionStorage.removeItem(STORAGE_KEY); } catch {}
         setAuthed(false);
       }
     });
@@ -44,15 +42,39 @@ export default function AdminGate({ children }) {
       }
       await signInWithEmailAndPassword(auth, email, password);
       toast({ title: 'Acceso concedido', description: 'Sesión iniciada con Firebase' });
+    } catch {
+      toast({ title: 'No se pudo ingresar', description: 'Correo o contraseña incorrectos', variant: 'destructive' });
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleGoogle = async () => {
+    setSubmitting(true);
+    try {
+      const { user } = await signInWithPopup(auth, new GoogleAuthProvider());
+      if (!allowedEmails.includes((user.email || '').toLowerCase())) {
+        await signOut(auth);
+        toast({ title: 'Acceso denegado', description: 'Esta cuenta de Google no está permitida', variant: 'destructive' });
+        return;
+      }
+      toast({ title: 'Acceso concedido', description: 'Sesión iniciada con Google' });
+    } catch (err) {
+      if (err?.code !== 'auth/popup-closed-by-user') {
+        toast({ title: 'No se pudo ingresar con Google', description: err?.code || 'Error desconocido', variant: 'destructive' });
+      }
     } finally {
       setSubmitting(false);
     }
   };
 
   const logout = () => {
-    try { sessionStorage.removeItem(STORAGE_KEY); } catch {}
     signOut(auth).finally(() => setAuthed(false));
   };
+
+  if (!auth) {
+    return <div className="max-w-md mx-auto pt-24 sm:pt-28 px-4 text-white">Panel no disponible: Firebase no está configurado.</div>;
+  }
 
   if (!authed) {
     return (
@@ -70,14 +92,15 @@ export default function AdminGate({ children }) {
           <button type="submit" disabled={submitting} className={`w-full rounded-md px-4 py-2 font-medium transition-colors ${submitting ? 'bg-white/10 cursor-not-allowed' : 'bg-emerald-500 hover:bg-emerald-400 text-black'}`}>
             {submitting ? 'Ingresando…' : 'Ingresar'}
           </button>
-          <p className="text-xs opacity-70">Este acceso usa Firebase Authentication (email/contraseña) y una lista de correos permitidos.</p>
+          <button type="button" onClick={handleGoogle} disabled={submitting} className="w-full min-h-[44px] rounded-md px-4 py-2 font-medium border border-white/20 bg-white text-black hover:bg-white/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
+            Ingresar con Google
+          </button>
+          <p className="text-xs opacity-70">Este acceso usa Firebase Authentication (email/contraseña o Google) y una lista de correos permitidos.</p>
         </form>
       </div>
     );
   }
 
-  // Detecta si está en /admin/layout
-  const isLayoutEditor = typeof window !== 'undefined' && window.location.pathname === '/admin/layout';
   return (
     <div className="relative">
       {/* Botón de cerrar sesión eliminado; ahora está dentro del menú del panel Admin */}

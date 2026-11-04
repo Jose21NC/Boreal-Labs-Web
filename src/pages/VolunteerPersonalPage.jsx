@@ -98,28 +98,14 @@ const VolunteerPersonalPage = () => {
       return { id: first.id, ...first.data() };
     }
 
-    const fallbackSnap = await getDocs(collection(db, 'voluntarios2026'));
-    let match = null;
-    fallbackSnap.forEach((docItem) => {
-      const data = docItem.data();
-      if (normalizeEmail(data?.email) === normalizedEmail && !match) {
-        match = { id: docItem.id, ...data };
-      }
-    });
-    return match;
+    return null;
   };
 
   const findLogsByEmail = async (normalizedEmail) => {
     const directQuery = query(collection(db, 'volunteerAttendanceLogs'), where('email', '==', normalizedEmail));
     const directSnap = await getDocs(directQuery);
-    let items = directSnap.docs.map((docItem) => ({ id: docItem.id, ...docItem.data() }));
+    const items = directSnap.docs.map((docItem) => ({ id: docItem.id, ...docItem.data() }));
 
-    if (items.length === 0) {
-      const fallbackSnap = await getDocs(collection(db, 'volunteerAttendanceLogs'));
-      items = fallbackSnap.docs
-        .map((docItem) => ({ id: docItem.id, ...docItem.data() }))
-        .filter((item) => normalizeEmail(item?.email) === normalizedEmail);
-    }
 
     return items.sort((a, b) => {
       const dateA = toDateSafe(a.createdAt || a.attendanceDate)?.getTime() || 0;

@@ -10,9 +10,6 @@ import { db, storage } from '@/firebase.jsx';
 import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
 import { getDownloadURL, ref as storageRef, uploadBytes } from 'firebase/storage';
 
-const ACCESS_CODE_ENABLED = true;
-const TEAM_EDITOR_ACCESS_CODE = 'Staff_BOREAL2026*';
-const ACCESS_SESSION_KEY = 'team_editor_unlocked';
 const MAX_IMAGE_SIZE_MB = 8;
 const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 
@@ -148,17 +145,6 @@ const getCroppedFileFromPixels = async (imageSrc, pixelCrop, originalName) => {
 };
 
 const TeamEditorPage = () => {
-  const [accessCode, setAccessCode] = useState('');
-  const [accessError, setAccessError] = useState('');
-  const [isAccessGranted, setIsAccessGranted] = useState(() => {
-    if (!ACCESS_CODE_ENABLED) return true;
-
-    try {
-      return sessionStorage.getItem(ACCESS_SESSION_KEY) === 'ok';
-    } catch {
-      return false;
-    }
-  });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
@@ -185,28 +171,6 @@ const TeamEditorPage = () => {
     whatsappInput: '',
     externalUrl: '',
   });
-
-  const handleAccessSubmit = (event) => {
-    event.preventDefault();
-    setAccessError('');
-
-    if (!ACCESS_CODE_ENABLED) {
-      setIsAccessGranted(true);
-      return;
-    }
-
-    if (accessCode.trim() !== TEAM_EDITOR_ACCESS_CODE) {
-      setAccessError('Codigo incorrecto.');
-      return;
-    }
-
-    try {
-      sessionStorage.setItem(ACCESS_SESSION_KEY, 'ok');
-    } catch {
-      // no-op
-    }
-    setIsAccessGranted(true);
-  };
 
   const handleInputChange = (event) => {
     const { name, value } = event.target;
@@ -325,6 +289,11 @@ const TeamEditorPage = () => {
       return;
     }
 
+    if (formData.externalUrl.trim() && !isFullUrl(formData.externalUrl)) {
+      setErrorMessage('El enlace externo debe empezar con http:// o https://.');
+      return;
+    }
+
     setIsSubmitting(true);
 
     try {
@@ -392,42 +361,6 @@ const TeamEditorPage = () => {
 
       <div className="pt-32 pb-20 bg-boreal-dark">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-          {ACCESS_CODE_ENABLED && !isAccessGranted ? (
-            <motion.section
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5 }}
-              className="max-w-lg mx-auto glass-effect rounded-2xl p-6 md:p-8"
-            >
-              <h1 className="text-2xl md:text-3xl font-black text-white mb-2">Acceso al Editor</h1>
-              <p className="text-gray-300 mb-6">Ingresa el codigo de acceso para continuar.</p>
-
-              <form onSubmit={handleAccessSubmit} className="space-y-4">
-                <div>
-                  <Label htmlFor="accessCode" className="text-gray-200 mb-1 block">Codigo de acceso</Label>
-                  <Input
-                    id="accessCode"
-                    type="password"
-                    value={accessCode}
-                    onChange={(e) => setAccessCode(e.target.value)}
-                    placeholder="Codigo"
-                    autoFocus
-                    required
-                  />
-                </div>
-
-                {accessError && (
-                  <div className="rounded-md border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm text-red-200">
-                    {accessError}
-                  </div>
-                )}
-
-                <Button type="submit" className="w-full bg-gradient-to-r from-boreal-blue to-boreal-purple text-white">
-                  Entrar al editor
-                </Button>
-              </form>
-            </motion.section>
-          ) : (
           <motion.section
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -758,7 +691,6 @@ const TeamEditorPage = () => {
               </div>
             )}
           </motion.section>
-          )}
         </div>
       </div>
     </>

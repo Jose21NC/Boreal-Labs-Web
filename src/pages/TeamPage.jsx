@@ -7,6 +7,9 @@ import { db, storage } from '@/firebase.jsx';
 import { collection, getDocs, query, orderBy } from 'firebase/firestore';
 import { ref as storageRef, getDownloadURL } from 'firebase/storage';
 
+// Solo permite enlaces http(s); evita javascript: u otros esquemas guardados en Firestore.
+const safeUrl = (value) => (/^https?:\/\//i.test(String(value || '').trim()) ? value : null);
+
 const TEAM_TAG_OPTIONS = [
   'Directiva General',
   'Operaciones',
@@ -106,6 +109,8 @@ const TeamPage = () => {
 
   useEffect(() => {
     const fetchTeam = async () => {
+      // Sin Firebase configurado no hay equipo que cargar: mostrar el estado vacío.
+      if (!db) { setLoading(false); return; }
       try {
         const q = query(collection(db, 'teamMembers'), orderBy('name', 'asc'));
         const querySnapshot = await getDocs(q);
@@ -242,7 +247,7 @@ const TeamPage = () => {
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true }}
       transition={{ duration: 0.6, delay: Math.min(index, 15) * 0.05 }}
-      className="glass-effect rounded-2xl p-4 text-center hover:bg-white/10 transition-all group transform hover:-translate-y-1"
+      className="glass-effect rounded-2xl border border-white/10 p-6 text-center transition-[transform,background-color,border-color] duration-300 hover:-translate-y-1 hover:bg-white/10 hover:border-boreal-aqua/30 group"
     >
       <MemberAvatar member={member} />
 
@@ -257,17 +262,17 @@ const TeamPage = () => {
         </div>
       )}
 
-      <p className="text-gray-400 mb-4 text-xs">{member.description}</p>
+      <p className="text-gray-400 mb-4 text-sm leading-relaxed">{member.description}</p>
 
       <div className="flex space-x-2 justify-center">
-        {member.linkedinUrl && (
+        {safeUrl(member.linkedinUrl) && (
           <motion.a
             href={member.linkedinUrl}
             target="_blank"
             rel="noopener noreferrer"
             whileHover={{ scale: 1.1 }}
             whileTap={{ scale: 0.95 }}
-            className="bg-white/10 hover:bg-white/20 p-1 rounded-lg transition-colors"
+            className="inline-flex h-11 w-11 items-center justify-center rounded-xl bg-white/10 hover:bg-white/20 transition-colors"
             aria-label="LinkedIn"
           >
             <Linkedin className="w-4 h-4 text-boreal-aqua" />
@@ -279,49 +284,49 @@ const TeamPage = () => {
             href={`mailto:${member.email}`}
             whileHover={{ scale: 1.1 }}
             whileTap={{ scale: 0.95 }}
-            className="bg-white/10 hover:bg-white/20 p-1 rounded-lg transition-colors"
+            className="inline-flex h-11 w-11 items-center justify-center rounded-xl bg-white/10 hover:bg-white/20 transition-colors"
             aria-label="Email"
           >
             <Mail className="w-4 h-4 text-boreal-aqua" />
           </motion.a>
         )}
 
-        {member.instagramUrl && (
+        {safeUrl(member.instagramUrl) && (
           <motion.a
             href={member.instagramUrl}
             target="_blank"
             rel="noopener noreferrer"
             whileHover={{ scale: 1.1 }}
             whileTap={{ scale: 0.95 }}
-            className="bg-white/10 hover:bg-white/20 p-1 rounded-lg transition-colors"
+            className="inline-flex h-11 w-11 items-center justify-center rounded-xl bg-white/10 hover:bg-white/20 transition-colors"
             aria-label="Instagram"
           >
             <Instagram className="w-4 h-4 text-boreal-aqua" />
           </motion.a>
         )}
 
-        {member.whatsappUrl && (
+        {safeUrl(member.whatsappUrl) && (
           <motion.a
             href={member.whatsappUrl}
             target="_blank"
             rel="noopener noreferrer"
             whileHover={{ scale: 1.1 }}
             whileTap={{ scale: 0.95 }}
-            className="bg-white/10 hover:bg-white/20 p-1 rounded-lg transition-colors"
+            className="inline-flex h-11 w-11 items-center justify-center rounded-xl bg-white/10 hover:bg-white/20 transition-colors"
             aria-label="WhatsApp"
           >
             <Smartphone className="w-4 h-4 text-boreal-aqua" />
           </motion.a>
         )}
 
-        {member.externalUrl && (
+        {safeUrl(member.externalUrl) && (
           <motion.a
             href={member.externalUrl}
             target="_blank"
             rel="noopener noreferrer"
             whileHover={{ scale: 1.1 }}
             whileTap={{ scale: 0.95 }}
-            className="bg-white/10 hover:bg-white/20 p-1 rounded-lg transition-colors"
+            className="inline-flex h-11 w-11 items-center justify-center rounded-xl bg-white/10 hover:bg-white/20 transition-colors"
             aria-label="Enlace externo"
           >
             <LinkIcon className="w-4 h-4 text-boreal-aqua" />
@@ -334,12 +339,12 @@ const TeamPage = () => {
   const renderTeamSection = (title, members) => (
     <section className="mb-16">
       <div className="mb-6 text-center">
-        <h2 className="text-2xl md:text-3xl font-extrabold text-white tracking-tight">{title}</h2>
+        <h2 className="text-sm font-semibold uppercase tracking-[0.2em] text-boreal-aqua">{title}</h2>
       </div>
 
       {members.length === 0 ? (
-        <div className="glass-effect rounded-2xl p-6 text-gray-300 text-sm">
-          No hay integrantes registrados en esta seccion.
+        <div className="glass-effect rounded-2xl border border-dashed border-white/15 p-8 text-center text-gray-400 text-sm">
+          Todavía no hay integrantes publicados en esta sección.
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -372,7 +377,7 @@ const TeamPage = () => {
             transition={{ duration: 0.8 }}
             className="text-center mb-20"
           >
-            <h1 className="text-4xl md:text-5xl font-black mb-6">
+            <h1 className="text-4xl sm:text-5xl md:text-7xl font-black tracking-tighter leading-[1.05] mb-6">
               Conoce a Nuestro <span className="text-gradient">Equipo</span>
             </h1>
             <p className="text-lg text-gray-300 max-w-3xl mx-auto">
@@ -381,8 +386,15 @@ const TeamPage = () => {
           </motion.div>
 
           {loading ? (
-            <div className="text-center text-boreal-aqua text-xl">
-              Cargando equipo...
+            <div role="status" aria-label="Cargando equipo" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-16">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <div key={i} className="glass-effect rounded-2xl border border-white/10 p-6 animate-pulse">
+                  <div className="w-32 h-32 mx-auto mb-4 rounded-full bg-white/10" />
+                  <div className="h-5 w-2/3 mx-auto mb-2 rounded bg-white/10" />
+                  <div className="h-4 w-1/3 mx-auto mb-4 rounded bg-white/10" />
+                  <div className="h-3 w-5/6 mx-auto rounded bg-white/5" />
+                </div>
+              ))}
             </div>
           ) : (
             <>
@@ -396,7 +408,7 @@ const TeamPage = () => {
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
             transition={{ duration: 0.6, delay: 0.3 }}
-            className="mt-20 text-center glass-effect rounded-2xl p-12"
+            className="mt-20 text-center glass-effect rounded-3xl border border-white/10 px-6 py-10 md:p-14"
           >
             <h2 className="text-3xl md:text-4xl font-bold mb-4">
               <span className="text-gradient">Únete a Nuestro Equipo</span>

@@ -1,13 +1,13 @@
 import React from 'react';
 import { Helmet } from 'react-helmet-async';
-import { motion } from 'framer-motion';
+import { motion, MotionConfig } from 'framer-motion';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { AlertTriangle, Home } from 'lucide-react'; // Ícono para el error
 
 const NotFoundPage = () => {
   return (
-    <>
+    <MotionConfig reducedMotion="user">
       <Helmet>
         <title>Página no encontrada - Boreal Labs</title>
         <meta name="description" content="La página que buscas no existe o ha sido movida." />
@@ -20,7 +20,7 @@ const NotFoundPage = () => {
           transition={{ duration: 0.8 }}
           className="max-w-lg mx-auto px-4 sm:px-6 lg:px-8"
         >
-          <AlertTriangle className="w-24 h-24 text-boreal-purple mx-auto mb-8 animate-bounce" />
+          <AlertTriangle className="w-24 h-24 text-boreal-purple mx-auto mb-8 animate-bounce motion-reduce:animate-none" aria-hidden="true" />
           <h1 className="text-6xl md:text-8xl font-black text-white mb-4">
             404
           </h1>
@@ -30,18 +30,19 @@ const NotFoundPage = () => {
           <p className="text-lg text-gray-300 mb-10">
             Lo sentimos, la página que estás buscando no existe o ha sido movida.
           </p>
-          <Link to="/">
-            <Button
-              size="lg"
-              className="bg-gradient-to-r from-boreal-blue to-boreal-purple hover:opacity-90 text-white px-8 py-4 text-lg font-semibold"
-            >
-              <Home className="mr-2 w-5 h-5" />
+          <Button
+            asChild
+            size="lg"
+            className="bg-gradient-to-r from-boreal-blue to-boreal-purple hover:opacity-90 text-white px-8 text-lg font-semibold"
+          >
+            <Link to="/">
+              <Home className="mr-2 w-5 h-5" aria-hidden="true" />
               Volver al Inicio
-            </Button>
-          </Link>
+            </Link>
+          </Button>
         </motion.div>
       </div>
-    </>
+    </MotionConfig>
   );
 };
 

@@ -1,5 +1,5 @@
 import { onCall, HttpsError } from 'firebase-functions/v2/https';
-import { onDocumentCreated } from 'firebase-functions/v2/firestore';
+import { defineString } from 'firebase-functions/params';
 import { initializeApp } from 'firebase-admin/app';
 import { getFirestore, FieldValue } from 'firebase-admin/firestore';
 import { getStorage } from 'firebase-admin/storage';
@@ -16,12 +16,25 @@ const isPresent = (value) => {
   return !!value;
 };
 
+// Lista blanca de admins; sincronizar con firestore.rules y VITE_ADMIN_EMAILS. Se puede sobreescribir con ADMIN_EMAILS en functions/.env.
+const ADMIN_EMAILS = defineString('ADMIN_EMAILS', { default: 'contacto@borealabs.org,admin@borealabs.org,jose@borealabs.org' });
+const MAX_POINTS = 1000;
+
+const assertAdmin = (request) => {
+  const token = request.auth?.token;
+  if (!token) throw new HttpsError('unauthenticated', 'Debes estar autenticado');
+  if (token.firebase?.sign_in_provider === 'anonymous') throw new HttpsError('permission-denied', 'Solo administradores');
+  if (token.admin === true) return;
+  const allowed = ADMIN_EMAILS.value().split(',').map((e) => e.trim().toLowerCase()).filter(Boolean);
+  if (!token.email || !allowed.includes(token.email.toLowerCase())) throw new HttpsError('permission-denied', 'Solo administradores');
+};
+
 export const generateCertificates = onCall({ cors: true, region: 'us-central1' }, async (request) => {
   const { eventName, templateSet, addPoints, points } = request.data || {};
 
   if (!eventName) throw new HttpsError('invalid-argument', 'Falta eventName');
-  // Requerir autenticación de Firebase
-  if (!request.auth) throw new HttpsError('unauthenticated', 'Debes estar autenticado');
+  // Requerir admin (no basta con estar autenticado)
+  assertAdmin(request);
 
   // Traer registros del evento
   const regsSnap = await db.collection('registrations').where('eventName', '==', eventName).get();
@@ -45,7 +58,7 @@ export const generateCertificates = onCall({ cors: true, region: 'us-central1' }
   const addPointsEnabled = Boolean(addPoints);
   const pointsRaw = Number(points);
   const pointsPerCertificate = addPointsEnabled ? Math.floor(pointsRaw) : 0;
-  if (addPointsEnabled && (!Number.isFinite(pointsPerCertificate) || pointsPerCertificate <= 0)) {
+  if (addPointsEnabled && (!Number.isFinite(pointsPerCertificate) || pointsPerCertificate <= 0 || pointsPerCertificate > MAX_POINTS)) {
     throw new HttpsError('invalid-argument', 'Puntos inválidos');
   }
   const pointsByEmail = new Map();
@@ -481,7 +494,7 @@ export const generateCertificates = onCall({ cors: true, region: 'us-central1' }
 export const mergeCertificatesPdf = onCall({ cors: true, region: 'us-central1', timeoutSeconds: 540, memory: '1GiB' }, async (request) => {
   const { eventName } = request.data || {};
   if (!eventName) throw new HttpsError('invalid-argument', 'Falta eventName');
-  if (!request.auth) throw new HttpsError('unauthenticated', 'Debes estar autenticado');
+  assertAdmin(request);
 
   const certsSnap = await db.collection('certificados').where('nombreEvento', '==', eventName).get();
   if (certsSnap.empty) return { merged: false, reason: 'Sin certificados' };
@@ -533,73 +546,5 @@ export const mergeCertificatesPdf = onCall({ cors: true, region: 'us-central1', 
   return { merged: true, urlPdf, pages: addedPages };
 });
 
-export const processVolunteerAttendanceCredits = onDocumentCreated(
-  { document: 'volunteerAttendanceLogs/{attendanceId}', region: 'us-central1' },
-  async (event) => {
-    const snap = event.data;
-    if (!snap?.exists) return;
-
-    const data = snap.data() || {};
-    const email = String(data.email || '').trim().toLowerCase();
-    const attendanceDate = String(data.attendanceDate || '').trim();
-    const startTime = String(data.startTime || '').trim();
-    const endTime = String(data.endTime || '').trim();
-
-    const latest = await snap.ref.get();
-    if (!latest.exists || latest.get('creditsProcessed') === true) return;
-
-    const parseDateTime = (dateValue, timeValue) => new Date(`${dateValue}T${timeValue}:00`);
-    const startAt = parseDateTime(attendanceDate, startTime);
-    const endAt = parseDateTime(attendanceDate, endTime);
-    const validTimes = !Number.isNaN(startAt.getTime()) && !Number.isNaN(endAt.getTime()) && endAt > startAt;
-
-    const minutesWorked = validTimes
-      ? Math.max(0, Math.floor((endAt.getTime() - startAt.getTime()) / (1000 * 60)))
-      : 0;
-
-    let volunteerRef = null;
-    if (email) {
-      const volunteerSnap = await db.collection('voluntarios2026').where('email', '==', email).limit(1).get();
-      if (!volunteerSnap.empty) volunteerRef = volunteerSnap.docs[0].ref;
-    }
-
-    await db.runTransaction(async (tx) => {
-      const currentAttendance = await tx.get(snap.ref);
-      if (!currentAttendance.exists || currentAttendance.get('creditsProcessed') === true) return;
-
-      const updates = {
-        creditsProcessed: true,
-        creditsProcessedAt: FieldValue.serverTimestamp(),
-        computedHours: Number((minutesWorked / 60).toFixed(2)),
-        workedMinutes: minutesWorked,
-      };
-
-      if (!validTimes) {
-        updates.creditStatus = 'invalid-time-range';
-      } else if (!volunteerRef) {
-        updates.creditStatus = 'volunteer-not-found';
-      } else {
-        const volunteerDoc = await tx.get(volunteerRef);
-        const previousCarryMinutes = Math.max(0, Number(volunteerDoc.get('creditMinutesCarry') || 0));
-        const totalMinutes = previousCarryMinutes + minutesWorked;
-        const creditsToAssign = Math.floor(totalMinutes / 120);
-        const remainingCarryMinutes = totalMinutes % 120;
-
-        tx.update(volunteerRef, {
-          creditos: FieldValue.increment(creditsToAssign),
-          creditMinutesCarry: remainingCarryMinutes,
-          updatedAt: FieldValue.serverTimestamp(),
-        });
-
-        updates.creditStatus = creditsToAssign > 0 ? 'assigned' : 'minutes-accumulated';
-        updates.volunteerId = volunteerRef.id;
-        updates.previousCarryMinutes = previousCarryMinutes;
-        updates.totalProcessedMinutes = totalMinutes;
-        updates.remainingCarryMinutes = remainingCarryMinutes;
-        updates.creditsGranted = creditsToAssign;
-      }
-
-      tx.update(snap.ref, updates);
-    });
-  }
-);
+// processVolunteerAttendanceCredits eliminado: acreditaba cualquier envío público sin aprobación.
+// Los créditos los asigna un admin desde VolunteerAdminPanel (assignPendingCredits).

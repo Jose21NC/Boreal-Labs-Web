@@ -54,11 +54,11 @@ const Footer = () => {
             <div className="space-y-3">
               <div className="flex items-center space-x-3 text-gray-400 text-sm">
                 <Mail className="w-4 h-4 text-boreal-aqua" />
-                <span>contacto@borealabs.org</span>
+                <a href="mailto:contacto@borealabs.org" className="hover:text-white transition-colors">contacto@borealabs.org</a>
               </div>
               <div className="flex items-center space-x-3 text-gray-400 text-sm">
                 <Phone className="w-4 h-4 text-boreal-aqua" />
-                <span>+505 7679-6164</span>
+                <a href="tel:+50576796164" className="hover:text-white transition-colors">+505 7679-6164</a>
               </div>
               <div className="flex items-center space-x-3 text-gray-400 text-sm">
                 <MapPin className="w-4 h-4 text-boreal-aqua" />
@@ -77,7 +77,7 @@ const Footer = () => {
                 href="https://instagram.com/boreal.labs" // <-- ¡CAMBIA ESTA URL POR LA DE TU INSTAGRAM!
                 target="_blank"
                 rel="noopener noreferrer"
-                className="bg-white/10 hover:bg-white/20 p-3 rounded-lg transition-colors hover:-translate-y-0.5"
+                className="bg-white/10 hover:bg-white/20 p-3 rounded-lg transition motion-safe:hover:-translate-y-0.5"
                 aria-label="Instagram"
               >
                 <Instagram className="w-5 h-5 text-boreal-aqua" />
@@ -86,7 +86,7 @@ const Footer = () => {
                 href="https://www.tiktok.com/@boreal.labs"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="bg-white/10 hover:bg-white/20 p-3 rounded-lg transition-colors hover:-translate-y-0.5"
+                className="bg-white/10 hover:bg-white/20 p-3 rounded-lg transition motion-safe:hover:-translate-y-0.5"
                 aria-label="TikTok"
               >
                 <TiktokIcon className="w-5 h-5 text-boreal-aqua" />
@@ -95,7 +95,7 @@ const Footer = () => {
                 href="https://www.linkedin.com/company/boreal-labs/"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="bg-white/10 hover:bg-white/20 p-3 rounded-lg transition-colors hover:-translate-y-0.5"
+                className="bg-white/10 hover:bg-white/20 p-3 rounded-lg transition motion-safe:hover:-translate-y-0.5"
                 aria-label="LinkedIn"
               >
                 <Linkedin className="w-5 h-5 text-boreal-aqua" />
