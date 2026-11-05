@@ -9,7 +9,8 @@ export const escapeHtml = (value) => String(value ?? '')
 
 export const safeHttpsUrl = (value) => (/^https:\/\//i.test(String(value || '').trim()) ? String(value).trim() : null);
 
-// PNG (no SVG: Gmail y Outlook no muestran SVG). Vive en public/email/ y se sirve desde el sitio.
+// PNG (no SVG: Gmail y Outlook no muestran SVG) con su propio fondo oscuro incluido: en modo oscuro Gmail
+// cambia el color de fondo de la cabecera, pero no altera imágenes, así el logo blanco siempre se ve.
 const LOGO = `${SITE}/email/logo-boreal.png`;
 const BRAND = { dark: '#010b1d', aqua: '#69e6af', blue: '#3162ed', purple: '#be58f0', text: '#0f172a', muted: '#64748b', bg: '#eef1f7' };
 
@@ -29,12 +30,13 @@ export const stripMarkup = (text) => String(text ?? '').replace(/\*\*([^*\n]+)\*
 
 export const button = (href, label) => `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:8px 0 24px"><tr><td style="border-radius:10px;background:${BRAND.blue};background-image:linear-gradient(90deg,${BRAND.blue},${BRAND.purple})"><a href="${escapeHtml(href)}" style="display:inline-block;padding:14px 26px;color:#ffffff;font-weight:bold;font-size:15px;text-decoration:none;border-radius:10px">${escapeHtml(label)}</a></td></tr></table>`;
 
-export const layout = (title, bodyHtml) => `<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light"><title>${escapeHtml(title)}</title></head>
+export const layout = (title, bodyHtml) => `<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light only"><meta name="supported-color-schemes" content="light"><title>${escapeHtml(title)}</title></head>
 <body style="margin:0;padding:0;background:${BRAND.bg};font-family:'Helvetica Neue',Arial,Helvetica,sans-serif;color:${BRAND.text};-webkit-font-smoothing:antialiased">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${BRAND.bg}"><tr><td align="center" style="padding:32px 12px">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:600px">
-<tr><td style="background:${BRAND.dark};border-radius:16px 16px 0 0;padding:28px 32px">
-<a href="${SITE}" style="text-decoration:none"><img src="${LOGO}" width="84" height="48" alt="Boreal Labs" style="display:block;border:0;height:48px;width:auto"></a>
+<!-- background-image: Gmail en modo oscuro recolorea background-color pero no las imágenes de fondo -->
+<tr><td bgcolor="${BRAND.dark}" style="background:${BRAND.dark};background-image:linear-gradient(${BRAND.dark},${BRAND.dark});border-radius:16px 16px 0 0;padding:20px 24px">
+<a href="${SITE}" style="text-decoration:none"><img src="${LOGO}" width="110" height="55" alt="Boreal Labs" style="display:block;border:0;height:55px;width:110px"></a>
 </td></tr>
 <tr><td style="height:4px;line-height:4px;font-size:0;background:${BRAND.aqua};background-image:linear-gradient(90deg,${BRAND.aqua},${BRAND.blue},${BRAND.purple})">&nbsp;</td></tr>
 <tr><td style="background:#ffffff;padding:36px 32px 12px;font-size:16px;line-height:1.65">
