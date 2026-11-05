@@ -149,6 +149,60 @@ const Row = ({ label, children }) => (
   </div>
 );
 
+/** Editor admin de una respuesta personalizada según el tipo de campo del evento (formFields). */
+function AnswerInput({ field, value, onChange }) {
+  const label = `${field.label}${field.required ? ' *' : ''}`;
+  const options = field.options || [];
+  switch (field.type) {
+    case 'textarea':
+      return <Field label={label}><Textarea rows={3} value={value ?? ''} onChange={(e) => onChange(e.target.value)} /></Field>;
+    case 'select':
+    case 'radio':
+      return (
+        <Field label={label}>
+          <Select value={value ?? ''} onChange={(e) => onChange(e.target.value)}>
+            <option value="">Sin respuesta</option>
+            {options.map((o) => <option key={o} value={o}>{o}</option>)}
+          </Select>
+        </Field>
+      );
+    case 'multiselect': {
+      const list = Array.isArray(value) ? value : [];
+      return (
+        <fieldset className="space-y-1.5">
+          <legend className="text-xs font-semibold uppercase tracking-wide text-adm-muted">{label}</legend>
+          {options.map((o) => (
+            <Checkbox key={o} className="flex" label={o} checked={list.includes(o)} onChange={(e) => onChange(e.target.checked ? [...list, o] : list.filter((x) => x !== o))} />
+          ))}
+        </fieldset>
+      );
+    }
+    case 'checkbox':
+      return <Checkbox className="flex" label={field.label} checked={value === true} onChange={(e) => onChange(e.target.checked)} />;
+    case 'image': {
+      const url = safeUrl(value?.url);
+      return (
+        <Field label={label}>
+          {url ? (
+            <div className="flex items-center gap-3">
+              <a href={url} target="_blank" rel="noopener noreferrer"><img src={url} alt="" className="h-16 w-16 rounded-lg border border-adm-border object-cover" /></a>
+              <Button size="sm" variant="danger-ghost" onClick={() => onChange(null)}>Quitar imagen</Button>
+            </div>
+          ) : <p className="text-sm text-adm-muted">Sin imagen</p>}
+        </Field>
+      );
+    }
+    default: {
+      const type = { number: 'number', date: 'date', email: 'email', phone: 'tel', url: 'url' }[field.type] || 'text';
+      return (
+        <Field label={label}>
+          <Input type={type} value={value ?? ''} onChange={(e) => onChange(field.type === 'number' ? (e.target.value === '' ? '' : Number(e.target.value)) : e.target.value)} />
+        </Field>
+      );
+    }
+  }
+}
+
 export function RegistrationDetailModal({ group, reg, onClose, onToggleAttendance }) {
   const { reload } = useEventsStore();
   const { toast } = useToast();
@@ -161,7 +215,12 @@ export function RegistrationDetailModal({ group, reg, onClose, onToggleAttendanc
   const present = isPresent(reg.statusAsistencia);
   const close = () => { setEdit(null); onClose(); };
 
-  const startEdit = () => setEdit({ name: reg.userName || '', email: reg.userEmail || '', tipo, modalidad: modalidadOf(reg), customEventName: reg.customEventName || '' });
+  const startEdit = () => setEdit({
+    name: reg.userName || '', email: reg.userEmail || '', tipo, modalidad: modalidadOf(reg), customEventName: reg.customEventName || '',
+    whatsapp: reg.userWhatsapp || '', university: reg.userUniversity || '', country: reg.userCountry || '', department: reg.userDepartment || '',
+    isCommunityMember: reg.isCommunityMember === true ? 'yes' : reg.isCommunityMember === false ? 'no' : '',
+    answers: { ...(reg.answers || {}) },
+  });
 
   const save = async (e) => {
     e.preventDefault();
@@ -173,7 +232,16 @@ export function RegistrationDetailModal({ group, reg, onClose, onToggleAttendanc
         userEmail: edit.email.trim(),
         tipo: edit.tipo,
         modalidad: edit.modalidad,
+        // Los registros públicos guardan la modalidad en tipoAsistencia (la usan correos y Meet).
+        ...(reg.tipoAsistencia && !['ponente', 'staff', 'participante'].includes(String(reg.tipoAsistencia).toLowerCase())
+          ? { tipoAsistencia: labelOf(MODALIDADES, edit.modalidad) } : {}),
         ...(edit.tipo === 'ponente' ? { customEventName: edit.customEventName.trim() } : {}),
+        userWhatsapp: edit.whatsapp.trim(),
+        userUniversity: edit.university.trim(),
+        userCountry: edit.country.trim(),
+        userDepartment: edit.department.trim(),
+        ...(edit.isCommunityMember ? { isCommunityMember: edit.isCommunityMember === 'yes' } : {}),
+        ...(fields.length || Object.keys(edit.answers).length ? { answers: edit.answers } : {}),
       });
       await reload();
       await logActivity('eventos.registro_editado', `Editó el registro de ${edit.name.trim()} en "${group.name}"`, { id: reg.id, event: group.name });
@@ -213,13 +281,14 @@ export function RegistrationDetailModal({ group, reg, onClose, onToggleAttendanc
       description={edit ? undefined : reg.userEmail}
       footer={edit ? (
         <>
-          <Button variant="ghost" onClick={() => setEdit(null)}>Cancelar</Button>
-          <Button type="submit" form="edit-reg-form" variant="primary" loading={saving}>Guardar</Button>
+          {/* keys distintas: si React reutiliza el botón "Editar" como este submit, el mismo clic envía el formulario */}
+          <Button key="cancel-edit" variant="ghost" onClick={() => setEdit(null)}>Cancelar</Button>
+          <Button key="save-edit" type="submit" form="edit-reg-form" variant="primary" loading={saving}>Guardar</Button>
         </>
       ) : (
         <>
-          <Button variant="danger-ghost" onClick={remove} className="mr-auto"><Trash2 className="h-4 w-4" aria-hidden="true" /> Eliminar</Button>
-          <Button variant="secondary" onClick={startEdit}>Editar</Button>
+          <Button key="remove" variant="danger-ghost" onClick={remove} className="mr-auto"><Trash2 className="h-4 w-4" aria-hidden="true" /> Eliminar</Button>
+          <Button key="start-edit" variant="secondary" onClick={startEdit}>Editar</Button>
         </>
       )}
     >
@@ -228,6 +297,27 @@ export function RegistrationDetailModal({ group, reg, onClose, onToggleAttendanc
           <Field label="Nombre completo"><Input value={edit.name} onChange={(e) => setEdit({ ...edit, name: e.target.value })} required /></Field>
           <Field label="Correo" hint="El certificado se busca por este correo."><Input type="email" value={edit.email} onChange={(e) => setEdit({ ...edit, email: e.target.value })} required /></Field>
           <RoleFields value={edit} onChange={(p) => setEdit({ ...edit, ...p })} />
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field label="WhatsApp"><Input value={edit.whatsapp} onChange={(e) => setEdit({ ...edit, whatsapp: e.target.value })} /></Field>
+            <Field label="Universidad / procedencia"><Input value={edit.university} onChange={(e) => setEdit({ ...edit, university: e.target.value })} /></Field>
+            <Field label="País"><Input value={edit.country} onChange={(e) => setEdit({ ...edit, country: e.target.value })} /></Field>
+            <Field label="Departamento"><Input value={edit.department} onChange={(e) => setEdit({ ...edit, department: e.target.value })} /></Field>
+            <Field label="Comunidad Boreal">
+              <Select value={edit.isCommunityMember} onChange={(e) => setEdit({ ...edit, isCommunityMember: e.target.value })}>
+                <option value="">Sin dato</option>
+                <option value="yes">Sí</option>
+                <option value="no">No</option>
+              </Select>
+            </Field>
+          </div>
+          {fields.length > 0 && (
+            <div className="space-y-4 border-t border-adm-border pt-4">
+              <p className="text-xs font-semibold uppercase tracking-wide text-adm-muted">Preguntas del evento</p>
+              {fields.map((f) => (
+                <AnswerInput key={f.id} field={f} value={edit.answers[f.id]} onChange={(v) => setEdit({ ...edit, answers: { ...edit.answers, [f.id]: v } })} />
+              ))}
+            </div>
+          )}
         </form>
       ) : (
         <>
