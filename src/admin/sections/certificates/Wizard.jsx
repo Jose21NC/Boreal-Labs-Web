@@ -56,7 +56,7 @@ function Results({ result, eventName, onMerge, merging }) {
         )}
         {created === 0 && skipped > 0 && !errors.length && <p className="text-sm text-adm-warning">Todos los certificados fueron omitidos: ya estaban emitidos.</p>}
         {[...errors.map((e) => ({ ...e, kind: 'Certificado' })), ...pointsErrors.map((e) => ({ ...e, kind: 'Puntos' }))].length > 0 && (
-          <ul className="max-h-48 space-y-1 overflow-y-auto rounded-lg border border-adm-danger/30 bg-adm-danger/5 p-3 text-xs">
+          <ul className="space-y-1 rounded-lg border border-adm-danger/30 bg-adm-danger/5 p-3 text-xs">
             {[...errors.map((e) => ({ ...e, kind: 'Certificado' })), ...pointsErrors.map((e) => ({ ...e, kind: 'Puntos' }))].map((e, i) => (
               <li key={i} className="text-adm-text"><strong>{e.kind}</strong> · {e.email || '—'}: <span className="text-adm-danger">{e.message}</span></li>
             ))}
@@ -214,7 +214,7 @@ export default function Wizard() {
             {stats.eligible.length > 0 && (
               <details className="rounded-lg border border-adm-border">
                 <summary className="cursor-pointer px-3 py-2 text-sm font-medium text-adm-text">Ver {stats.eligible.length} personas por emitir y su saldo de puntos</summary>
-                <ul className="max-h-72 divide-y divide-adm-border overflow-y-auto border-t border-adm-border text-sm">
+                <ul className="divide-y divide-adm-border border-t border-adm-border text-sm">
                   {stats.eligible.map((r) => (
                     <li key={`${r.userEmail}|${r.rol}`} className="flex items-center gap-3 px-3 py-2">
                       <span className="min-w-0 flex-1">

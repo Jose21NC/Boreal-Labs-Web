@@ -1,6 +1,7 @@
 // Kit de UI del panel admin. Usa solo los tokens `adm-*` (tailwind.config.js) para que el tema
 // claro/oscuro funcione en todo el panel. No usar aquí los componentes públicos de src/components/ui.
 import React, { createContext, useCallback, useContext, useEffect, useId, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Loader2, Search, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -269,14 +270,14 @@ export function Tabs({ items, value, onChange, className }) {
 }
 
 // ---------- Tabla ----------
-/** `sticky`: cabecera fija dentro de un contenedor con scroll propio (tablas largas). */
-export const Table = ({ className, sticky, children }) => (
-  <div className={cn('overflow-x-auto', sticky && 'max-h-[min(70vh,760px)] overflow-y-auto overscroll-contain')} data-sticky={sticky || undefined}>
+// Sin scroll vertical propio: la página es el único scroll. Solo se desborda en horizontal (tablas anchas).
+export const Table = ({ className, children }) => (
+  <div className="overflow-x-auto">
     <table className={cn('w-full text-sm', className)}>{children}</table>
   </div>
 );
 export const THead = ({ children }) => (
-  <thead className="border-b border-adm-border bg-adm-surface-2/60 text-left text-xs font-semibold uppercase tracking-wide text-adm-muted [[data-sticky]_&]:sticky [[data-sticky]_&]:top-0 [[data-sticky]_&]:z-[1] [[data-sticky]_&]:bg-adm-surface-2 [[data-sticky]_&]:shadow-[inset_0_-1px_0_rgb(var(--adm-border))]">{children}</thead>
+  <thead className="border-b border-adm-border bg-adm-surface-2/60 text-left text-xs font-semibold uppercase tracking-wide text-adm-muted">{children}</thead>
 );
 export const TH = ({ className, sort, onSort, children, ...props }) => (
   <th className={cn('px-4 py-3 font-semibold', className)} aria-sort={sort === 'asc' ? 'ascending' : sort === 'desc' ? 'descending' : undefined} {...props}>
@@ -306,7 +307,13 @@ const smUp = () => window.matchMedia?.('(min-width: 640px)').matches ?? true;
 export function Modal({ open, ...props }) {
   const last = useRef(props);
   if (open) last.current = props;
-  return <AnimatePresence>{open && <ModalPanel key="modal" {...last.current} />}</AnimatePresence>;
+  // Portal a .admin-root: la sección animada tiene transform, y un `fixed` dentro de ella
+  // se posicionaría respecto a esa sección (no al viewport). Dentro de .admin-root siguen valiendo las variables de tema.
+  const target = (typeof document !== 'undefined' && document.querySelector('.admin-root')) || document.body;
+  return createPortal(
+    <AnimatePresence>{open && <ModalPanel key="modal" {...last.current} />}</AnimatePresence>,
+    target,
+  );
 }
 
 function ModalPanel({ onClose, title, description, children, footer, size = 'md' }) {
