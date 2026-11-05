@@ -1,111 +1,17 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { motion } from 'framer-motion';
-import { Linkedin, Mail, Instagram, Smartphone, Link as LinkIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { db, storage } from '@/firebase.jsx';
+import TeamMemberCard from '@/components/TeamMemberCard';
+import { db } from '@/firebase.jsx';
 import { collection, getDocs, query, orderBy } from 'firebase/firestore';
-import { ref as storageRef, getDownloadURL } from 'firebase/storage';
-
-// Solo permite enlaces http(s); evita javascript: u otros esquemas guardados en Firestore.
-const safeUrl = (value) => (/^https?:\/\//i.test(String(value || '').trim()) ? value : null);
-
-const TEAM_TAG_OPTIONS = [
-  'Directiva General',
-  'Operaciones',
-  'Finanzas',
-  'Redes',
-  'Voluntariado',
-  'Secretaria General',
-  'Relaciones Institucionales',
-];
-
-const TAG_STYLES = {
-  'Directiva General': 'border-sky-400/50 bg-sky-500/15 text-sky-200',
-  Operaciones: 'border-emerald-400/50 bg-emerald-500/15 text-emerald-200',
-  Finanzas: 'border-lime-400/50 bg-lime-500/15 text-lime-200',
-  Redes: 'border-fuchsia-400/50 bg-fuchsia-500/15 text-fuchsia-200',
-  Voluntariado: 'border-amber-400/50 bg-amber-500/15 text-amber-200',
-  'Secretaria General': 'border-indigo-400/50 bg-indigo-500/15 text-indigo-200',
-  'Relaciones Institucionales': 'border-rose-400/50 bg-rose-500/15 text-rose-200',
-};
-
-const normalizeSection = (member) => {
-  const raw = String(
-    member.teamSection || member.teamType || member.group || member.area || ''
-  )
-    .toLowerCase()
-    .trim();
-
-  if (raw.includes('directiva') || raw.includes('board') || raw.includes('lider')) {
-    return 'DIRECTIVA';
-  }
-
-  return 'STAFF';
-};
-
-const normalizeTag = (member) => {
-  const rawTag = String(member.teamTag || member.tag || member.label || '').trim();
-  const found = TEAM_TAG_OPTIONS.find((tag) => tag.toLowerCase() === rawTag.toLowerCase());
-  if (found) {
-    return found;
-  }
-
-  if (rawTag) {
-    return rawTag;
-  }
-
-  return normalizeSection(member) === 'DIRECTIVA' ? 'Directiva General' : 'Operaciones';
-};
+import { normalizeSection, normalizeTag, resolveMemberImage } from '@/lib/team';
 
 const TeamPage = () => {
   const siteUrl = 'https://borealabs.org';
   const canonicalUrl = `${siteUrl}/equipo`;
   const [teamMembers, setTeamMembers] = useState([]);
   const [loading, setLoading] = useState(true);
-
-  const MemberAvatar = ({ member }) => {
-    const [imgError, setImgError] = useState(false);
-    const [imgLoading, setImgLoading] = useState(true);
-
-    const initials = member.name
-      ? member.name.split(' ').map((n) => n[0]).slice(0, 2).join('').toUpperCase()
-      : '';
-
-    const imageSrc = member.resolvedImageUrl || member.imageUrl || null;
-    if (!imageSrc) {
-      return (
-        <div className="mb-4 overflow-hidden rounded-full w-32 h-32 mx-auto border-2 border-boreal-blue/50 flex items-center justify-center bg-white/5 text-white text-xl font-bold">
-          {initials}
-        </div>
-      );
-    }
-
-    return (
-      <div className="relative mb-4 overflow-hidden rounded-full w-32 h-32 mx-auto border-2 border-boreal-blue/50 bg-white/5 flex items-center justify-center">
-        {imgLoading && (
-          <div className="absolute inset-0 animate-pulse flex items-center justify-center bg-white/5 z-10">
-            <div className="w-8 h-8 rounded-full bg-white/10" />
-          </div>
-        )}
-        {!imgError ? (
-          <img
-            alt={`${member.name} - ${member.role}`}
-            className={`w-full h-full object-cover transition-opacity duration-300 ${imgLoading ? 'opacity-0' : 'opacity-100'}`}
-            src={imageSrc}
-            loading="lazy"
-            decoding="async"
-            onLoad={() => setImgLoading(false)}
-            onError={() => { setImgError(true); setImgLoading(false); }}
-          />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center text-white text-xl font-bold">
-            {initials}
-          </div>
-        )}
-      </div>
-    );
-  };
 
   useEffect(() => {
     const fetchTeam = async () => {
@@ -116,31 +22,12 @@ const TeamPage = () => {
         const querySnapshot = await getDocs(q);
         const rawMembers = querySnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
 
-        const members = await Promise.all(rawMembers.map(async (member) => {
-          const out = { ...member };
-          try {
-            if (Array.isArray(member.imageUrl) && member.imageUrl.length > 0) {
-              const first = member.imageUrl[0];
-              if (first.downloadURL) {
-                out.resolvedImageUrl = first.downloadURL;
-              } else if (first.ref) {
-                out.resolvedImageUrl = await getDownloadURL(storageRef(storage, first.ref));
-              }
-            } else if (member.imageUrl && typeof member.imageUrl === 'string') {
-              out.resolvedImageUrl = member.imageUrl;
-            } else if (member.imageUrl && member.imageUrl.ref) {
-              out.resolvedImageUrl = await getDownloadURL(storageRef(storage, member.imageUrl.ref));
-            }
-          } catch (e) {
-            console.warn('No se pudo resolver imageUrl para', member.id, e);
-            out.resolvedImageUrl = null;
-          }
-
-          out.memberSection = normalizeSection(member);
-          out.memberTag = normalizeTag(member);
-
-          return out;
-        }));
+        const members = await Promise.all(rawMembers.map(async (member) => ({
+          ...member,
+          resolvedImageUrl: await resolveMemberImage(member),
+          memberSection: normalizeSection(member),
+          memberTag: normalizeTag(member),
+        })));
 
         setTeamMembers(members);
       } catch (error) {
@@ -240,101 +127,7 @@ const TeamPage = () => {
     };
   }, [staffMembers]);
 
-  const renderMemberCard = (member, index) => (
-    <motion.div
-      key={member.id}
-      initial={{ opacity: 0, y: 20 }}
-      whileInView={{ opacity: 1, y: 0 }}
-      viewport={{ once: true }}
-      transition={{ duration: 0.6, delay: Math.min(index, 15) * 0.05 }}
-      className="glass-effect rounded-2xl border border-white/10 p-6 text-center transition-[transform,background-color,border-color] duration-300 hover:-translate-y-1 hover:bg-white/10 hover:border-boreal-aqua/30 group"
-    >
-      <MemberAvatar member={member} />
-
-      <h3 className="text-xl font-bold text-white mb-1">{member.name}</h3>
-      <div className="text-boreal-aqua font-medium mb-2 text-sm">{member.role}</div>
-
-      {member.memberTag && (
-        <div className="mb-3">
-          <span className={`inline-flex items-center rounded-full border px-3 py-1 text-[11px] font-semibold uppercase tracking-wide ${TAG_STYLES[member.memberTag] || 'border-boreal-aqua/50 bg-boreal-aqua/10 text-boreal-aqua'}`}>
-            {member.memberTag}
-          </span>
-        </div>
-      )}
-
-      <p className="text-gray-400 mb-4 text-sm leading-relaxed">{member.description}</p>
-
-      <div className="flex space-x-2 justify-center">
-        {safeUrl(member.linkedinUrl) && (
-          <motion.a
-            href={member.linkedinUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            whileHover={{ scale: 1.1 }}
-            whileTap={{ scale: 0.95 }}
-            className="inline-flex h-11 w-11 items-center justify-center rounded-xl bg-white/10 hover:bg-white/20 transition-colors"
-            aria-label="LinkedIn"
-          >
-            <Linkedin className="w-4 h-4 text-boreal-aqua" />
-          </motion.a>
-        )}
-
-        {member.email && (
-          <motion.a
-            href={`mailto:${member.email}`}
-            whileHover={{ scale: 1.1 }}
-            whileTap={{ scale: 0.95 }}
-            className="inline-flex h-11 w-11 items-center justify-center rounded-xl bg-white/10 hover:bg-white/20 transition-colors"
-            aria-label="Email"
-          >
-            <Mail className="w-4 h-4 text-boreal-aqua" />
-          </motion.a>
-        )}
-
-        {safeUrl(member.instagramUrl) && (
-          <motion.a
-            href={member.instagramUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            whileHover={{ scale: 1.1 }}
-            whileTap={{ scale: 0.95 }}
-            className="inline-flex h-11 w-11 items-center justify-center rounded-xl bg-white/10 hover:bg-white/20 transition-colors"
-            aria-label="Instagram"
-          >
-            <Instagram className="w-4 h-4 text-boreal-aqua" />
-          </motion.a>
-        )}
-
-        {safeUrl(member.whatsappUrl) && (
-          <motion.a
-            href={member.whatsappUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            whileHover={{ scale: 1.1 }}
-            whileTap={{ scale: 0.95 }}
-            className="inline-flex h-11 w-11 items-center justify-center rounded-xl bg-white/10 hover:bg-white/20 transition-colors"
-            aria-label="WhatsApp"
-          >
-            <Smartphone className="w-4 h-4 text-boreal-aqua" />
-          </motion.a>
-        )}
-
-        {safeUrl(member.externalUrl) && (
-          <motion.a
-            href={member.externalUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            whileHover={{ scale: 1.1 }}
-            whileTap={{ scale: 0.95 }}
-            className="inline-flex h-11 w-11 items-center justify-center rounded-xl bg-white/10 hover:bg-white/20 transition-colors"
-            aria-label="Enlace externo"
-          >
-            <LinkIcon className="w-4 h-4 text-boreal-aqua" />
-          </motion.a>
-        )}
-      </div>
-    </motion.div>
-  );
+  const renderMemberCard = (member, index) => <TeamMemberCard key={member.id} member={member} index={index} />;
 
   const renderTeamSection = (title, members) => (
     <section className="mb-16">

@@ -3,6 +3,7 @@ import React from 'react';
 // Se eliminaron Facebook, Linkedin, Twitter y toast. Solo se conserva Instagram.
 import { Instagram, Linkedin, Mail, MapPin, Phone } from 'lucide-react';
 import logoBoreal from '@/images/logoBoreal.svg';
+import { useSiteLinks } from '@/lib/useSiteConfig';
 
 const TiktokIcon = ({ className }) => (
   <svg
@@ -22,9 +23,7 @@ const TiktokIcon = ({ className }) => (
 );
 
 const Footer = () => {
-  // --- MODIFICACIÓN 2: LÓGICA SIMPLIFICADA ---
-  // Se eliminó la función 'handleSocialClick' y el array 'socialLinks'
-  // ya que solo se usará un enlace directo.
+  const { instagramUrl } = useSiteLinks(); // editable en /admin/sitio
 
   return (
     <footer className="glass-effect border-t border-white/10 mt-20">
@@ -74,7 +73,7 @@ const Footer = () => {
               {/* --- MODIFICACIÓN 5: SOLO INSTAGRAM --- */}
               {/* Se eliminó el .map() y se dejó un solo enlace <a> a Instagram */}
               <a
-                href="https://instagram.com/boreal.labs" // <-- ¡CAMBIA ESTA URL POR LA DE TU INSTAGRAM!
+                href={instagramUrl}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="bg-white/10 hover:bg-white/20 p-3 rounded-lg transition motion-safe:hover:-translate-y-0.5"

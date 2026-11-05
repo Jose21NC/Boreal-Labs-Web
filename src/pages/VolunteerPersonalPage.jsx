@@ -3,7 +3,7 @@ import { db } from '../firebase';
 import { collection, getDocs, query, where } from 'firebase/firestore';
 import { Helmet } from 'react-helmet-async';
 import { Link } from 'react-router-dom';
-import { Mail, Search, Clock3, BadgeDollarSign, ListChecks, CheckCircle2, Hourglass, ArrowLeft, ShieldCheck, Sparkles } from 'lucide-react';
+import { Mail, Search, Clock3, BadgeDollarSign, ListChecks, CheckCircle2, Hourglass, XCircle, ArrowLeft, ShieldCheck, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 const normalizeEmail = (value) => String(value || '').trim().toLowerCase();
@@ -70,7 +70,7 @@ const VolunteerPersonalPage = () => {
   const summary = useMemo(() => {
     const totalHours = logs.reduce((acc, item) => acc + (Number(item.registeredHours) || 0), 0);
     const pendingCredits = logs.reduce((acc, item) => {
-      if (item.creditsProcessed) return acc;
+      if (item.creditsProcessed || item.creditStatus === 'rejected') return acc;
       return acc + getLogCreditsValue(item);
     }, 0);
 
@@ -275,6 +275,10 @@ const VolunteerPersonalPage = () => {
                               {item.creditsProcessed ? (
                                 <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
                                   <CheckCircle2 className="w-3.5 h-3.5" /> Asignado
+                                </span>
+                              ) : item.creditStatus === 'rejected' ? (
+                                <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs bg-red-500/15 text-red-300 border border-red-500/30" title={item.rejectionReason || undefined}>
+                                  <XCircle className="w-3.5 h-3.5" /> Rechazado
                                 </span>
                               ) : (
                                 <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs bg-amber-500/15 text-amber-200 border border-amber-500/30">

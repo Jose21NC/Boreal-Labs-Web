@@ -11,17 +11,14 @@ import HomePage from '@/pages/HomePage';
 
 const AboutPage = lazy(() => import('@/pages/AboutPage'));
 const TeamPage = lazy(() => import('@/pages/TeamPage'));
-const TeamEditorPage = lazy(() => import('@/pages/TeamEditorPage'));
 const EventsPage = lazy(() => import('@/pages/EventsPage'));
 const VolunteerPage = lazy(() => import('@/pages/VolunteerPage'));
 const VolunteerAttendancePage = lazy(() => import('@/pages/VolunteerAttendancePage'));
 const VolunteerPersonalPage = lazy(() => import('@/pages/VolunteerPersonalPage'));
 const NotFoundPage = lazy(() => import('@/pages/NotFoundPage'));
-const LayoutEditor = lazy(() => import('@/pages/LayoutEditor'));
 const PaginaValidacion = lazy(() => import('@/pages/PaginaValidacion'));
-const AdminPanel = lazy(() => import('@/pages/AdminPanel'));
-const VolunteerAdminPanel = lazy(() => import('@/pages/VolunteerAdminPanel'));
 const AdminGate = lazy(() => import('@/components/AdminGate'));
+const AdminApp = lazy(() => import('@/admin/AdminApp'));
 const VoxlabPage = lazy(() => import('@/pages/VoxlabPage'));
 
 // Se importa el proveedor de reCAPTCHA
@@ -69,16 +66,15 @@ function App() {
                     {/* Rutas en español */}
                     <Route path="/nosotros" element={<AboutPage />} />
                     <Route path="/equipo" element={<TeamPage />} />
-                    <Route path="/equipo/editar" element={<AdminGate><TeamEditorPage /></AdminGate>} />
+                    <Route path="/equipo/editar" element={<Navigate to="/admin/equipo" replace />} />
                     <Route path="/eventos" element={<EventsPage />} />
                     <Route path="/voluntariado" element={<VolunteerPage />} />
                     <Route path="/voluntariado/asistencia" element={<VolunteerAttendancePage />} />
                     <Route path="/voluntariado/personal" element={<VolunteerPersonalPage />} />
 
                     {/* Admin */}
-                    <Route path="/admin" element={<AdminGate><AdminPanel /></AdminGate>} />
-                    <Route path="/admin/layout" element={<AdminGate><LayoutEditor /></AdminGate>} />
-                    <Route path="/voluntariado/admin" element={<AdminGate><VolunteerAdminPanel /></AdminGate>} />
+                    <Route path="/admin/*" element={<AdminGate><AdminApp /></AdminGate>} />
+                    <Route path="/voluntariado/admin" element={<Navigate to="/admin/voluntariado" replace />} />
 
 
                     {/* Voxlab */}
@@ -115,11 +111,11 @@ function ConditionalFooter() {
   const location = useLocation();
   const path = location.pathname || '';
   
-  if (path.toLowerCase() === '/voxlab') {
+  if (path.toLowerCase() === '/voxlab' || path.startsWith('/admin')) {
     return null;
   }
   
-  const hideOnMobile = path.startsWith('/admin') || path === '/validacion' || path === '/validar-certificado';
+  const hideOnMobile = path === '/validacion' || path === '/validar-certificado';
   if (hideOnMobile) {
     return (
       <div className="hidden sm:block">

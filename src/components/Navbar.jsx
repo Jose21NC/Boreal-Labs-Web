@@ -3,16 +3,12 @@ import { Link, useLocation } from 'react-router-dom';
 import { Menu, X, Wallet as WalletIcon } from 'lucide-react'; // Se eliminó 'Rocket' porque ya no se usa
 import { Button } from '@/components/ui/button';
 import logoBoreal from '@/images/logoBoreal.svg';
-
-const FALLBACK_LINKS = {
-  walletUrl: 'https://wallet.borealabs.org',
-  communityUrl: 'https://chat.whatsapp.com/HAaxnHFYsuaBltQ812XhRW?mode=wwc',
-};
+import { useSiteLinks } from '@/lib/useSiteConfig';
 
 const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false);
-  const walletUrl = FALLBACK_LINKS.walletUrl;
-  const communityUrl = FALLBACK_LINKS.communityUrl;
+  // Editables en /admin/sitio; pinta con los defaults hasta que llega siteConfig/links.
+  const { walletUrl, communityUrl } = useSiteLinks();
   const location = useLocation();
   const [scrolled, setScrolled] = useState(false);
 
@@ -23,7 +19,7 @@ const Navbar = () => {
     return () => window.removeEventListener('scroll', onScroll);
   }, []);
 
-  if (location.pathname.toLowerCase() === '/voxlab') {
+  if (location.pathname.toLowerCase() === '/voxlab' || location.pathname.startsWith('/admin')) {
     return null;
   }
 

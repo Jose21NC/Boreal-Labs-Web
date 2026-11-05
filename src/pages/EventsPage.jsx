@@ -12,8 +12,6 @@ import {
   DialogFooter,
   DialogClose // Para cerrar el modal
 } from '@/components/ui/dialog';
-import { Input } from "@/components/ui/input"; // Inputs del formulario
-import { Label } from "@/components/ui/label"; // Labels del formulario
 import {
   Select,
   SelectContent,
@@ -24,20 +22,19 @@ import {
 import { useToast } from '@/components/ui/use-toast';
 // reCAPTCHA v3 removed: using only reCAPTCHA v2 (react-google-recaptcha)
 import ReCAPTCHA from 'react-google-recaptcha';
+
+// Modo de prueba (npm run dev:demo): sin captcha, igual que el admin sin login. Nunca es 'demo' en un build.
+const IS_DEMO = import.meta.env.MODE === 'demo';
 import { RecaptchaContext } from '@/App.jsx';
 // --- MODIFICACIÓN 1: Imports de Firebase ---
 import { db, storage } from '@/firebase.jsx'; // Asegúrate que la ruta sea correcta
-import { collection, getDocs, query, orderBy, serverTimestamp, doc, writeBatch, increment } from 'firebase/firestore';
+import { collection, getDocs, query, orderBy, serverTimestamp, doc, getDoc, writeBatch, increment } from 'firebase/firestore';
 import { useFormGuard, EMAIL_RE } from '@/lib/antiSpam';
-import { ref as storageRef, getDownloadURL } from 'firebase/storage';
-
-// Objeto para traducir las categorías
-const categoryDisplayNames = {
-  'workshop': 'Taller',
-  'conference': 'Conferencia',
-  'networking': 'Networking',
-  'competition': 'Competencia',
-};
+import { ref as storageRef, getDownloadURL, uploadBytes } from 'firebase/storage';
+import EventCustomFields, { FieldShell, OptionCards, inputCls } from '@/components/EventCustomFields';
+import { safeUrl } from '@/lib/team';
+import { BUILTIN_CATEGORIES, loadEventCategories, normalizeCode, validateAnswers } from '@/lib/eventForms';
+import { compressImageFile } from '@/lib/image';
 
 const isEventPast = (ev) => {
   if (!ev?.date) return false;
@@ -56,6 +53,11 @@ const EventRegistrationForm = ({ event, onSuccess, onShowConfirmation }) => {
   const [department, setDepartment] = useState('');
   const [isMember, setIsMember] = useState('');
   const [tipoAsistencia, setTipoAsistencia] = useState('');
+  const [accessCode, setAccessCode] = useState('');
+  const [codeOk, setCodeOk] = useState(false);
+  // Campos adicionales definidos en el admin (events/{id}.formFields).
+  const formFields = Array.isArray(event?.formFields) ? event.formFields : [];
+  const [answers, setAnswers] = useState({});
   // Opciones de asistencia configurables por evento
   const getAttendanceOptions = () => {
     // Soporta varias formas: array en event.tipoAsistencia o event.tipoAsistenciaOptions,
@@ -82,18 +84,42 @@ const EventRegistrationForm = ({ event, onSuccess, onShowConfirmation }) => {
   const { setRecaptchaTokenV2, recaptchaSiteKey } = useContext(RecaptchaContext);
   const { isBot, honeypot } = useFormGuard();
 
+  const [errors, setErrors] = useState({});
+  const setField = (key, setter) => (v) => { setter(v); setErrors((er) => (er[key] ? { ...er, [key]: undefined } : er)); };
+
+  // Errores en línea (además del toast): campos estándar + los adicionales con la misma lógica de validateAnswers.
+  const collectErrors = () => {
+    const req = 'Este campo es obligatorio.';
+    const er = {};
+    if (!name.trim()) er.name = req;
+    if (!email.trim()) er.email = req; else if (!EMAIL_RE.test(email.trim())) er.email = 'Revisa que tu correo esté bien escrito.';
+    if (!whatsapp.trim()) er.whatsapp = req;
+    if (!university.trim()) er.university = req;
+    if (!country.trim()) er.country = req;
+    if (!department.trim()) er.department = req;
+    if (!isMember) er.isMember = 'Elige una opción.';
+    if (!tipoAsistencia) er.tipoAsistencia = 'Elige una opción.';
+    for (const f of formFields) {
+      const msg = validateAnswers([f], answers);
+      if (msg) er[f.id] = msg;
+    }
+    return er;
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!name || !email || !whatsapp || !university || !country || !department || !isMember || !tipoAsistencia) {
-      toast({
-        title: "Campos incompletos",
-        description: "Por favor, completa todos los campos del formulario.",
-        variant: "destructive",
-      });
+    const er = collectErrors();
+    setErrors(er);
+    const firstKey = Object.keys(er)[0];
+    if (firstKey) {
+      const el = document.getElementById(STD_IDS[firstKey] || `reg-extra-${firstKey}`) || document.querySelector(`[name="reg-extra-${firstKey}"]`) || document.querySelector(`[name="reg-${firstKey}"]`);
+      el?.focus?.();
+      toast({ title: 'Revisa el formulario', description: 'Hay campos por completar o corregir.', variant: 'destructive' });
       return;
     }
 
-    if (!recaptchaV2Token) {
+    // Antes del captcha: la validación ya corrió arriba, así el token no caduca mientras se corrigen campos.
+    if (!recaptchaV2Token && !IS_DEMO) {
       toast({
         title: "Captcha requerido",
         description: "Por favor, marca el captcha 'No soy un robot' antes de enviar.",
@@ -102,10 +128,6 @@ const EventRegistrationForm = ({ event, onSuccess, onShowConfirmation }) => {
       return;
     }
 
-    if (!EMAIL_RE.test(email.trim())) {
-      toast({ title: "Correo inválido", description: "Revisa que tu correo esté bien escrito.", variant: "destructive" });
-      return;
-    }
     if (isBot()) {
       toast({ title: 'Espera un momento', description: 'Revisa tus datos e intenta enviar de nuevo en unos segundos.', variant: 'destructive' });
       return;
@@ -114,6 +136,24 @@ const EventRegistrationForm = ({ event, onSuccess, onShowConfirmation }) => {
     setLoading(true);
 
     try {
+      // Las imágenes se suben antes del batch: el registro guarda solo { url, path, name }.
+      const cleanAnswers = {};
+      for (const field of formFields) {
+        const v = answers[field.id];
+        if (v == null || v === '' || (Array.isArray(v) && !v.length)) continue;
+        if (field.type === 'image') {
+          const file = await compressImageFile(v);
+          const safeName = file.name.replace(/\s+/g, '-').replace(/[^a-zA-Z0-9._-]/g, '') || 'imagen.jpg';
+          const path = `registration-uploads/${event.id}/${Date.now()}-${safeName}`;
+          const fileRef = storageRef(storage, path);
+          await uploadBytes(fileRef, file, { contentType: file.type });
+          cleanAnswers[field.id] = { url: await getDownloadURL(fileRef), path, name: v.name.slice(0, 200) };
+        } else if (field.type === 'number') {
+          cleanAnswers[field.id] = Number(v);
+        } else {
+          cleanAnswers[field.id] = typeof v === 'string' ? v.trim() : v;
+        }
+      }
       // Registro + contador de cupos en un solo batch; firestore.rules valida el +1 y el tope de capacity.
       // ID determinista evento+correo: un segundo registro con el mismo correo es rechazado por las reglas.
       const regRef = doc(db, 'registrations', `${event.id}_${email.trim().toLowerCase()}`);
@@ -131,6 +171,9 @@ const EventRegistrationForm = ({ event, onSuccess, onShowConfirmation }) => {
         tipoAsistencia,
         recaptchaTokenV2: recaptchaV2Token || null,
         registrationDate: serverTimestamp(),
+        ...(formFields.length ? { answers: cleanAnswers } : {}),
+        // Mayúsculas y sin espacios, igual que lo guarda el admin en eventSecrets (ver normalizeCode).
+        ...(event.requiresCode ? { accessCode: normalizeCode(accessCode) } : {}),
       });
       batch.update(doc(db, 'events', event.id), { registeredCount: increment(1), lastRegistrationId: regRef.id });
       await batch.commit();
@@ -151,8 +194,10 @@ const EventRegistrationForm = ({ event, onSuccess, onShowConfirmation }) => {
       ).toString().trim();
       const baseMsg = `Te has registrado exitosamente para el evento: ${event.title}.`;
       const asistenciaMsg = tipoAsistencia ? `\n\nTipo de asistencia seleccionado: ${tipoAsistencia}.` : '';
-      const virtualMsg = (tipoAsistencia || '').toLowerCase().includes('virtual')
-        ? '📍 Si tu asistencia es Virtual: Entrá aquí el día del taller: https://meet.google.com/nyx-nkmg-kwc'
+      // Enlace de Meet del evento (events/{id}.meetLink) solo para quien eligió modalidad virtual.
+      const meet = safeUrl(event?.meetLink);
+      const virtualMsg = meet && (tipoAsistencia || '').toLowerCase().includes('virtual') && !extraMsg.includes(meet.trim())
+        ? `📍 Asistencia virtual: entra aquí el día del evento: ${meet.trim()}`
         : '';
       const finalMsg = [baseMsg + asistenciaMsg, extraMsg, virtualMsg].filter(Boolean).join("\n\n");
 
@@ -164,7 +209,9 @@ const EventRegistrationForm = ({ event, onSuccess, onShowConfirmation }) => {
       toast({
         title: "Error en el registro",
         description: error?.code === 'permission-denied'
-          ? "Es posible que ya estés registrado con este correo o que no queden cupos."
+          ? event.requiresCode
+            ? "Código incorrecto, ya estás registrado con este correo o no quedan cupos."
+            : "Es posible que ya estés registrado con este correo o que no queden cupos."
           : "Hubo un problema al enviar tu registro. Intenta de nuevo.",
         variant: "destructive",
       });
@@ -173,87 +220,172 @@ const EventRegistrationForm = ({ event, onSuccess, onShowConfirmation }) => {
     }
   };
 
-  return (
-    <form onSubmit={handleSubmit} className="space-y-4 pr-2"> {/* El contenedor modal controla el scroll */}
-      {honeypot}
-      <div className="space-y-2">
-        <Label htmlFor="reg-name" className="text-gray-300">Nombre Completo</Label>
-        <Input id="reg-name" value={name} onChange={(e) => setName(e.target.value)} disabled={loading} className="bg-gray-800 border-gray-700 text-white"/>
-      </div>
-      <div className="space-y-2">
-        <Label htmlFor="reg-email" className="text-gray-300">Correo Electrónico</Label>
-        <Input id="reg-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} disabled={loading} className="bg-gray-800 border-gray-700 text-white"/>
-      </div>
-       <div className="space-y-2">
-        <Label htmlFor="reg-whatsapp" className="text-gray-300">Número de WhatsApp</Label>
-        <Input id="reg-whatsapp" type="tel" value={whatsapp} onChange={(e) => setWhatsapp(e.target.value)} placeholder="+505 1234 5678" disabled={loading} className="bg-gray-800 border-gray-700 text-white"/>
-      </div>
-       <div className="space-y-2">
-        <Label htmlFor="reg-university" className="text-gray-300">Universidad/Centro de Procedencia</Label>
-        <Input id="reg-university" value={university} onChange={(e) => setUniversity(e.target.value)} disabled={loading} className="bg-gray-800 border-gray-700 text-white"/>
-      </div>
-  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <Label htmlFor="reg-country" className="text-gray-300">País</Label>
-            <Input id="reg-country" value={country} onChange={(e) => setCountry(e.target.value)} disabled={loading} className="bg-gray-800 border-gray-700 text-white"/>
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="reg-department" className="text-gray-300">Departamento/Estado</Label>
-            <Input id="reg-department" value={department} onChange={(e) => setDepartment(e.target.value)} disabled={loading} className="bg-gray-800 border-gray-700 text-white"/>
-          </div>
-       </div>
-       <div className="space-y-2">
-          <Label htmlFor="reg-member" className="text-gray-300">¿Ya perteneces a la comunidad Boreal Labs?</Label>
-          <select
-            id="reg-member"
-            value={isMember}
-            onChange={(e) => setIsMember(e.target.value)}
-            disabled={loading}
-            className="w-full bg-gray-800 border border-gray-700 text-white px-3 py-2 rounded-md"
-          >
-            <option value="">Selecciona una opción</option>
-            <option value="yes">Sí</option>
-            <option value="no">No</option>
-          </select>
-       </div>
+  if (event?.requiresCode && !codeOk) {
+    return <AccessCodeGate eventId={event.id} onValid={(code) => { setAccessCode(code); setCodeOk(true); }} />;
+  }
 
-      <div className="space-y-2">
-        <Label htmlFor="reg-tipoAsistencia" className="text-gray-300">Tipo de Asistencia</Label>
-        <select
+  const std = (key, label, input) => (
+    <FieldShell id={STD_IDS[key]} label={label} required error={errors[key]}>
+      {(aria) => input(aria)}
+    </FieldShell>
+  );
+  const text = (key, value, setter, props = {}) => std(key, props.label, (aria) => (
+    <input {...aria} id={STD_IDS[key]} value={value} onChange={(e) => setField(key, setter)(e.target.value)} disabled={loading} className={inputCls} type={props.type || 'text'} placeholder={props.placeholder} autoComplete={props.autoComplete} maxLength={300} />
+  ));
+  const sectionCls = 'space-y-4';
+  const headingCls = 'text-xs font-semibold uppercase tracking-[0.14em] text-boreal-aqua/80';
+
+  return (
+    <motion.form
+      onSubmit={handleSubmit}
+      noValidate
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.25 }}
+      className="space-y-7 pr-1"
+    >
+      {honeypot}
+      <section className={sectionCls} aria-labelledby="reg-sec-you">
+        <h3 id="reg-sec-you" className={headingCls}>Tus datos</h3>
+        {text('name', name, setName, { label: 'Nombre completo', autoComplete: 'name' })}
+        {text('email', email, setEmail, { label: 'Correo electrónico', type: 'email', autoComplete: 'email' })}
+        {text('whatsapp', whatsapp, setWhatsapp, { label: 'Número de WhatsApp', type: 'tel', placeholder: '+505 1234 5678', autoComplete: 'tel' })}
+        {text('university', university, setUniversity, { label: 'Universidad / centro de procedencia', autoComplete: 'organization' })}
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          {text('country', country, setCountry, { label: 'País', autoComplete: 'country-name' })}
+          {text('department', department, setDepartment, { label: 'Departamento / estado', autoComplete: 'address-level1' })}
+        </div>
+      </section>
+
+      <section className={sectionCls} aria-labelledby="reg-sec-event">
+        <h3 id="reg-sec-event" className={headingCls}>Preguntas del evento</h3>
+        <FieldShell id="reg-isMember" group label="¿Ya perteneces a la comunidad Boreal Labs?" required error={errors.isMember}>
+          {() => <OptionCards name="reg-isMember" options={[{ value: 'yes', label: 'Sí' }, { value: 'no', label: 'No' }]} value={isMember} onChange={setField('isMember', setIsMember)} disabled={loading} />}
+        </FieldShell>
+        <FieldShell
           id="reg-tipoAsistencia"
-          value={tipoAsistencia}
-          onChange={(e) => setTipoAsistencia(e.target.value)}
-          disabled={loading}
-          className="w-full bg-gray-800 border border-gray-700 text-white px-3 py-2 rounded-md"
+          group
+          label="Tipo de asistencia"
+          required
+          error={errors.tipoAsistencia}
+          help={event?.mensajeConfirmacion ? 'Al confirmar verás información adicional del evento.' : undefined}
         >
-          <option value="">Selecciona una opción</option>
-          {asistenciaOptions.map((opt) => (
-            <option key={opt} value={opt}>{opt}</option>
-          ))}
-        </select>
-        {event?.mensajeConfirmacion && (
-          <p className="text-xs text-gray-400">Nota del evento: se te enviará información adicional al confirmar.</p>
-        )}
-      </div>
-      <div className="my-4">
+          {() => <OptionCards name="reg-tipoAsistencia" options={asistenciaOptions} value={tipoAsistencia} onChange={setField('tipoAsistencia', setTipoAsistencia)} disabled={loading} />}
+        </FieldShell>
+        <EventCustomFields
+          fields={formFields}
+          values={answers}
+          errors={errors}
+          disabled={loading}
+          onChange={(id, v) => { setAnswers((a) => ({ ...a, [id]: v })); setErrors((er) => (er[id] ? { ...er, [id]: undefined } : er)); }}
+        />
+      </section>
+
+      {!IS_DEMO && (
+        <div>
           <ReCAPTCHA
             sitekey={recaptchaSiteKey}
             onChange={(token) => { setRecaptchaV2Token(token); if (setRecaptchaTokenV2) setRecaptchaTokenV2(token); }}
             ref={recaptchaRef}
           />
-      </div>
+        </div>
+      )}
 
-      <Button
-        type="submit"
-        disabled={loading}
-        className="w-full bg-gradient-to-r from-boreal-blue to-boreal-purple hover:opacity-90 text-white font-bold"
-      >
-        {loading ? "Registrando..." : "Confirmar Registro"}
-      </Button>
-    </form>
+      {/* Barra de envío fija al fondo del modal en móvil. */}
+      <div className="sticky bottom-0 -mx-1 border-t border-white/10 bg-boreal-dark/95 px-1 pb-1 pt-3 backdrop-blur sm:static sm:border-0 sm:bg-transparent sm:p-0 sm:backdrop-blur-none">
+        <Button
+          type="submit"
+          disabled={loading}
+          className="min-h-[48px] w-full rounded-xl bg-gradient-to-r from-boreal-blue to-boreal-purple text-white font-bold hover:opacity-90"
+        >
+          {loading ? 'Registrando…' : 'Confirmar registro'}
+        </Button>
+      </div>
+    </motion.form>
   );
 };
 
+const STD_IDS = {
+  name: 'reg-name', email: 'reg-email', whatsapp: 'reg-whatsapp', university: 'reg-university',
+  country: 'reg-country', department: 'reg-department',
+};
+
+// Paso previo: verifica el código sin leerlo. firestore.rules permiten get de eventSecrets/{id}/check/{código}
+// solo si coincide (el doc no existe): éxito = válido, permission-denied = inválido.
+const AccessCodeGate = ({ eventId, onValid }) => {
+  const [code, setCode] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const [fails, setFails] = useState(0);
+  const [lockedUntil, setLockedUntil] = useState(0);
+  const [now, setNow] = useState(Date.now());
+  const locked = lockedUntil > now;
+
+  useEffect(() => {
+    if (!locked) return undefined;
+    const t = setInterval(() => setNow(Date.now()), 500);
+    return () => clearInterval(t);
+  }, [locked]);
+
+  const submit = async (e) => {
+    e.preventDefault();
+    const value = normalizeCode(code);
+    if (!value || busy || locked) return;
+    if (!db) { setError('No se pudo verificar, intenta de nuevo.'); return; }
+    setBusy(true);
+    setError('');
+    try {
+      await getDoc(doc(db, 'eventSecrets', eventId, 'check', value));
+      onValid(value);
+    } catch (err) {
+      if (err?.code === 'permission-denied') {
+        const n = fails + 1;
+        setFails(n);
+        // Desalienta adivinar: 2 s tras cada intento fallido, 30 s cada 5.
+        const wait = n % 5 === 0 ? 30000 : 2000;
+        setLockedUntil(Date.now() + wait);
+        setNow(Date.now());
+        setError(n % 5 === 0 ? 'Demasiados intentos. Espera 30 segundos para volver a intentar.' : 'Código incorrecto. Revisa e intenta de nuevo.');
+      } else {
+        console.error('[eventos] verificación de código', err);
+        setError('No se pudo verificar, intenta de nuevo.');
+      }
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const secs = Math.ceil((lockedUntil - now) / 1000);
+  return (
+    <motion.form onSubmit={submit} noValidate initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="space-y-4 py-2">
+      <div className="space-y-1">
+        <h3 className="text-lg font-semibold text-white">Código de acceso</h3>
+        <p className="text-sm text-gray-400">Este evento es por invitación. Ingresa el código que te compartieron los organizadores.</p>
+      </div>
+      <input
+        id="reg-access-code"
+        aria-label="Código de acceso"
+        value={code}
+        onChange={(e) => { setCode(e.target.value.toUpperCase()); if (error && !locked) setError(''); }}
+        disabled={busy}
+        autoComplete="off"
+        autoCapitalize="characters"
+        spellCheck={false}
+        autoFocus
+        aria-invalid={error ? true : undefined}
+        aria-describedby="reg-access-code-status"
+        className={`${inputCls} text-center text-lg uppercase tracking-[0.3em]`}
+        maxLength={64}
+      />
+      <p id="reg-access-code-status" aria-live="polite" className="min-h-[1.25rem] text-sm text-red-300">
+        {error}{locked && secs > 0 ? ` (${secs} s)` : ''}
+      </p>
+      <Button type="submit" disabled={busy || locked || !normalizeCode(code)} className="min-h-[48px] w-full rounded-xl bg-gradient-to-r from-boreal-blue to-boreal-purple font-bold text-white hover:opacity-90">
+        {busy ? 'Verificando…' : 'Continuar'}
+      </Button>
+    </motion.form>
+  );
+};
 
 const EventsPage = () => {
   const [filter, setFilter] = useState('all');
@@ -264,6 +396,9 @@ const EventsPage = () => {
   const [showConfirmation, setShowConfirmation] = useState(false);
   const [confirmationMsg, setConfirmationMsg] = useState('');
   const [visibleCount, setVisibleCount] = useState(10);
+  // Integradas + personalizadas (siteConfig/eventCategories); sin Firebase quedan las integradas.
+  const [eventCategories, setEventCategories] = useState(BUILTIN_CATEGORIES);
+  useEffect(() => { loadEventCategories(db).then(setEventCategories); }, []);
   const { toast } = useToast(); // Toast para el botón de compartir
 
   // Sonido de confirmación ligero (Web Audio API)
@@ -376,13 +511,8 @@ const EventsPage = () => {
     fetchEvents();
   }, []); // Cargar solo una vez al montar
 
-  const categories = [
-    { value: 'all', label: 'Todos los Eventos' },
-    { value: 'workshop', label: 'Taller' },
-    { value: 'conference', label: 'Conferencia' },
-    { value: 'networking', label: 'Networking' },
-    { value: 'competition', label: 'Competencia' },
-  ];
+  const categories = [{ value: 'all', label: 'Todos los Eventos' }, ...eventCategories];
+  const categoryDisplayNames = Object.fromEntries(eventCategories.map((c) => [c.value, c.label]));
 
   // --- MODIFICACIÓN 4: Filtrar eventos cargados ---
   // Normaliza y compara categorías de forma permissiva:
@@ -434,7 +564,7 @@ const EventsPage = () => {
       const dateB = b.date ? new Date(b.date).getTime() : 0;
       return dateA - dateB;
     });
-  }, [events, filter]);
+  }, [events, filter, eventCategories]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Resetear la cuenta visible cuando cambia el filtro
   useEffect(() => {
@@ -744,7 +874,7 @@ const EventsPage = () => {
               
               <div className="my-4">
                 <h4 className="text-lg font-semibold text-white mb-3">Formulario de Registro</h4>
-                <EventRegistrationForm 
+                <EventRegistrationForm key={selectedEvent.id}
                   event={selectedEvent} 
                   onSuccess={handleCloseModal} 
                   onShowConfirmation={(msg) => { setConfirmationMsg(msg); setShowConfirmation(true); }}
@@ -786,7 +916,9 @@ const EventsPage = () => {
               <DialogHeader className="text-center items-center">
                 <DialogTitle className="text-2xl font-bold text-gradient w-full text-center block">¡Registro Exitoso!</DialogTitle>
               </DialogHeader>
-              <div className="mb-4 mt-2 text-gray-300 whitespace-pre-line text-left">{confirmationMsg}</div>
+              <div className="mb-4 mt-2 text-gray-300 whitespace-pre-line text-left">{confirmationMsg.split(/(https?:\/\/[^\s]+?)(?=[.,;:!?)]*(?:\s|$))/g).map((part, i) => (safeUrl(part) && i % 2 === 1
+                ? <a key={i} href={part} target="_blank" rel="noopener noreferrer" className="break-all text-boreal-aqua underline">{part}</a>
+                : part))}</div>
               <div className="flex gap-3 justify-end">
                 <Button
                   variant="outline"

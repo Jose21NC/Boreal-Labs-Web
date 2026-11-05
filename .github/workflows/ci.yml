@@ -1,0 +1,35 @@
+# Verifica que el sitio compile en cada PR. Repo público + runner ubuntu-latest = minutos gratis.
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+    paths-ignore:
+      - '**.md'
+      - 'functions/**'
+
+permissions:
+  contents: read
+
+# Un push nuevo al mismo PR cancela la corrida anterior: no se gastan minutos en commits viejos.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      - run: npm ci
+
+      # Sin VITE_FIREBASE_* la app compila igual (Firebase es opcional), así que el check no depende de secretos.
+      - run: npm run build

@@ -72,6 +72,11 @@ export default function AdminGate({ children }) {
     signOut(auth).finally(() => setAuthed(false));
   };
 
+  // Modo de prueba: sin login. `import.meta.env.MODE` es 'production' en todo build, así que esto no se publica.
+  if (import.meta.env.MODE === 'demo') {
+    return children;
+  }
+
   if (!auth) {
     return <div className="max-w-md mx-auto pt-24 sm:pt-28 px-4 text-white">Panel no disponible: Firebase no está configurado.</div>;
   }

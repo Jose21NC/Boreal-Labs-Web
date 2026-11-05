@@ -74,10 +74,26 @@ Dos caminos, solo uno está automatizado:
 - Entrada: `src/main.jsx` → `src/App.jsx` (`BrowserRouter`, `HelmetProvider`, contexto de reCAPTCHA, `Navbar`/`Footer`, `ScrollToTop`).
 - Alias `@` → `src` (`vite.config.js`).
 - Rutas en español con redirect desde las de inglés (`/about`→`/nosotros`, `/team`→`/equipo`, `/events`→`/eventos`). Voxlab expone `/voxlab` y redirige `/Voxlab` y `/VOXLAB`.
-- `src/pages/AdminPanel.jsx` (128 KB), `VolunteerAdminPanel.jsx` (173 KB) y `EventsPage.jsx` son archivos enormes generados/expandidos a mano. Editarlos con cuidado.
+- `EventsPage.jsx` es un archivo grande expandido a mano; editarlo con cuidado. El panel admin vive en `src/admin` (ver "Panel admin").
 - `src/lib/configService.js` lee configuración editable desde Firestore (`siteConfig/links`, `siteConfig/home`) con defaults y `onSnapshot`. Todo consumidor debe tolerar que el doc no exista.
 - `functions/` es un proyecto Node separado para Cloud Functions (`generateCertificates`, región `us-central1`, `VALIDATION_URL_BASE`). Se despliega aparte del frontend.
 - `src/index.css` self-hostea la fuente **Agrandir**; `font-agrandir` en Tailwind depende de ella. Si algo se ve con otra tipografía, revisar ese archivo primero.
+
+## Panel admin (`src/admin`)
+
+- `/admin/*` monta `src/admin/AdminApp.jsx` (rutas, cada sección con `lazy`) dentro de `AdminLayout.jsx` (shell: sidebar `NAV`, drawer móvil, tema claro/oscuro/sistema en `localStorage['admin:theme']`, paleta ⌘K, banner de modo prueba).
+- `ui.jsx` es el kit (Button, Card, StatCard, Table, Modal, Tabs, EmptyState, Skeleton, `useConfirm`…). No usar `src/components/ui` dentro del panel.
+- `lib.js`: `logActivity`, fechas (`toDate`, `formatDate`, `formatRelative`), `normalize`, `isPresent`, `downloadCsv`.
+- `sections/<área>/index.jsx` = una sección por ruta (`dashboard` = `/admin`, `activity` = `/admin/actividad`, `events`, `certificates`, …).
+
+Convenciones:
+- Solo tokens `adm-*` de Tailwind (`bg-adm-surface`, `text-adm-muted`, `adm-accent`, `adm-danger`…). Nada de colores fijos: rompe uno de los dos temas.
+- Confirmaciones con `useConfirm()`, nunca `window.confirm`.
+- Tras **cada** mutación exitosa: `logActivity('area.verbo', 'Resumen legible', meta)`. El área (prefijo antes del punto) alimenta los filtros de `/admin/actividad`. Nunca lanza.
+- `db` puede ser `null`: mostrar `EmptyState` "Firebase no configurado". Una consulta = un `getDocs` por colección; `getCountFromServer` si solo hace falta el número.
+- Las reglas de `adminActivity` caen en el catch-all `match /{document=**}` (solo admin); no necesita regla propia.
+
+Modo de prueba: `npm run dev:demo` (`vite --mode demo`). `vite.config.js` reemplaza `firebase/*` por los mocks en memoria de `src/dev/mocks`, con la semilla `src/dev/seed.js` persistida en `localStorage['demo:firestore:v1']` (borrar la clave para volver a la semilla). `AdminGate` se salta el login **solo** en ese modo, y `vite build --mode demo` lanza error a propósito para que nunca llegue a producción.
 
 ## Otras instrucciones del repo
 

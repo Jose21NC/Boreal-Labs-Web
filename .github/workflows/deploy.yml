@@ -4,35 +4,58 @@ on:
   push:
     branches:
       - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Nunca dos deploys FTP a la vez; el segundo espera en lugar de pisar al primero.
+concurrency:
+  group: deploy-hostinger
+  cancel-in-progress: false
 
 jobs:
   web_deploy:
     name: Deploy
     runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      # Config web pública de Firebase: Settings → Secrets and variables → Actions → Variables.
+      VITE_FIREBASE_API_KEY: ${{ vars.VITE_FIREBASE_API_KEY }}
+      VITE_FIREBASE_AUTH_DOMAIN: ${{ vars.VITE_FIREBASE_AUTH_DOMAIN }}
+      VITE_FIREBASE_PROJECT_ID: ${{ vars.VITE_FIREBASE_PROJECT_ID }}
+      VITE_FIREBASE_STORAGE_BUCKET: ${{ vars.VITE_FIREBASE_STORAGE_BUCKET }}
+      VITE_FIREBASE_MESSAGING_SENDER_ID: ${{ vars.VITE_FIREBASE_MESSAGING_SENDER_ID }}
+      VITE_FIREBASE_APP_ID: ${{ vars.VITE_FIREBASE_APP_ID }}
+      VITE_FIREBASE_MEASUREMENT_ID: ${{ vars.VITE_FIREBASE_MEASUREMENT_ID }}
+      VITE_RECAPTCHA_SITE_KEY: ${{ vars.VITE_RECAPTCHA_SITE_KEY }}
+      VITE_ADMIN_EMAILS: ${{ vars.VITE_ADMIN_EMAILS }}
+      VITE_APPCHECK_SITE_KEY: ${{ vars.VITE_APPCHECK_SITE_KEY }}
     steps:
-    - name: Checkout Code
-      uses: actions/checkout@v4
+      # Sin config de Firebase el build "funciona" pero publica un sitio sin eventos ni admin: abortar.
+      - name: Verificar config de Firebase
+        if: ${{ vars.VITE_FIREBASE_API_KEY == '' || vars.VITE_FIREBASE_PROJECT_ID == '' || vars.VITE_FIREBASE_APP_ID == '' }}
+        run: |
+          echo "::error::Faltan variables VITE_FIREBASE_* en el repo; no se despliega."
+          exit 1
 
-    - name: Setup Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: '20'
+      - uses: actions/checkout@v4
 
-    - name: Install Dependencies
-      run: npm install
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
 
-    - name: Build Project
-      run: npm run build
+      - run: npm ci
 
-    - name: Deploy to Hostinger via FTP (Corregido)
-      uses: SamKirkland/FTP-Deploy-Action@v4.3.0
-      with:
-        server: ${{ secrets.FTP_SERVER }}
-        username: ${{ secrets.FTP_USERNAME }}
-        password: ${{ secrets.FTP_PASSWORD }}
-        # PROPIEDAD CORREGIDA: Usar 'server-dir' en lugar de 'server-directory'
-        server-dir: ${{ secrets.FTP_PATH }}/
-        local-dir: ./dist/
-        # Ya no se usa 'ftp-s'. 'state-name' se usa para manejar el estado.
-        # Quitamos la línea 'ftp-s: true' que causaba el error.
-        
+      - run: npm run build
+
+      # Sube solo lo que cambió (estado en .ftp-deploy-sync-state.json): el APK de 53 MB no se re-sube si no cambia.
+      - name: Deploy a Hostinger via FTP
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.0
+        with:
+          server: ${{ secrets.FTP_SERVER }}
+          username: ${{ secrets.FTP_USERNAME }}
+          password: ${{ secrets.FTP_PASSWORD }}
+          server-dir: ${{ secrets.FTP_PATH }}/
+          local-dir: ./dist/
