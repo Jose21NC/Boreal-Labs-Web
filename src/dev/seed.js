@@ -222,6 +222,25 @@ export function seed() {
       [`${id}-g1`]: { amount: u.balance, email: u.email, grantedAt: at(-18), grantedBy: 'contacto@borealabs.org', note: u.lastEvent, type: 'manual-award' },
     }])),
     teamMembers,
+    // Enlaces de perfil del equipo: abre /equipo/perfil/demo-invite-nuevo para probar el formulario público.
+    teamInvites: {
+      'demo-invite-nuevo': { mode: 'create', memberId: null, teamSection: 'STAFF', teamTag: 'Redes', active: true, expiresAt: at(14, 23), createdBy: 'admin@borealabs.org', createdAt: at(-1) },
+      'demo-invite-pend-nuevo': { mode: 'create', memberId: null, teamSection: 'STAFF', teamTag: 'Voluntariado', active: true, expiresAt: at(7, 23), createdBy: 'admin@borealabs.org', createdAt: at(-3) },
+      'demo-invite-pend-edit': { mode: 'edit', memberId: 'tm-2', memberName: teamMembers['tm-2'].name, teamSection: 'STAFF', teamTag: 'Staff', active: true, expiresAt: at(7, 23), createdBy: 'admin@borealabs.org', createdAt: at(-2) },
+      'demo-invite-vencido': { mode: 'create', memberId: null, teamSection: 'DIRECTIVA', teamTag: 'Finanzas', active: true, expiresAt: at(-1), createdBy: 'admin@borealabs.org', createdAt: at(-20) },
+    },
+    teamSubmissions: {
+      'demo-invite-pend-nuevo': {
+        mode: 'create', teamSection: 'STAFF', teamTag: 'Voluntariado', name: 'Lucía Herrera', role: 'Coordinadora de voluntariado',
+        description: 'Organiza jornadas y acompaña a nuevos voluntarios.', email: 'lucia.herrera@example.com',
+        instagramUrl: 'https://instagram.com/lucia.demo', status: 'pending', submittedAt: at(-1, 15),
+      },
+      'demo-invite-pend-edit': {
+        mode: 'edit', memberId: 'tm-2', teamSection: 'STAFF', teamTag: 'Staff', name: teamMembers['tm-2'].name, role: 'Diseño y marca',
+        description: 'Lidera la identidad visual de Boreal Labs.', email: teamMembers['tm-2'].email, linkedinUrl: 'https://www.linkedin.com/',
+        whatsappUrl: 'https://wa.me/50512345678', status: 'pending', submittedAt: at(-1, 17),
+      },
+    },
     eventSecrets: { 'evt-design': { code: 'BOREAL24', updatedAt: at(-4), updatedBy: 'contacto@borealabs.org' } },
     adminEvents: { 'adm-1': { name: 'Charla de Emprendimiento (manual)', createdAt: at(-8) } },
     eventTemplates: {},

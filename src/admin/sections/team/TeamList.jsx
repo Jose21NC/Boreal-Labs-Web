@@ -1,7 +1,7 @@
 // Listado del equipo publicado en /equipo: filtros, orden, edición y borrado.
 import React, { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Download, ExternalLink, Pencil, Plus, Trash2, Users } from 'lucide-react';
+import { Download, ExternalLink, Link2, Pencil, Plus, Trash2, Users } from 'lucide-react';
 import { collection, deleteDoc, doc, onSnapshot } from 'firebase/firestore';
 import { db } from '@/firebase';
 import { useToast } from '@/components/ui/use-toast';
@@ -10,6 +10,7 @@ import {
   Badge, Button, Card, EmptyState, PageHeader, SearchInput, Select, Skeleton, TD, TH, THead, TR, Table, Tabs, useConfirm,
 } from '@/admin/ui';
 import { downloadCsv, formatRelative, logActivity, normalize, toDate } from '@/admin/lib';
+import { GenerateLinkModal, LinkModal } from './Invites';
 
 const SORTERS = {
   name: (m) => normalize(m.name),
@@ -30,6 +31,8 @@ export default function TeamList() {
   const [section, setSection] = useState('all');
   const [tag, setTag] = useState('');
   const [sort, setSort] = useState({ key: 'name', dir: 'asc' });
+  const [linkFor, setLinkFor] = useState(null); // { member } o {} para nuevo perfil
+  const [shown, setShown] = useState(null);
 
   useEffect(() => {
     if (!db) { setMembers([]); return undefined; }
@@ -115,6 +118,7 @@ export default function TeamList() {
           <>
             <Button variant="ghost" onClick={() => window.open('/equipo', '_blank', 'noopener')}><ExternalLink className="h-4 w-4" />Ver página</Button>
             <Button onClick={exportCsv} disabled={!rows.length}><Download className="h-4 w-4" />CSV</Button>
+            <Button onClick={() => setLinkFor({})} disabled={!db}><Link2 className="h-4 w-4" />Generar enlace</Button>
             <Button variant="primary" onClick={() => navigate('nuevo')}><Plus className="h-4 w-4" />Nuevo integrante</Button>
           </>
         )}
@@ -190,6 +194,7 @@ export default function TeamList() {
                   </TD>
                   <TD className="text-right">
                     <div className="flex justify-end gap-1">
+                      <Button variant="ghost" size="icon" onClick={() => setLinkFor({ member: m })} aria-label={`Enlace de edición para ${m.name}`} title="Enlace de edición"><Link2 className="h-4 w-4" /></Button>
                       <Button variant="ghost" size="icon" onClick={() => navigate(m.id)} aria-label={`Editar a ${m.name}`}><Pencil className="h-4 w-4" /></Button>
                       <Button variant="danger-ghost" size="icon" onClick={() => remove(m)} aria-label={`Eliminar a ${m.name}`}><Trash2 className="h-4 w-4" /></Button>
                     </div>
@@ -200,6 +205,14 @@ export default function TeamList() {
           </Table>
         )}
       </Card>
+      <GenerateLinkModal
+        key={linkFor?.member?.id || 'nuevo'}
+        open={!!linkFor}
+        member={linkFor?.member}
+        onClose={() => setLinkFor(null)}
+        onCreated={(inv) => { setLinkFor(null); setShown(inv); }}
+      />
+      <LinkModal invite={shown} onClose={() => setShown(null)} />
     </>
   );
 }

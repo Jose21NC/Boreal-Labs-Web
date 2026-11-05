@@ -80,3 +80,19 @@ export const memberToForm = (m = {}) => ({
   whatsappInput: m.whatsappUrl || '',
   externalUrl: m.externalUrl || '',
 });
+
+// Enlaces de perfil: 32 caracteres url-safe (192 bits). 64 símbolos = byte & 63 sin sesgo.
+const TOKEN_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';
+export const newInviteToken = () => Array.from(crypto.getRandomValues(new Uint8Array(32)), (b) => TOKEN_ALPHABET[b & 63]).join('');
+
+/** Estado del formulario -> campos de perfil normalizados (mismo criterio que el editor admin). */
+export const formToProfile = (form) => ({
+  name: form.name.trim(),
+  role: form.role.trim(),
+  description: form.description.trim(),
+  email: cleanString(form.email),
+  linkedinUrl: normalizeLinkedin(form.linkedinInput),
+  instagramUrl: normalizeInstagram(form.instagramInput),
+  whatsappUrl: normalizeWhatsapp(form.whatsappInput).url,
+  externalUrl: isFullUrl(form.externalUrl) ? form.externalUrl.trim() : null,
+});

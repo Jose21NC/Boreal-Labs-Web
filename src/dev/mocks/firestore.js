@@ -222,7 +222,14 @@ const ops = {
   },
 };
 
-export const setDoc = (ref, data, options) => later(() => { ops.set(ref, data, options); persist(); });
+export const setDoc = (ref, data, options) => later(() => {
+  // Emula firestore.rules: teamSubmissions solo admite create; reescribir una existente se niega.
+  if (ref.parentPath === 'teamSubmissions' && readDoc(ref) !== undefined) {
+    throw Object.assign(new Error('Missing or insufficient permissions.'), { code: 'permission-denied' });
+  }
+  ops.set(ref, data, options);
+  persist();
+});
 export const updateDoc = (ref, ...args) => later(() => { ops.update(ref, ...args); persist(); });
 export const deleteDoc = (ref) => later(() => { ops.delete(ref); persist(); });
 export const addDoc = (collRef, data) => later(() => {

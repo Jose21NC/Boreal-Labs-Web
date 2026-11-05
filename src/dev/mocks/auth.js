@@ -1,7 +1,7 @@
 // Modo de prueba: un admin ficticio siempre autenticado (el panel no pide login con --mode demo).
 const demoUser = {
   uid: 'demo-admin',
-  email: 'demo@borealabs.org',
+  email: 'admin@borealabs.org', // = TEAM_APPROVER para poder probar aprobaciones
   displayName: 'Admin de prueba',
   photoURL: null,
   getIdToken: async () => 'demo-token',

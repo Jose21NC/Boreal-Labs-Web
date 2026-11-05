@@ -11,6 +11,7 @@ import HomePage from '@/pages/HomePage';
 
 const AboutPage = lazy(() => import('@/pages/AboutPage'));
 const TeamPage = lazy(() => import('@/pages/TeamPage'));
+const TeamProfilePage = lazy(() => import('@/pages/TeamProfilePage'));
 const EventsPage = lazy(() => import('@/pages/EventsPage'));
 const VolunteerPage = lazy(() => import('@/pages/VolunteerPage'));
 const VolunteerAttendancePage = lazy(() => import('@/pages/VolunteerAttendancePage'));
@@ -66,6 +67,7 @@ function App() {
                     {/* Rutas en español */}
                     <Route path="/nosotros" element={<AboutPage />} />
                     <Route path="/equipo" element={<TeamPage />} />
+                    <Route path="/equipo/perfil/:token" element={<TeamProfilePage />} />
                     <Route path="/equipo/editar" element={<Navigate to="/admin/equipo" replace />} />
                     <Route path="/eventos" element={<EventsPage />} />
                     <Route path="/voluntariado" element={<VolunteerPage />} />
