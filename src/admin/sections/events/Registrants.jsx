@@ -1,6 +1,6 @@
 // Tabla de inscritos de un evento: asistencia rápida (optimista), filtros, selección masiva y exportación.
 import React, { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
-import { Columns, Copy, Download, MailCheck, Trash2, UserCheck, UserPlus, UserX, Users, X } from 'lucide-react';
+import { Columns, Copy, Download, Mail, MailCheck, Trash2, UserCheck, UserPlus, UserX, Users, X } from 'lucide-react';
 import {
   Badge, Button, Card, Checkbox, EmptyState, Kbd, SearchInput, Select, Switch, Table, TD, TH, THead, TR, useConfirm,
 } from '@/admin/ui';
@@ -60,7 +60,7 @@ export default function Registrants({ group }) {
   const [openId, setOpenId] = useState(null);
   const [bulkBusy, setBulkBusy] = useState(null);
   const [seat, setSeat] = useState('');
-  const [seatOpen, setSeatOpen] = useState(false);
+  const [mailMode, setMailMode] = useState(null); // null | 'seat' | 'custom'
 
   useEffect(() => { try { localStorage.setItem(COLS_KEY, JSON.stringify(cols)); } catch { /* modo privado */ } }, [cols]);
   useEffect(() => { setSelected(new Set()); }, [group.key]);
@@ -244,7 +244,8 @@ export default function Registrants({ group }) {
           <span className="text-sm font-medium text-adm-text">{selected.size} seleccionado{selected.size === 1 ? '' : 's'}</span>
           <Button size="sm" variant="secondary" onClick={() => bulkAttendance(true)} loading={bulkBusy === 'present'}><UserCheck className="h-3.5 w-3.5" aria-hidden="true" /> Marcar presentes</Button>
           <Button size="sm" variant="secondary" onClick={() => bulkAttendance(false)} loading={bulkBusy === 'absent'}><UserX className="h-3.5 w-3.5" aria-hidden="true" /> Marcar ausentes</Button>
-          {group.kind === 'public' && <Button size="sm" variant="primary" onClick={() => setSeatOpen(true)}><MailCheck className="h-3.5 w-3.5" aria-hidden="true" /> Confirmar cupo</Button>}
+          {group.kind === 'public' && <Button size="sm" variant="primary" onClick={() => setMailMode('seat')}><MailCheck className="h-3.5 w-3.5" aria-hidden="true" /> Confirmar cupo</Button>}
+          {group.kind === 'public' && <Button size="sm" variant="secondary" onClick={() => setMailMode('custom')}><Mail className="h-3.5 w-3.5" aria-hidden="true" /> Enviar correo</Button>}
           <Button size="sm" variant="ghost" onClick={() => copyText(emailsOf(selectedRows), toast, 'Correos')}><Copy className="h-3.5 w-3.5" aria-hidden="true" /> Copiar correos</Button>
           <Button size="sm" variant="danger-ghost" onClick={bulkDelete} loading={bulkBusy === 'delete'}><Trash2 className="h-3.5 w-3.5" aria-hidden="true" /> Eliminar</Button>
           <Button size="icon" variant="ghost" onClick={() => setSelected(new Set())} className="ml-auto h-8 w-8" aria-label="Deseleccionar" title="Deseleccionar"><X className="h-4 w-4" /></Button>
@@ -320,12 +321,13 @@ export default function Registrants({ group }) {
         </>
       )}
 
-      {seatOpen && (
+      {mailMode && (
         <SeatConfirmModal
+          mode={mailMode}
           group={group}
           regs={selectedRows}
-          onClose={() => setSeatOpen(false)}
-          onDone={async () => { setSeatOpen(false); setSelected(new Set()); await reload(); }}
+          onClose={() => setMailMode(null)}
+          onDone={async () => { setMailMode(null); setSelected(new Set()); await reload(); }}
         />
       )}
       <AddRegistrationModal group={group} open={adding} onClose={() => setAdding(false)} />

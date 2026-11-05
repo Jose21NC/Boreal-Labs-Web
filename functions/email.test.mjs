@@ -111,3 +111,13 @@ test('sendOnce con field seatEmail es independiente de email; resend reenvía', 
   assert.equal(state.data.email.status, 'sent');
   assert.equal(transport.sent.length, 2);
 });
+
+test('negrita **texto** en HTML, sin asteriscos en texto plano, y sin inyectar etiquetas', async () => {
+  const { customEmail } = await import('./emailTemplates.js');
+  const msg = customEmail({ subject: 'Hola **{nombre}**', body: 'Tu cupo está **confirmado**.\n\n**<b>x</b>**' }, { userName: 'Ana', userEmail: 'a@example.com', tipoAsistencia: 'Presencial' }, { title: 'T' });
+  assert.match(msg.html, /<strong>confirmado<\/strong>/);
+  assert.match(msg.html, /<strong>&lt;b&gt;x&lt;\/b&gt;<\/strong>/);
+  assert.equal(msg.subject, 'Hola Ana');
+  assert.doesNotMatch(msg.text, /\*\*/);
+  assert.match(msg.html, /logo-boreal\.png/);
+});

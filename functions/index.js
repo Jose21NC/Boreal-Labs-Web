@@ -411,7 +411,8 @@ export const onCertificateCreated = onDocumentCreated(emailTrigger('certificados
 // Estado de envío en `seatEmail` (independiente del correo de inscripción en `email`).
 export const sendSeatConfirmations = onCall({ cors: true, region: 'us-central1', secrets: [SMTP_PASSWORD], timeoutSeconds: 300 }, async (request) => {
   assertAdmin(request);
-  const { eventId, regIds, subject, body, resend = false } = request.data || {};
+  // markSeat=false: correo personalizado a los seleccionados, sin marcar el cupo y sin límite de "una vez".
+  const { eventId, regIds, subject, body, resend = false, markSeat = true } = request.data || {};
   if (typeof eventId !== 'string' || !eventId) throw new HttpsError('invalid-argument', 'Falta eventId');
   if (!Array.isArray(regIds) || !regIds.length || regIds.length > 500 || !regIds.every((id) => typeof id === 'string' && id)) {
     throw new HttpsError('invalid-argument', 'regIds debe tener entre 1 y 500 ids');
@@ -430,12 +431,15 @@ export const sendSeatConfirmations = onCall({ cors: true, region: 'us-central1',
       const ref = db.collection('registrations').doc(id);
       const snap = await ref.get();
       if (!snap.exists || String(snap.get('eventId') || '') !== eventId) { errors.push({ id, message: 'No pertenece a este evento' }); continue; }
-      await ref.update({ seatConfirmed: true, seatConfirmedAt: FieldValue.serverTimestamp(), seatConfirmedBy: by });
-      confirmed++;
-      const result = await sendOnce(db, ref, async (reg) => customEmail({ subject, body }, reg, ev), { password: SMTP_PASSWORD.value(), field: 'seatEmail', resend: resend === true });
+      if (markSeat !== false) {
+        await ref.update({ seatConfirmed: true, seatConfirmedAt: FieldValue.serverTimestamp(), seatConfirmedBy: by });
+        confirmed++;
+      }
+      const field = markSeat !== false ? 'seatEmail' : 'customEmail';
+      const result = await sendOnce(db, ref, async (reg) => customEmail({ subject, body }, reg, ev), { password: SMTP_PASSWORD.value(), field, resend: markSeat === false || resend === true });
       if (result === 'sent') sent++;
       else if (result === 'skipped') skipped++;
-      else errors.push({ id, message: (await ref.get()).get('seatEmail.error') || 'Falló el envío' });
+      else errors.push({ id, message: (await ref.get()).get(`${field}.error`) || 'Falló el envío' });
     } catch (err) {
       errors.push({ id, message: err?.message || String(err) });
     }
