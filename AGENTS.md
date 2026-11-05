@@ -7,12 +7,11 @@ Sitio estático de una sola app (Vite + React 18). No es monorepo. Todo el conte
 ```bash
 npm install
 npm run dev       # vite --host :: --port 3000  → http://localhost:3000
-npm run build     # `node tools/generate-llms.js || true && vite build`
+npm run build     # vite build
 npm run preview   # sirve dist/ en puerto 3000
 ```
 
 - **No hay tests, ni script de lint, ni typecheck.** ESLint está instalado pero sin config en el repo (`eslint` + `eslint-config-react-app`, sin `.eslintrc*`). No inventes `npm test` ni `npm run lint`.
-- `npm run build` invoca `tools/generate-llms.js`, que **no existe** en el repo. Está protegido con `|| true`; el build funciona igual. No "arreglar" ese script.
 - `node_modules/` no está instalado en el checkout por defecto.
 
 ## Variables de entorno (gotcha importante)
