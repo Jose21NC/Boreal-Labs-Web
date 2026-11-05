@@ -152,6 +152,7 @@ export async function savePublicEvent(existing, form, imageFile) {
     mensajeConfirmacion: form.confirmationMessage.trim(),
     visible: form.visible,
     soldOut: form.soldOut,
+    confirmationEmail: form.confirmationEmail !== false,
     formFields: cleanFields(form.formFields || []),
     requiresCode: !!form.requiresCode,
     meetLink: (form.meetLink || '').trim(),

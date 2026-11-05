@@ -31,6 +31,7 @@ export const publicFormFrom = (ev = {}, categories = []) => {
     confirmationMessage: String(ev.mensajeConfirmacion || ev.confirmMessage || ''),
     visible: ev.visible !== false,
     soldOut: ev.soldOut === true || ev.isFull === true || ev.cupoLleno === true,
+    confirmationEmail: ev.confirmationEmail !== false,
     formFields: (Array.isArray(ev.formFields) ? ev.formFields : []).map((f) => ({ ...f, options: f.options ? [...f.options] : undefined })),
     meetLink: String(ev.meetLink || ''),
     requiresCode: ev.requiresCode === true,
@@ -184,6 +185,10 @@ export function PublicEventForm({ initial, onSubmit, submitting, submitLabel = '
         <div className="flex items-center gap-3">
           <Switch checked={form.soldOut} onChange={set('soldOut')} label="Marcar como agotado" />
           <span className="text-sm text-adm-text">Marcar como agotado</span>
+        </div>
+        <div className="flex items-center gap-3">
+          <Switch checked={form.confirmationEmail} onChange={set('confirmationEmail')} label="Enviar correo de confirmación al inscribirse" />
+          <span className="text-sm text-adm-text">Enviar correo de confirmación al inscribirse</span>
         </div>
       </div>
 
