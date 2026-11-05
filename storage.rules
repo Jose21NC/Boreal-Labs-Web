@@ -9,7 +9,10 @@ service firebase.storage {
       return request.auth != null
         && request.auth.token.firebase.sign_in_provider != 'anonymous'
         && (request.auth.token.get('admin', false) == true
-            || request.auth.token.get('email', '') in adminEmails);
+            || request.auth.token.get('email', '') in adminEmails
+            // Admins agregados desde la sección Accesos (Firestore isAdmin/{correo}).
+            || (firestore.exists(/databases/(default)/documents/isAdmin/$(request.auth.token.get('email', '')))
+                && firestore.get(/databases/(default)/documents/isAdmin/$(request.auth.token.get('email', ''))).data.get('active', true) != false));
     }
 
     // Comprobantes de asistencia: subida pública, solo crear, imagen < 5 MB.

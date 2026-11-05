@@ -24,13 +24,17 @@ const isPresent = (value) => {
 const ADMIN_EMAILS = defineString('ADMIN_EMAILS', { default: 'contacto@borealabs.org,admin@borealabs.org,jose@borealabs.org' });
 const MAX_POINTS = 1000;
 
-const assertAdmin = (request) => {
+const assertAdmin = async (request) => {
   const token = request.auth?.token;
   if (!token) throw new HttpsError('unauthenticated', 'Debes estar autenticado');
   if (token.firebase?.sign_in_provider === 'anonymous') throw new HttpsError('permission-denied', 'Solo administradores');
   if (token.admin === true) return;
+  const email = String(token.email || '').toLowerCase();
   const allowed = ADMIN_EMAILS.value().split(',').map((e) => e.trim().toLowerCase()).filter(Boolean);
-  if (!token.email || !allowed.includes(token.email.toLowerCase())) throw new HttpsError('permission-denied', 'Solo administradores');
+  if (email && allowed.includes(email)) return;
+  // Admins agregados desde el panel (sección Accesos): isAdmin/{correo} activo.
+  const doc = email ? await db.collection('isAdmin').doc(email).get() : null;
+  if (!doc?.exists || doc.get('active') === false) throw new HttpsError('permission-denied', 'Solo administradores');
 };
 
 export const generateCertificates = onCall({ cors: true, region: 'us-central1', timeoutSeconds: 540, memory: '512MiB' }, async (request) => {
@@ -38,7 +42,7 @@ export const generateCertificates = onCall({ cors: true, region: 'us-central1', 
 
   if (!eventName) throw new HttpsError('invalid-argument', 'Falta eventName');
   // Requerir admin (no basta con estar autenticado)
-  assertAdmin(request);
+  await assertAdmin(request);
 
   // Traer registros del evento
   const regsSnap = await db.collection('registrations').where('eventName', '==', eventName).get();
@@ -322,7 +326,7 @@ export const generateCertificates = onCall({ cors: true, region: 'us-central1', 
 export const mergeCertificatesPdf = onCall({ cors: true, region: 'us-central1', timeoutSeconds: 540, memory: '1GiB' }, async (request) => {
   const { eventName } = request.data || {};
   if (!eventName) throw new HttpsError('invalid-argument', 'Falta eventName');
-  assertAdmin(request);
+  await assertAdmin(request);
 
   // Incluye a los ponentes con título propio (su certificado se guarda con nombreEvento = customEventName).
   const regsSnap = await db.collection('registrations').where('eventName', '==', eventName).get();
@@ -410,7 +414,7 @@ export const onCertificateCreated = onDocumentCreated(emailTrigger('certificados
 // "Confirmar cupo" desde el panel: marca seatConfirmed y envía el correo redactado por el admin.
 // Estado de envío en `seatEmail` (independiente del correo de inscripción en `email`).
 export const sendSeatConfirmations = onCall({ cors: true, region: 'us-central1', secrets: [SMTP_PASSWORD], timeoutSeconds: 300 }, async (request) => {
-  assertAdmin(request);
+  await assertAdmin(request);
   // markSeat=false: correo personalizado a los seleccionados, sin marcar el cupo y sin límite de "una vez".
   const { eventId, regIds, subject, body, resend = false, markSeat = true } = request.data || {};
   if (typeof eventId !== 'string' || !eventId) throw new HttpsError('invalid-argument', 'Falta eventId');

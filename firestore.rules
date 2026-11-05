@@ -16,6 +16,13 @@ service cloud.firestore {
                 && get(/databases/$(database)/documents/isAdmin/$(email)).data.get('active', true) != false));
     }
 
+    // Pueden gestionar accesos (colección isAdmin) desde la sección Accesos del panel.
+    function isSuperAdmin() {
+      return request.auth != null
+        && request.auth.token.firebase.sign_in_provider != 'anonymous'
+        && request.auth.token.get('email', '') in ['admin@borealabs.org', 'jose@borealabs.org'];
+    }
+
     function signedIn() {
       return request.auth != null && request.auth.token.firebase.sign_in_provider != 'anonymous';
     }
@@ -169,7 +176,8 @@ service cloud.firestore {
 
     match /isAdmin/{id} {
       allow read: if isAdmin() || (signedIn() && (id == myEmail() || resource.data.get('email', '') == myEmail()));
-      allow write: if isAdmin();
+      // Solo los superadmins otorgan o quitan acceso (si no, cualquier admin podría darse más permisos).
+      allow write: if isSuperAdmin();
     }
 
     match /productos/{id} {
