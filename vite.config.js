@@ -45,6 +45,14 @@ export default defineConfig(({ command, mode }) => {
             if (id.includes('react-helmet-async')) return 'vendor-helmet';
             return 'vendor';
           },
+          // Los .mjs se sirven como text/plain en Hostinger y quedan cacheados 1 año (immutable).
+          // Se emiten como .js con "-v2" para que la URL sea nueva y ninguna caché la tenga.
+          assetFileNames: (assetInfo) => {
+            const name = assetInfo.names?.[0] ?? assetInfo.name ?? '';
+            return name.endsWith('.mjs')
+              ? 'assets/[name]-v2-[hash].js'
+              : 'assets/[name]-[hash][extname]';
+          },
         },
       },
     },
