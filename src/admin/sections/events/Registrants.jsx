@@ -208,7 +208,7 @@ export default function Registrants({ group }) {
   const openReg = group.regs.find((r) => r.id === openId) || null;
 
   return (
-    <Card className={selected.size ? 'mb-20' : undefined}>
+    <Card>
       <div className="space-y-3 border-b border-adm-border p-4">
         <div className="flex flex-wrap items-center gap-2">
           <SearchInput
@@ -268,7 +268,7 @@ export default function Registrants({ group }) {
 
       {selected.size > 0 && (
         /* Barra flotante: no desplaza la tabla al seleccionar (evita clics fallidos) y queda a mano en móvil. */
-        <div className="fixed inset-x-3 bottom-4 z-30 mx-auto flex max-w-max flex-wrap items-center gap-2 rounded-xl border border-adm-border bg-adm-surface px-4 py-2 shadow-2xl" role="region" aria-label="Acciones masivas">
+        <div className="sticky bottom-0 z-30 flex flex-wrap items-center gap-2 border-t border-adm-border bg-adm-surface px-4 py-2 shadow-[0_-4px_12px_rgba(0,0,0,0.08)]" role="region" aria-label="Acciones masivas">
           <span className="text-sm font-medium text-adm-text">{selected.size} seleccionado{selected.size === 1 ? '' : 's'}</span>
           <Button size="sm" variant="secondary" onClick={() => bulkAttendance(true)} loading={bulkBusy === 'present'}><UserCheck className="h-3.5 w-3.5" aria-hidden="true" /> Marcar presentes</Button>
           <Button size="sm" variant="secondary" onClick={() => bulkAttendance(false)} loading={bulkBusy === 'absent'}><UserX className="h-3.5 w-3.5" aria-hidden="true" /> Marcar ausentes</Button>
