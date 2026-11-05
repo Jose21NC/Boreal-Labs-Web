@@ -67,7 +67,10 @@ service cloud.firestore {
         && request.resource.data.registrationDate == request.time
         // Respuestas a campos personalizados del evento: mapa acotado (el contenido lo valida el formulario).
         && (!('answers' in request.resource.data) || (request.resource.data.answers is map && request.resource.data.answers.size() <= 40))
-        && validAccessCode(request.resource.data.eventId);
+        && validAccessCode(request.resource.data.eventId)
+        // El contador de cupos debe subir en el mismo batch (si no, se podría inscribir sin respetar capacity).
+        && getAfter(/databases/$(database)/documents/events/$(request.resource.data.eventId)).data.get('registeredCount', 0)
+           == get(/databases/$(database)/documents/events/$(request.resource.data.eventId)).data.get('registeredCount', 0) + 1;
       allow read, update, delete: if isAdmin();
     }
 

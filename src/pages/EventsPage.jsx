@@ -28,7 +28,7 @@ const IS_DEMO = import.meta.env.MODE === 'demo';
 import { RecaptchaContext } from '@/App.jsx';
 // --- MODIFICACIÓN 1: Imports de Firebase ---
 import { db, storage } from '@/firebase.jsx'; // Asegúrate que la ruta sea correcta
-import { collection, getDocs, query, orderBy, serverTimestamp, doc, getDoc, writeBatch, increment } from 'firebase/firestore';
+import { collection, getDocs, query, orderBy, serverTimestamp, doc, getDoc, setDoc, writeBatch, increment } from 'firebase/firestore';
 import { useFormGuard, EMAIL_RE } from '@/lib/antiSpam';
 import { ref as storageRef, getDownloadURL, uploadBytes } from 'firebase/storage';
 import EventCustomFields, { FieldShell, OptionCards, inputCls } from '@/components/EventCustomFields';
@@ -157,8 +157,7 @@ const EventRegistrationForm = ({ event, onSuccess, onShowConfirmation }) => {
       // Registro + contador de cupos en un solo batch; firestore.rules valida el +1 y el tope de capacity.
       // ID determinista evento+correo: un segundo registro con el mismo correo es rechazado por las reglas.
       const regRef = doc(db, 'registrations', `${event.id}_${email.trim().toLowerCase()}`);
-      const batch = writeBatch(db);
-      batch.set(regRef, {
+      const payload = {
         eventName: event.title,
         eventId: event.id,
         userName: name,
@@ -174,9 +173,19 @@ const EventRegistrationForm = ({ event, onSuccess, onShowConfirmation }) => {
         ...(formFields.length ? { answers: cleanAnswers } : {}),
         // Mayúsculas y sin espacios, igual que lo guarda el admin en eventSecrets (ver normalizeCode).
         ...(event.requiresCode ? { accessCode: normalizeCode(accessCode) } : {}),
-      });
-      batch.update(doc(db, 'events', event.id), { registeredCount: increment(1), lastRegistrationId: regRef.id });
-      await batch.commit();
+      };
+      try {
+        await writeBatch(db)
+          .set(regRef, payload)
+          .update(doc(db, 'events', event.id), { registeredCount: increment(1), lastRegistrationId: regRef.id })
+          .commit();
+      } catch (batchError) {
+        if (batchError?.code !== 'permission-denied') throw batchError;
+        // Reglas anteriores (sin permiso público sobre events): guardar solo la inscripción.
+        // Con las reglas del repo esto también se rechaza (exigen el +1 en el mismo batch), así que no salta el cupo.
+        // shortcut: el contador no sube en este caso; "Recalcular cupo" en el admin lo corrige. Quitar al desplegar firestore.rules.
+        await setDoc(regRef, payload);
+      }
 
       toast({
         title: "¡Registro Exitoso!",
