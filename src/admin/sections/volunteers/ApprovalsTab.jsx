@@ -166,7 +166,7 @@ export default function ApprovalsTab({ logs, byEmail, loading }) {
             description={status === 'pending' && !search ? 'No hay horas pendientes de aprobar.' : 'Ningún registro coincide con el filtro.'}
           />
         ) : (
-          <Table sticky>
+          <Table>
             <THead>
               <tr>
                 <TH className="hidden w-10 sm:table-cell">

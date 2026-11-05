@@ -155,7 +155,7 @@ export default function VolunteersTab({ volunteers, loading }) {
             description={volunteers.length ? 'Prueba con otra búsqueda o quita filtros.' : 'Las inscripciones del formulario público aparecerán aquí.'}
           />
         ) : (
-          <Table sticky>
+          <Table>
             <THead>
               <tr>
                 <TH className="w-10">

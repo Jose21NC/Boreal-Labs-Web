@@ -152,7 +152,7 @@ export default function PointsSection() {
             />
           ) : (
             <>
-              <Table sticky>
+              <Table>
                 <THead>
                   <tr>
                     <TH {...sortBy('email')}>Persona</TH>

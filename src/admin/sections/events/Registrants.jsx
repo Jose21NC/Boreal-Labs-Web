@@ -289,7 +289,7 @@ export default function Registrants({ group }) {
         />
       ) : (
         <>
-          <Table sticky className="sm:min-w-[640px]">
+          <Table className="sm:min-w-[640px]">
             <THead>
               <tr>
                 <TH className="w-10">

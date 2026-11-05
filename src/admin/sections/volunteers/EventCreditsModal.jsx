@@ -127,7 +127,7 @@ export default function EventCreditsModal({ byEmail, logs, onClose }) {
               {onlyPresent ? 'Nadie tiene asistencia marcada en este evento.' : 'Este evento no tiene inscritos.'}
             </p>
           ) : (
-            <ul className="max-h-72 divide-y divide-adm-border overflow-y-auto rounded-lg border border-adm-border">
+            <ul className="divide-y divide-adm-border rounded-lg border border-adm-border">
               {rows.map(({ reg, status }) => (
                 <li key={reg.id} className="flex items-center justify-between gap-3 px-3 py-2 text-sm">
                   <div className="min-w-0">

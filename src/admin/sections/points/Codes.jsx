@@ -152,7 +152,7 @@ export default function Codes({ codes }) {
           action={!codes.length && <Button variant="primary" onClick={() => setCreating(true)}><Plus className="h-4 w-4" />Crear códigos</Button>}
         />
       ) : (
-        <Table sticky>
+        <Table>
           <THead>
             <tr>
               <TH className="hidden w-10 sm:table-cell"><Checkbox aria-label="Seleccionar todos" checked={allSelected} onChange={() => setSelected(allSelected ? new Set() : new Set(rows.map((c) => c.id)))} /></TH>
@@ -286,7 +286,7 @@ function CreateDialog({ open, onClose, onPrint }) {
       )}
     >
       {created ? (
-        <ul className="max-h-72 space-y-1 overflow-y-auto font-mono text-sm text-adm-text">{created.map((c) => <li key={c.id}>{c.id}</li>)}</ul>
+        <ul className="space-y-1 font-mono text-sm text-adm-text">{created.map((c) => <li key={c.id}>{c.id}</li>)}</ul>
       ) : (
         <form id="create-codes" onSubmit={submit} className="space-y-4" noValidate>
           <div className="grid grid-cols-2 gap-3">

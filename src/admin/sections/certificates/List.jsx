@@ -188,7 +188,7 @@ export default function CertificateList() {
           />
         ) : (
           <>
-            <Table sticky>
+            <Table>
               <THead>
                 <tr>
                   <TH className="w-10">
