@@ -8,7 +8,7 @@ import { downloadCsv, formatDate, isPresent, logActivity, normalize, toDate } fr
 import { useToast } from '@/components/ui/use-toast';
 import { useEventsStore } from './store';
 import { MODALIDADES, ROLES, attendanceValue, labelOf, matchesSearch, modalidadOf, roleOf } from './data';
-import { deleteRegistrations, setAttendance } from './actions';
+import { deleteRegistrations, setAttendance, updateRegistration } from './actions';
 import { AddRegistrationModal, AnswerValue, RegistrationDetailModal } from './RegistrationModals';
 import { answerText } from '@/lib/eventForms';
 import SeatConfirmModal from './SeatConfirmModal';
@@ -44,6 +44,34 @@ async function copyText(text, toast, what) {
 
 export default function Registrants({ group }) {
   const { patchRegs, reload } = useEventsStore();
+
+  // Cambio rápido tocando el badge: rol en ciclo y modalidad (solo si el evento ofrece ambas). UI optimista.
+  const eventModes = (group.doc?.tipoAsistenciaOptions || group.doc?.tipoAsistencia || ['Presencial', 'Virtual']);
+  const bothModes = group.kind !== 'public' || (Array.isArray(eventModes) && ['presencial', 'virtual'].every((m) => eventModes.some((o) => String(o).toLowerCase().includes(m))));
+  const quickUpdate = async (r, updates, summary) => {
+    const ids = new Set([r.id]);
+    const before = Object.fromEntries(Object.keys(updates).map((k) => [k, r[k]]));
+    patchRegs(ids, () => updates);
+    try {
+      await updateRegistration(r.id, updates);
+      logActivity('eventos.registro_editado', summary, { id: r.id, ...updates });
+    } catch (e) {
+      patchRegs(ids, () => before);
+      toast({ title: 'No se pudo actualizar', description: e?.message, variant: 'destructive' });
+    }
+  };
+  const cycleRole = (r) => {
+    const order = ROLES.map((x) => x.value);
+    const next = order[(order.indexOf(roleOf(r)) + 1) % order.length];
+    quickUpdate(r, { tipo: next }, `Cambió el rol de ${r.userName || r.userEmail} a ${labelOf(ROLES, next)} en "${group.name}"`);
+  };
+  const toggleModalidad = (r) => {
+    const next = modalidadOf(r) === 'virtual' ? 'presencial' : 'virtual';
+    const label = labelOf(MODALIDADES, next);
+    // Los registros públicos guardan la modalidad en tipoAsistencia (lo usan los correos y el Meet): mantenerlo igual.
+    const legacyRole = ['ponente', 'staff', 'participante'].includes(String(r.tipoAsistencia || '').toLowerCase());
+    quickUpdate(r, { modalidad: next, ...(r.tipoAsistencia && !legacyRole ? { tipoAsistencia: label } : {}) }, `Cambió la modalidad de ${r.userName || r.userEmail} a ${label} en "${group.name}"`);
+  };
   const { toast } = useToast();
   const confirm = useConfirm();
   const searchRef = useRef(null);
@@ -299,8 +327,18 @@ export default function Registrants({ group }) {
                         <span className="mt-1 block text-xs text-adm-muted sm:hidden">{labelOf(ROLES, tipo)} · {labelOf(MODALIDADES, modalidadOf(r))}</span>
                       </button>
                     </TD>
-                    <TD className="hidden sm:table-cell"><Badge tone={tipo === 'ponente' ? 'accent' : tipo === 'staff' ? 'info' : 'neutral'}>{labelOf(ROLES, tipo)}</Badge></TD>
-                    <TD className="hidden text-adm-muted sm:table-cell">{labelOf(MODALIDADES, modalidadOf(r))}</TD>
+                    <TD className="hidden sm:table-cell">
+                      <button type="button" onClick={() => cycleRole(r)} title="Cambiar rol" aria-label={`Rol: ${labelOf(ROLES, tipo)}. Cambiar`} className="rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-adm-accent">
+                        <Badge tone={tipo === 'ponente' ? 'accent' : tipo === 'staff' ? 'info' : 'neutral'} className="cursor-pointer hover:opacity-80">{labelOf(ROLES, tipo)}</Badge>
+                      </button>
+                    </TD>
+                    <TD className="hidden text-adm-muted sm:table-cell">
+                      {bothModes ? (
+                        <button type="button" onClick={() => toggleModalidad(r)} title="Cambiar modalidad" aria-label={`Modalidad: ${labelOf(MODALIDADES, modalidadOf(r))}. Cambiar`} className="rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-adm-accent">
+                          <Badge tone={modalidadOf(r) === 'virtual' ? 'info' : 'neutral'} className="cursor-pointer hover:opacity-80">{labelOf(MODALIDADES, modalidadOf(r))}</Badge>
+                        </button>
+                      ) : labelOf(MODALIDADES, modalidadOf(r))}
+                    </TD>
                     {shownCols.map((c) => <TD key={c.key} className="hidden max-w-[180px] truncate text-adm-muted md:table-cell" title={c.value(r) || ''}>{(c.raw ? <AnswerValue value={c.raw(r)} small /> : c.value(r)) || '—'}</TD>)}
                     <TD className="hidden whitespace-nowrap text-adm-muted sm:table-cell">{r.registrationDate ? formatDate(r.registrationDate) : '—'}</TD>
                     <TD className="text-right">

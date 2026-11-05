@@ -25,3 +25,5 @@ export class GoogleAuthProvider {
   setCustomParameters() { return this; }
   addScope() { return this; }
 }
+export const signInWithRedirect = async () => {};
+export const getRedirectResult = async () => null;

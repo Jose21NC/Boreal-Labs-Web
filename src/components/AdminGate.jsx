@@ -3,12 +3,23 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from '@/components/ui/use-toast';
 import { auth } from '@/firebase';
-import { onAuthStateChanged, signInWithEmailAndPassword, signInWithPopup, GoogleAuthProvider, signOut, setPersistence, browserLocalPersistence } from 'firebase/auth';
+import { onAuthStateChanged, signInWithEmailAndPassword, signInWithPopup, signInWithRedirect, getRedirectResult, GoogleAuthProvider, signOut, setPersistence, browserLocalPersistence } from 'firebase/auth';
 
 // Gate de autenticación con Firebase Auth (email/contraseña o Google) + allowlist de correos.
 // VITE_ADMIN_EMAILS sobreescribe la lista; mantenerla igual que firestore.rules y functions/index.js.
 
-const EMAILS_ENV = import.meta.env.VITE_ADMIN_EMAILS || 'contacto@borealabs.org,admin@borealabs.org,jose@borealabs.org';
+// Admins base (mismos que firestore.rules/storage.rules y functions/index.js). VITE_ADMIN_EMAILS SUMA correos,
+// nunca reemplaza: antes un .env con otra lista dejaba fuera a estas cuentas y el login con Google era rechazado.
+const BASE_ADMINS = 'contacto@borealabs.org,admin@borealabs.org,jose@borealabs.org';
+const EMAILS_ENV = `${BASE_ADMINS},${import.meta.env.VITE_ADMIN_EMAILS || ''}`;
+
+// Mensajes claros para los fallos de Google más comunes (el código crudo no ayuda a nadie).
+const GOOGLE_ERRORS = {
+  'auth/unauthorized-domain': 'Este dominio no está autorizado en Firebase (Authentication → Configuración → Dominios autorizados: agrega borealabs.org).',
+  'auth/operation-not-allowed': 'El acceso con Google no está habilitado en Firebase (Authentication → Método de acceso → Google).',
+  'auth/popup-blocked': 'El navegador bloqueó la ventana de Google; te redirigimos para continuar.',
+  'auth/network-request-failed': 'Sin conexión con Google. Revisa tu internet e intenta de nuevo.',
+};
 
 export default function AdminGate({ children }) {
   const [email, setEmail] = useState('');
@@ -16,11 +27,15 @@ export default function AdminGate({ children }) {
   const [authed, setAuthed] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
-  const allowedEmails = useMemo(() => EMAILS_ENV.split(',').map(e => e.trim().toLowerCase()).filter(Boolean), []);
+  const allowedEmails = useMemo(() => [...new Set(EMAILS_ENV.split(',').map(e => e.trim().toLowerCase()).filter(Boolean))], []);
 
   useEffect(() => {
     if (!auth) return;
     setPersistence(auth, browserLocalPersistence).catch(() => {});
+    // Si se usó el respaldo por redirección, aquí llega su resultado (o su error).
+    getRedirectResult(auth).catch((err) => {
+      toast({ title: 'No se pudo ingresar con Google', description: GOOGLE_ERRORS[err?.code] || err?.code || 'Error desconocido', variant: 'destructive' });
+    });
     const unsub = onAuthStateChanged(auth, (user) => {
       if (user?.email && allowedEmails.includes(user.email.toLowerCase())) {
         setAuthed(true);
@@ -52,16 +67,28 @@ export default function AdminGate({ children }) {
   const handleGoogle = async () => {
     setSubmitting(true);
     try {
-      const { user } = await signInWithPopup(auth, new GoogleAuthProvider());
+      const provider = new GoogleAuthProvider();
+      provider.setCustomParameters({ prompt: 'select_account' });
+      let user;
+      try {
+        ({ user } = await signInWithPopup(auth, provider));
+      } catch (err) {
+        // Ventana bloqueada o no soportada (Safari/iOS, navegadores embebidos): seguir por redirección.
+        if (['auth/popup-blocked', 'auth/operation-not-supported-in-this-environment', 'auth/cancelled-popup-request'].includes(err?.code)) {
+          await signInWithRedirect(auth, provider);
+          return;
+        }
+        throw err;
+      }
       if (!allowedEmails.includes((user.email || '').toLowerCase())) {
         await signOut(auth);
-        toast({ title: 'Acceso denegado', description: 'Esta cuenta de Google no está permitida', variant: 'destructive' });
+        toast({ title: 'Acceso denegado', description: `${user.email} no está en la lista de administradores.`, variant: 'destructive' });
         return;
       }
       toast({ title: 'Acceso concedido', description: 'Sesión iniciada con Google' });
     } catch (err) {
       if (err?.code !== 'auth/popup-closed-by-user') {
-        toast({ title: 'No se pudo ingresar con Google', description: err?.code || 'Error desconocido', variant: 'destructive' });
+        toast({ title: 'No se pudo ingresar con Google', description: GOOGLE_ERRORS[err?.code] || err?.code || 'Error desconocido', variant: 'destructive' });
       }
     } finally {
       setSubmitting(false);
