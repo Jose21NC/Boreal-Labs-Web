@@ -1,6 +1,6 @@
 // Tabla de inscritos de un evento: asistencia rápida (optimista), filtros, selección masiva y exportación.
 import React, { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
-import { Columns, Copy, Download, Trash2, UserCheck, UserPlus, UserX, Users, X } from 'lucide-react';
+import { Columns, Copy, Download, MailCheck, Trash2, UserCheck, UserPlus, UserX, Users, X } from 'lucide-react';
 import {
   Badge, Button, Card, Checkbox, EmptyState, Kbd, SearchInput, Select, Switch, Table, TD, TH, THead, TR, useConfirm,
 } from '@/admin/ui';
@@ -11,6 +11,7 @@ import { MODALIDADES, ROLES, attendanceValue, labelOf, matchesSearch, modalidadO
 import { deleteRegistrations, setAttendance } from './actions';
 import { AddRegistrationModal, AnswerValue, RegistrationDetailModal } from './RegistrationModals';
 import { answerText } from '@/lib/eventForms';
+import SeatConfirmModal from './SeatConfirmModal';
 
 const OPTIONAL = [
   { key: 'whatsapp', label: 'WhatsApp', value: (r) => r.userWhatsapp || r.whatsapp },
@@ -58,6 +59,8 @@ export default function Registrants({ group }) {
   const [adding, setAdding] = useState(false);
   const [openId, setOpenId] = useState(null);
   const [bulkBusy, setBulkBusy] = useState(null);
+  const [seat, setSeat] = useState('');
+  const [seatOpen, setSeatOpen] = useState(false);
 
   useEffect(() => { try { localStorage.setItem(COLS_KEY, JSON.stringify(cols)); } catch { /* modo privado */ } }, [cols]);
   useEffect(() => { setSelected(new Set()); }, [group.key]);
@@ -78,9 +81,10 @@ export default function Registrants({ group }) {
     const list = group.regs.filter((r) => matchesSearch(r, q)
       && (!role || roleOf(r) === role)
       && (!modalidad || modalidadOf(r) === modalidad)
-      && (!status || isPresent(r.statusAsistencia) === (status === 'present')));
+      && (!status || isPresent(r.statusAsistencia) === (status === 'present'))
+      && (!seat || !!r.seatConfirmed === (seat === 'yes')));
     return list.sort((a, b) => SORTS[sort.key](a, b) * (sort.dir === 'asc' ? 1 : -1));
-  }, [group.regs, deferredSearch, role, modalidad, status, sort]);
+  }, [group.regs, deferredSearch, role, modalidad, status, seat, sort]);
 
   // Una columna opcional por cada campo adicional del evento (clave f:<id> en las preferencias).
   const optional = useMemo(() => [...OPTIONAL, ...(group.doc?.formFields || []).map((f) => ({
@@ -89,7 +93,7 @@ export default function Registrants({ group }) {
   const shownCols = optional.filter((c) => cols[c.key]);
   const selectedRows = group.regs.filter((r) => selected.has(r.id));
   const allSelected = rows.length > 0 && rows.every((r) => selected.has(r.id));
-  const filtersOn = search || role || modalidad || status;
+  const filtersOn = search || role || modalidad || status || seat;
 
   const sortProps = (key) => ({
     sort: sort.key === key ? sort.dir : undefined,
@@ -165,6 +169,7 @@ export default function Registrants({ group }) {
       { label: 'Rol', value: (r) => labelOf(ROLES, roleOf(r)) },
       { label: 'Ponencia', value: (r) => (roleOf(r) === 'ponente' ? r.customEventName || '' : '') },
       { label: 'Modalidad', value: (r) => labelOf(MODALIDADES, modalidadOf(r)) },
+      { label: 'Cupo confirmado', value: (r) => (r.seatConfirmed ? 'Sí' : 'No') },
       { label: 'Asistencia', value: (r) => (isPresent(r.statusAsistencia) ? 'Presente' : 'Ausente') },
       { label: 'Fecha de registro', value: (r) => toDate(r.registrationDate) },
       ...optional.slice(OPTIONAL.length).map((c) => ({ label: c.label, value: c.value })),
@@ -202,8 +207,13 @@ export default function Registrants({ group }) {
             <option value="present">Presentes</option>
             <option value="absent">Ausentes</option>
           </Select>
+          <Select aria-label="Filtrar por cupo confirmado" value={seat} onChange={(e) => setSeat(e.target.value)} className="h-9 w-auto">
+            <option value="">Todo cupo</option>
+            <option value="yes">Cupo confirmado</option>
+            <option value="no">Sin confirmar</option>
+          </Select>
           {filtersOn && (
-            <Button variant="ghost" size="sm" onClick={() => { setSearch(''); setRole(''); setModalidad(''); setStatus(''); }}>
+            <Button variant="ghost" size="sm" onClick={() => { setSearch(''); setRole(''); setModalidad(''); setStatus(''); setSeat(''); }}>
               <X className="h-3.5 w-3.5" aria-hidden="true" /> Limpiar
             </Button>
           )}
@@ -234,6 +244,7 @@ export default function Registrants({ group }) {
           <span className="text-sm font-medium text-adm-text">{selected.size} seleccionado{selected.size === 1 ? '' : 's'}</span>
           <Button size="sm" variant="secondary" onClick={() => bulkAttendance(true)} loading={bulkBusy === 'present'}><UserCheck className="h-3.5 w-3.5" aria-hidden="true" /> Marcar presentes</Button>
           <Button size="sm" variant="secondary" onClick={() => bulkAttendance(false)} loading={bulkBusy === 'absent'}><UserX className="h-3.5 w-3.5" aria-hidden="true" /> Marcar ausentes</Button>
+          {group.kind === 'public' && <Button size="sm" variant="primary" onClick={() => setSeatOpen(true)}><MailCheck className="h-3.5 w-3.5" aria-hidden="true" /> Confirmar cupo</Button>}
           <Button size="sm" variant="ghost" onClick={() => copyText(emailsOf(selectedRows), toast, 'Correos')}><Copy className="h-3.5 w-3.5" aria-hidden="true" /> Copiar correos</Button>
           <Button size="sm" variant="danger-ghost" onClick={bulkDelete} loading={bulkBusy === 'delete'}><Trash2 className="h-3.5 w-3.5" aria-hidden="true" /> Eliminar</Button>
           <Button size="icon" variant="ghost" onClick={() => setSelected(new Set())} className="ml-auto h-8 w-8" aria-label="Deseleccionar" title="Deseleccionar"><X className="h-4 w-4" /></Button>
@@ -282,6 +293,7 @@ export default function Registrants({ group }) {
                       <button type="button" onClick={() => setOpenId(r.id)} className="block max-w-full rounded text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-adm-accent">
                         <span className="block truncate font-medium hover:text-adm-accent">{r.userName || '—'}</span>
                         <span className="block truncate text-xs text-adm-muted">{r.userEmail}</span>
+                        {r.seatConfirmed && <Badge tone="success" className="mt-1">Cupo confirmado</Badge>}
                         {/* En móvil rol y modalidad van aquí para que el interruptor de asistencia quede a la vista. */}
                         <span className="mt-1 block text-xs text-adm-muted sm:hidden">{labelOf(ROLES, tipo)} · {labelOf(MODALIDADES, modalidadOf(r))}</span>
                       </button>
@@ -308,6 +320,14 @@ export default function Registrants({ group }) {
         </>
       )}
 
+      {seatOpen && (
+        <SeatConfirmModal
+          group={group}
+          regs={selectedRows}
+          onClose={() => setSeatOpen(false)}
+          onDone={async () => { setSeatOpen(false); setSelected(new Set()); await reload(); }}
+        />
+      )}
       <AddRegistrationModal group={group} open={adding} onClose={() => setAdding(false)} />
       {openReg && (
         <RegistrationDetailModal

@@ -6,7 +6,7 @@ import { getFirestore, FieldValue } from 'firebase-admin/firestore';
 import { getStorage } from 'firebase-admin/storage';
 import { getAuth } from 'firebase-admin/auth';
 import { PDFDocument } from 'pdf-lib';
-import { certificateEmail, registrationEmail, sendOnce } from './email.js';
+import { certificateEmail, customEmail, registrationEmail, sendOnce } from './email.js';
 import {
   mergeLayout, renderCertificate, resolveRole, resolveModality, templateCandidates, formatCiudadFecha, normalizeTemplateSet,
 } from './certificate.js';
@@ -405,4 +405,40 @@ export const onCertificateCreated = onDocumentCreated(emailTrigger('certificados
   if (!event.data) return;
   const base = process.env.VALIDATION_URL_BASE || 'https://borealabs.org/validacion?id=';
   await sendOnce(db, event.data.ref, async (cert) => (cert.notify === true ? certificateEmail(cert, base) : null), { password: SMTP_PASSWORD.value() });
+});
+
+// "Confirmar cupo" desde el panel: marca seatConfirmed y envía el correo redactado por el admin.
+// Estado de envío en `seatEmail` (independiente del correo de inscripción en `email`).
+export const sendSeatConfirmations = onCall({ cors: true, region: 'us-central1', secrets: [SMTP_PASSWORD], timeoutSeconds: 300 }, async (request) => {
+  assertAdmin(request);
+  const { eventId, regIds, subject, body, resend = false } = request.data || {};
+  if (typeof eventId !== 'string' || !eventId) throw new HttpsError('invalid-argument', 'Falta eventId');
+  if (!Array.isArray(regIds) || !regIds.length || regIds.length > 500 || !regIds.every((id) => typeof id === 'string' && id)) {
+    throw new HttpsError('invalid-argument', 'regIds debe tener entre 1 y 500 ids');
+  }
+  if (typeof subject !== 'string' || !subject.trim() || subject.length > 200) throw new HttpsError('invalid-argument', 'Asunto inválido (máx. 200)');
+  if (typeof body !== 'string' || !body.trim() || body.length > 5000) throw new HttpsError('invalid-argument', 'Cuerpo inválido (máx. 5000)');
+  const eventSnap = await db.collection('events').doc(eventId).get();
+  if (!eventSnap.exists) throw new HttpsError('not-found', 'Evento no encontrado');
+  const ev = eventSnap.data();
+  const by = request.auth.token.email || request.auth.uid;
+
+  let confirmed = 0, sent = 0, skipped = 0;
+  const errors = [];
+  for (const id of [...new Set(regIds)]) { // secuencial: respeta el límite SMTP de Gmail
+    try {
+      const ref = db.collection('registrations').doc(id);
+      const snap = await ref.get();
+      if (!snap.exists || String(snap.get('eventId') || '') !== eventId) { errors.push({ id, message: 'No pertenece a este evento' }); continue; }
+      await ref.update({ seatConfirmed: true, seatConfirmedAt: FieldValue.serverTimestamp(), seatConfirmedBy: by });
+      confirmed++;
+      const result = await sendOnce(db, ref, async (reg) => customEmail({ subject, body }, reg, ev), { password: SMTP_PASSWORD.value(), field: 'seatEmail', resend: resend === true });
+      if (result === 'sent') sent++;
+      else if (result === 'skipped') skipped++;
+      else errors.push({ id, message: (await ref.get()).get('seatEmail.error') || 'Falló el envío' });
+    } catch (err) {
+      errors.push({ id, message: err?.message || String(err) });
+    }
+  }
+  return { confirmed, sent, skipped, errors };
 });
