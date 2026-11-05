@@ -123,7 +123,7 @@ const handlers = {
   },
 
   // Igual que functions/index.js#sendSeatConfirmations pero SIN enviar correo: solo marca el registro.
-  async sendSeatConfirmations({ eventId, regIds, subject, body, resend }) {
+  async sendSeatConfirmations({ eventId, regIds, subject, body, resend, markSeat = true }) {
     if (!eventId || !Array.isArray(regIds) || !regIds.length || regIds.length > 500 || !subject?.trim() || !body?.trim() || subject.length > 200 || body.length > 5000) {
       throw Object.assign(new Error('Datos inválidos'), { code: 'functions/invalid-argument' });
     }
@@ -134,13 +134,14 @@ const handlers = {
     for (const id of new Set(regIds)) {
       const snap = byId.get(id);
       if (!snap) { errors.push({ id, message: 'No pertenece a este evento' }); continue; }
-      const already = snap.get('seatEmail')?.status && !resend;
+      const field = markSeat !== false ? 'seatEmail' : 'customEmail';
+      const already = markSeat !== false && snap.get('seatEmail')?.status && !resend;
       const valid = /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(snap.get('userEmail') || '');
       await updateDoc(snap.ref, {
-        seatConfirmed: true, seatConfirmedAt: serverTimestamp(), seatConfirmedBy: 'demo@borealabs.org',
-        ...(already ? {} : { seatEmail: { status: valid ? 'sent' : 'skipped', at: new Date() } }),
+        ...(markSeat !== false ? { seatConfirmed: true, seatConfirmedAt: serverTimestamp(), seatConfirmedBy: 'demo@borealabs.org' } : {}),
+        ...(already ? {} : { [field]: { status: valid ? 'sent' : 'skipped', at: new Date() } }),
       });
-      confirmed += 1;
+      if (markSeat !== false) confirmed += 1;
       if (already || !valid) skipped += 1; else sent += 1;
     }
     return { confirmed, sent, skipped, errors };

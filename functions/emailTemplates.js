@@ -9,22 +9,46 @@ export const escapeHtml = (value) => String(value ?? '')
 
 export const safeHttpsUrl = (value) => (/^https:\/\//i.test(String(value || '').trim()) ? String(value).trim() : null);
 
-/** Texto plano → HTML: escapa, respeta saltos de línea y convierte https:// en enlaces. */
+// PNG (no SVG: Gmail y Outlook no muestran SVG). Vive en public/email/ y se sirve desde el sitio.
+const LOGO = `${SITE}/email/logo-boreal.png`;
+const BRAND = { dark: '#010b1d', aqua: '#69e6af', blue: '#3162ed', purple: '#be58f0', text: '#0f172a', muted: '#64748b', bg: '#eef1f7' };
+
+/**
+ * Texto del admin → HTML: escapa todo, **negrita**, enlaces https clicables y saltos de línea.
+ * Los párrafos (línea en blanco) se separan con margen.
+ */
 export const textToHtml = (text) => escapeHtml(text)
-  .replace(/https:\/\/[^\s<]+/g, (url) => `<a href="${url}" style="color:#3162ed">${url}</a>`)
-  .replace(/\n/g, '<br>');
+  .replace(/\*\*([^*\n]+)\*\*/g, '<strong>$1</strong>')
+  .replace(/https:\/\/[^\s<]+/g, (url) => `<a href="${url}" style="color:${BRAND.blue};text-decoration:underline">${url}</a>`)
+  .split(/\n{2,}/)
+  .map((p) => `<p style="margin:0 0 16px">${p.replace(/\n/g, '<br>')}</p>`)
+  .join('');
 
-export const button = (href, label) => `<p style="margin:24px 0"><a href="${escapeHtml(href)}" style="background:#3162ed;color:#ffffff;padding:12px 20px;border-radius:8px;text-decoration:none;font-weight:bold;display:inline-block">${escapeHtml(label)}</a></p>`;
+/** Versión texto plano: quita los ** de negrita. */
+export const stripMarkup = (text) => String(text ?? '').replace(/\*\*([^*\n]+)\*\*/g, '$1');
 
-export const layout = (title, bodyHtml) => `<!doctype html><html lang="es"><body style="margin:0;background:#f4f6fb;font-family:Arial,Helvetica,sans-serif;color:#0f172a">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td align="center" style="padding:24px 12px">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:#ffffff;border-radius:12px;overflow:hidden">
-<tr><td style="background:#010b1d;padding:20px 24px;color:#69e6af;font-weight:bold;font-size:18px">Boreal Labs</td></tr>
-<tr><td style="padding:24px;font-size:15px;line-height:1.6">
-<h1 style="font-size:20px;margin:0 0 16px">${escapeHtml(title)}</h1>
+export const button = (href, label) => `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:8px 0 24px"><tr><td style="border-radius:10px;background:${BRAND.blue};background-image:linear-gradient(90deg,${BRAND.blue},${BRAND.purple})"><a href="${escapeHtml(href)}" style="display:inline-block;padding:14px 26px;color:#ffffff;font-weight:bold;font-size:15px;text-decoration:none;border-radius:10px">${escapeHtml(label)}</a></td></tr></table>`;
+
+export const layout = (title, bodyHtml) => `<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light"><title>${escapeHtml(title)}</title></head>
+<body style="margin:0;padding:0;background:${BRAND.bg};font-family:'Helvetica Neue',Arial,Helvetica,sans-serif;color:${BRAND.text};-webkit-font-smoothing:antialiased">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${BRAND.bg}"><tr><td align="center" style="padding:32px 12px">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:600px">
+<tr><td style="background:${BRAND.dark};border-radius:16px 16px 0 0;padding:28px 32px">
+<a href="${SITE}" style="text-decoration:none"><img src="${LOGO}" width="84" height="48" alt="Boreal Labs" style="display:block;border:0;height:48px;width:auto"></a>
+</td></tr>
+<tr><td style="height:4px;line-height:4px;font-size:0;background:${BRAND.aqua};background-image:linear-gradient(90deg,${BRAND.aqua},${BRAND.blue},${BRAND.purple})">&nbsp;</td></tr>
+<tr><td style="background:#ffffff;padding:36px 32px 12px;font-size:16px;line-height:1.65">
+<h1 style="margin:0 0 20px;font-size:24px;line-height:1.3;color:${BRAND.text};font-weight:800">${escapeHtml(title)}</h1>
 ${bodyHtml}
 </td></tr>
-<tr><td style="padding:16px 24px;background:#f8fafc;font-size:12px;color:#64748b">Recibiste este correo por tu participación en actividades de Boreal Labs · <a href="${SITE}" style="color:#64748b">borealabs.org</a></td></tr>
+<tr><td style="background:#ffffff;border-radius:0 0 16px 16px;padding:0 32px 32px">
+<p style="margin:16px 0 0;padding-top:20px;border-top:1px solid #e2e8f0;font-size:14px;color:${BRAND.muted}">Con cariño,<br><strong style="color:${BRAND.text}">Equipo Boreal Labs</strong></p>
+</td></tr>
+<tr><td align="center" style="padding:24px 16px;font-size:12px;line-height:1.6;color:${BRAND.muted}">
+Juventud que innova, crea y transforma Nicaragua<br>
+<a href="${SITE}" style="color:${BRAND.muted}">borealabs.org</a> · <a href="https://instagram.com/boreal.labs" style="color:${BRAND.muted}">Instagram</a> · <a href="mailto:${SENDER}" style="color:${BRAND.muted}">${SENDER}</a><br>
+Recibiste este correo por tu participación en actividades de Boreal Labs.
+</td></tr>
 </table></td></tr></table></body></html>`;
 
 export const formatDate = (value) => {
@@ -49,12 +73,12 @@ export function registrationEmail(reg, event) {
   const message = String(event?.mensajeConfirmacion || '').trim();
 
   const html = layout('¡Tu cupo está confirmado!', `
-<p>Hola ${escapeHtml(reg.userName || '')},</p>
-<p>Te registraste en <strong>${escapeHtml(title)}</strong>.</p>
-${details.length ? `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:16px 0">${details.map(([k, v]) => `<tr><td style="padding:4px 12px 4px 0;color:#64748b">${escapeHtml(k)}</td><td style="padding:4px 0"><strong>${escapeHtml(v)}</strong></td></tr>`).join('')}</table>` : ''}
-${message ? `<p>${textToHtml(message)}</p>` : ''}
+<p style="margin:0 0 16px">Hola ${escapeHtml(reg.userName || '')},</p>
+<p style="margin:0 0 16px">Te registraste en <strong>${escapeHtml(title)}</strong>.</p>
+${details.length ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:8px 0 24px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px">${details.map(([k, v]) => `<tr><td style="padding:10px 16px;color:${BRAND.muted};font-size:14px;width:110px">${escapeHtml(k)}</td><td style="padding:10px 16px;font-weight:bold;font-size:15px">${escapeHtml(v)}</td></tr>`).join('')}</table>` : ''}
+${message ? textToHtml(message) : ''}
 ${meet && !message.includes(meet) ? button(meet, 'Unirme por Google Meet') : ''}
-<p>¡Nos vemos pronto!</p>`);
+<p style="margin:0 0 16px">¡Nos vemos pronto!</p>`);
 
   const text = [
     `Hola ${reg.userName || ''},`,
@@ -72,10 +96,10 @@ export function certificateEmail(cert, validationBase) {
   const validation = `${validationBase}${encodeURIComponent(cert.idValidacion)}`;
   const pdf = safeHttpsUrl(cert.urlPdf);
   const html = layout('Tu certificado está listo', `
-<p>Hola ${escapeHtml(cert.nombreUsuario || '')},</p>
-<p>Gracias por participar en <strong>${escapeHtml(cert.nombreEvento || '')}</strong>. Tu certificado ya fue emitido.</p>
+<p style="margin:0 0 16px">Hola ${escapeHtml(cert.nombreUsuario || '')},</p>
+<p style="margin:0 0 16px">Gracias por participar en <strong>${escapeHtml(cert.nombreEvento || '')}</strong>. Tu certificado ya fue emitido.</p>
 ${pdf ? button(pdf, 'Descargar certificado (PDF)') : ''}
-<p>Cualquier persona puede verificar su autenticidad aquí:<br><a href="${escapeHtml(validation)}" style="color:#3162ed">${escapeHtml(validation)}</a></p>
+<p style="margin:0 0 16px">Cualquier persona puede verificar su autenticidad aquí:<br><a href="${escapeHtml(validation)}" style="color:#3162ed">${escapeHtml(validation)}</a></p>
 <p style="color:#64748b;font-size:13px">Código de validación: ${escapeHtml(cert.idValidacion)}</p>`);
   const text = [
     `Hola ${cert.nombreUsuario || ''},`,
@@ -111,6 +135,7 @@ export function customEmail({ subject, body }, reg, event) {
   const finalSubject = fillPlaceholders(subject, vars).replace(/\s+/g, ' ').trim() || `Cupo confirmado: ${title}`;
   const text = fillPlaceholders(body, vars).trim();
   const meet = isVirtual(reg) && vars.meet && !text.includes(vars.meet) ? vars.meet : null;
-  const html = layout(finalSubject, `<p>${textToHtml(text)}</p>${meet ? button(meet, 'Unirme por Google Meet') : ''}`);
-  return { to: reg?.userEmail, subject: finalSubject, html, text: meet ? `${text}\n\nGoogle Meet: ${meet}` : text };
+  const html = layout(finalSubject, `${textToHtml(text)}${meet ? button(meet, 'Unirme por Google Meet') : ''}`);
+  const plain = stripMarkup(text);
+  return { to: reg?.userEmail, subject: stripMarkup(finalSubject), html, text: meet ? `${plain}\n\nGoogle Meet: ${meet}` : plain };
 }
