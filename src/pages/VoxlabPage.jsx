@@ -7,7 +7,8 @@ import outlineVoxImg from '@/voxlab/outlinevox.png';
 import voxiAwakeImg from '@/voxlab/voxi-awake.png';
 import voxlabStartImg from '@/voxlab/voxlabstartpage.png';
 import voxlabMapImg from '@/voxlab/voxlabmap.png';
-import InstallButton, { useApkDownload } from '@/components/InstallButton';
+import InstallButton from '@/components/InstallButton';
+import { useSiteLinks } from '@/lib/useSiteConfig';
 
 const FEATURES = [
   {
@@ -37,7 +38,7 @@ const FEATURES = [
 ];
 
 export default function VoxlabPage() {
-  const apk = useApkDownload();
+  const { voxlabDownloadUrl } = useSiteLinks();
 
   const handleShare = async () => {
     const url = window.location.href;
@@ -231,7 +232,7 @@ export default function VoxlabPage() {
             transition={{ duration: 0.6, delay: 0.5, ease: 'easeOut' }}
             className="mb-6"
           >
-            <InstallButton status={apk.status} error={apk.error} onCheck={apk.check} variant="hero" />
+            <InstallButton href={voxlabDownloadUrl} variant="hero" />
           </motion.div>
 
           {/* Capturas reales de la app */}
@@ -319,12 +320,7 @@ export default function VoxlabPage() {
               Descarga Voxlab, crea tu cuenta gratis y practica tu primera presentacion en minutos.
             </p>
 
-            <InstallButton
-              status={apk.status}
-              error={apk.error}
-              onCheck={apk.check}
-              variant="section"
-            />
+            <InstallButton href={voxlabDownloadUrl} variant="section" />
           </motion.section>
 
           </main>

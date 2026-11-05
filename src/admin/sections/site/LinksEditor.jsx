@@ -6,6 +6,7 @@ export const LINK_FIELDS = [
   { key: 'communityUrl', label: 'Comunidad (WhatsApp)', where: 'Navbar e Inicio', placeholder: 'https://chat.whatsapp.com/…' },
   { key: 'walletUrl', label: 'Boreal Wallet', where: 'Navbar', placeholder: 'https://wallet.borealabs.org' },
   { key: 'instagramUrl', label: 'Instagram', where: 'Inicio y Footer', placeholder: 'https://instagram.com/boreal.labs' },
+  { key: 'voxlabDownloadUrl', label: 'Descarga de Voxlab', where: 'Botones de /voxlab (vacío = “Próximamente”)', placeholder: 'https://play.google.com/store/apps/details?id=…' },
   { key: 'youtubeVideoUrl', label: 'Video de YouTube', where: 'Reservado: hoy ninguna página lo muestra', placeholder: 'https://www.youtube.com/watch?v=…' },
 ];
 

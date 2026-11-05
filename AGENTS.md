@@ -37,29 +37,12 @@ Esto importa porque `initializeApp()` **lanza** `auth/invalid-api-key` con confi
 
 **No reviertas esto.** Si un consumidor necesita `db`, debe tolerar `null` (ver el early-return en `handleSubscribe` de `VoxlabPage.jsx`). `AdminGate.jsx` y `configService.js` asumen Firebase presente: no los uses en una página estática sin revisar.
 
-## Assets: cómo se sirve un archivo (clave para el APK)
+## Voxlab
 
-Regla dura de Vite, y es la fuente de casi todos los "no encuentro el archivo":
-
-- `public/**` se copia **verbatim** a `dist/`. Se referencia por ruta absoluta: `/logoBoreal.svg`.
-- `src/**` **no** se sirve. Solo llega a `dist/` si se importa explícitamente desde el código.
-- Vite solo reconoce como asset las extensiones de su lista por defecto (imágenes, fuentes, medios). `.apk` **no** está: `import apk from '@/apk/app-release.apk'` falla. Necesita `assetsInclude: ['**/*.apk']` en `vite.config.js` o el sufijo `?url`.
-- Un APK de 53 MB dentro del grafo de assets lo hashea y lo mueve a `dist/assets/`. **No lo hagas**: lo que funciona es `public/` + URL sin hash.
-
-## El APK de Voxlab
-
-- El binario vive en `public/app-release.apk` (53 MB) y se sirve como `/app-release.apk`. Verificá que siga siendo un APK real, no HTML:
-  ```bash
-  file public/app-release.apk          # debe decir "Android package (APK)"
-  curl -sI http://localhost:3000/app-release.apk | grep -i content-type
-  ```
-- `/voxlab` ya no es una landing de cuenta regresiva: es la landing de producto de la app. `VoxlabPage.jsx` presenta la app con capturas reales (`voxlabstartpage.png`, `voxlabmap.png`), features y CTA de instalación.
-- El botón de instalación vive en `src/components/InstallButton.jsx` (`useApkDownload` + componente). `VoxlabPage.jsx` lo usa dos veces: hero y CTA final.
-- **El botón hace `fetch(..., { method: 'HEAD' })` antes de habilitarse** y rechaza la descarga si la respuesta es `text/html`. Esto no es paranoia: `public/.htaccess` y `firebase.json` tienen rewrite `**` → `index.html`, así que un APK ausente responde **200 con el HTML del sitio**. Sin esa verificación, un `<a download>` "roto" descarga `index.html` en silencio y el usuario cree que instaló la app.
-- `public/.htaccess` y `firebase.json` fijan `Cache-Control: public, max-age=3600, must-revalidate` y `Content-Type: application/vnd.android.package-archive` para `*.apk`. **No** usar `immutable`: el nombre no lleva hash, así que un usuario con el APK cacheado nunca recibiría una versión nueva.
-- **Sui no aparece en `/voxlab`.** Es un proyecto con web propia (`sui.app`); mencionarlo en la landing de Voxi confunde. No reintroducirlo.
-- Los assets de la mascota: `src/voxlab/voxi-awake.png` es la del hero (512×512, alfa). `src/voxlab/voxi.png` es la versión dormida con "Zzz" de la landing anterior — ya no se usa en el hero. `outlinevox.png` alimenta el patrón SVG de fondo.
-- Ojo: el CI sube `dist/` por FTP a Hostinger en cada push a `main`. Son 53 MB por push. Considerar Firebase Storage para el binario.
+- `/voxlab` es la landing de producto de la app Voxi (capturas, features, CTA). Sui no aparece ahí: tiene web propia.
+- El APK ya no se sirve desde este sitio. El botón de descarga (`src/components/InstallButton.jsx`) usa un enlace externo editable en `/admin/sitio` → Enlaces ("Descarga de Voxlab", `siteConfig/links.voxlabDownloadUrl`); vacío = "Próximamente".
+- Assets de la mascota: `src/voxlab/voxi-awake.png` (hero), `outlinevox.png` (patrón de fondo).
+- Recordatorio de Vite: `public/**` se copia tal cual a `dist/`; `src/**` solo llega si se importa.
 
 ## Deploy
 

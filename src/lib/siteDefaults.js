@@ -13,6 +13,7 @@ export const defaultLinks = {
   walletUrl: 'https://wallet.borealabs.org',
   communityUrl: 'https://chat.whatsapp.com/HAaxnHFYsuaBltQ812XhRW?mode=wwc',
   instagramUrl: 'https://instagram.com/boreal.labs',
+  voxlabDownloadUrl: '',
 };
 
 export const defaultHomeConfig = {
