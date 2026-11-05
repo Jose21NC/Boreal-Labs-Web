@@ -153,6 +153,9 @@ export async function savePublicEvent(existing, form, imageFile) {
     visible: form.visible,
     soldOut: form.soldOut,
     confirmationEmail: form.confirmationEmail !== false,
+    // Vacío = correo por defecto (functions/emailTemplates.js#registrationEmail).
+    emailSubject: (form.emailSubject || '').trim().slice(0, 200),
+    emailBody: (form.emailBody || '').trim().slice(0, 5000),
     formFields: cleanFields(form.formFields || []),
     requiresCode: !!form.requiresCode,
     meetLink: (form.meetLink || '').trim(),

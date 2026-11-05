@@ -3,7 +3,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import nodemailer from 'nodemailer';
-import { certificateEmail, registrationEmail, sendOnce } from './email.js';
+import { certificateEmail, customEmail, fillPlaceholders, registrationEmail, sendOnce } from './email.js';
 
 const jsonTransport = () => {
   const sent = [];
@@ -79,4 +79,35 @@ test('sendOnce: correo inválido se omite, build null no marca nada, error queda
   assert.equal(await sendOnce(failing.db, failing.ref, async () => ({ to: 'd@example.com', subject: 's', text: 't' }), { transport }), 'error');
   assert.equal(failing.state.data.email.status, 'error');
   assert.match(failing.state.data.email.error, /SMTP caído/);
+});
+
+test('fillPlaceholders: reemplaza conocidos, vacíos quedan en blanco, desconocidos intactos', () => {
+  assert.equal(fillPlaceholders('Hola {nombre}, {evento} {meet}{otro}', { nombre: 'Ana', evento: 'T' }), 'Hola Ana, T {otro}');
+});
+
+test('customEmail: escapa, enlaza https, respeta saltos y agrega Meet solo a virtuales', () => {
+  const event = { title: 'Taller <IA>', meetLink: 'https://meet.google.com/abc', emailSubject: 'Cupo {evento}', emailBody: 'Hola {nombre}\nMás: https://borealabs.org/x <b>' };
+  const reg = { userName: '<img src=x>', userEmail: 'a@example.com', tipoAsistencia: 'Virtual' };
+  const msg = customEmail({ subject: event.emailSubject, body: event.emailBody }, reg, event);
+  assert.equal(msg.subject, 'Cupo Taller <IA>');
+  assert.doesNotMatch(msg.html, /<img src=x>|<b>/);
+  assert.match(msg.html, /<a href="https:\/\/borealabs\.org\/x"/);
+  assert.match(msg.html, /<br>/);
+  assert.match(msg.html, /Unirme por Google Meet/);
+  assert.doesNotMatch(customEmail({ subject: 's', body: 'b' }, { ...reg, tipoAsistencia: 'Presencial' }, event).html, /meet\.google/);
+  assert.doesNotMatch(customEmail({ subject: 's', body: 'Entra {meet}' }, reg, event).html, /Unirme por Google Meet/);
+  // registrationEmail usa la plantilla del evento cuando existe
+  assert.equal(registrationEmail(reg, event).subject, 'Cupo Taller <IA>');
+});
+
+test('sendOnce con field seatEmail es independiente de email; resend reenvía', async () => {
+  const { db, ref, state } = fakeDb({ userEmail: 'c@example.com', email: { status: 'sent' } });
+  const transport = jsonTransport();
+  const build = async (d) => ({ to: d.userEmail, subject: 's', text: 't', html: 'h' });
+  assert.equal(await sendOnce(db, ref, build, { transport, field: 'seatEmail' }), 'sent');
+  assert.equal(await sendOnce(db, ref, build, { transport, field: 'seatEmail' }), 'skipped');
+  assert.equal(await sendOnce(db, ref, build, { transport, field: 'seatEmail', resend: true }), 'sent');
+  assert.equal(state.data.seatEmail.status, 'sent');
+  assert.equal(state.data.email.status, 'sent');
+  assert.equal(transport.sent.length, 2);
 });

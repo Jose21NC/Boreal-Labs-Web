@@ -122,6 +122,30 @@ const handlers = {
     return { created, skipped, errors, pointsApplied, pointsErrors, pointsPending };
   },
 
+  // Igual que functions/index.js#sendSeatConfirmations pero SIN enviar correo: solo marca el registro.
+  async sendSeatConfirmations({ eventId, regIds, subject, body, resend }) {
+    if (!eventId || !Array.isArray(regIds) || !regIds.length || regIds.length > 500 || !subject?.trim() || !body?.trim() || subject.length > 200 || body.length > 5000) {
+      throw Object.assign(new Error('Datos inválidos'), { code: 'functions/invalid-argument' });
+    }
+    const regs = await getDocs(query(collection({}, 'registrations'), where('eventId', '==', eventId)));
+    const byId = new Map(regs.docs.map((d) => [d.id, d]));
+    let confirmed = 0; let sent = 0; let skipped = 0;
+    const errors = [];
+    for (const id of new Set(regIds)) {
+      const snap = byId.get(id);
+      if (!snap) { errors.push({ id, message: 'No pertenece a este evento' }); continue; }
+      const already = snap.get('seatEmail')?.status && !resend;
+      const valid = /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(snap.get('userEmail') || '');
+      await updateDoc(snap.ref, {
+        seatConfirmed: true, seatConfirmedAt: serverTimestamp(), seatConfirmedBy: 'demo@borealabs.org',
+        ...(already ? {} : { seatEmail: { status: valid ? 'sent' : 'skipped', at: new Date() } }),
+      });
+      confirmed += 1;
+      if (already || !valid) skipped += 1; else sent += 1;
+    }
+    return { confirmed, sent, skipped, errors };
+  },
+
   async mergeCertificatesPdf({ eventName }) {
     const certs = await getDocs(query(collection({}, 'certificados'), where('nombreEvento', '==', eventName)));
     if (certs.empty) return { merged: false, reason: 'Sin certificados' };

@@ -1,3 +1,9 @@
+# Módulos ES (.mjs, p. ej. el worker de pdf.js): Apache los sirve como text/plain por defecto y,
+# con X-Content-Type-Options: nosniff, el navegador se niega a ejecutarlos.
+<IfModule mod_mime.c>
+  AddType text/javascript .mjs
+</IfModule>
+
 # Vite SPA fallback for Apache (e.g., Hostinger)
 <IfModule mod_rewrite.c>
   RewriteEngine On

@@ -11,6 +11,7 @@ import CategoryPicker from './CategoryPicker';
 import FormBuilder from './FormBuilder';
 import AccessCode from './AccessCode';
 import TextTemplatePicker from './TextTemplatePicker';
+import EmailComposer from './EmailComposer';
 
 // react-easy-crop solo se descarga al elegir una imagen.
 const ImageCropper = lazy(() => import('./ImageCropper'));
@@ -32,6 +33,8 @@ export const publicFormFrom = (ev = {}, categories = []) => {
     visible: ev.visible !== false,
     soldOut: ev.soldOut === true || ev.isFull === true || ev.cupoLleno === true,
     confirmationEmail: ev.confirmationEmail !== false,
+    emailSubject: String(ev.emailSubject || ''),
+    emailBody: String(ev.emailBody || ''),
     formFields: (Array.isArray(ev.formFields) ? ev.formFields : []).map((f) => ({ ...f, options: f.options ? [...f.options] : undefined })),
     meetLink: String(ev.meetLink || ''),
     requiresCode: ev.requiresCode === true,
@@ -191,6 +194,19 @@ export function PublicEventForm({ initial, onSubmit, submitting, submitLabel = '
           <span className="text-sm text-adm-text">Enviar correo de confirmación al inscribirse</span>
         </div>
       </div>
+
+      {form.confirmationEmail && (
+        <fieldset className="space-y-2 rounded-lg border border-adm-border p-4">
+          <legend className="px-1 text-xs font-semibold uppercase tracking-wide text-adm-muted">Correo de confirmación</legend>
+          <p className="text-xs text-adm-muted">Vacío = se envía el correo por defecto.</p>
+          <EmailComposer
+            value={{ subject: form.emailSubject, body: form.emailBody }}
+            onChange={({ subject, body }) => patch({ emailSubject: subject, emailBody: body })}
+            event={{ title: form.title, date: form.date ? new Date(`${form.date}T12:00:00`) : null, time: form.time, location: form.location, meetLink: form.meetLink }}
+            reg={{ userName: 'Ana Pérez', userEmail: 'ana@example.com', tipoAsistencia: form.attendanceOptions[0] || 'Presencial' }}
+          />
+        </fieldset>
+      )}
 
       {error && <p role="alert" className="text-sm text-adm-danger">{error}</p>}
 
