@@ -5,8 +5,9 @@ import { AnimatePresence, MotionConfig, motion } from 'framer-motion';
 import { signOut } from 'firebase/auth';
 import {
   LayoutDashboard, CalendarDays, Award, FileImage, HeartHandshake, Users, Star, Globe, History,
-  Menu, X, Sun, Moon, Monitor, LogOut, Search, FlaskConical, ExternalLink,
+  Menu, X, Sun, Moon, Monitor, LogOut, Search, FlaskConical, ExternalLink, ShieldCheck,
 } from 'lucide-react';
+import { canSee, sectionOfPath, useAccess } from './access';
 import { auth } from '@/firebase';
 import { cn } from '@/lib/utils';
 import { Button, ConfirmProvider, Kbd } from './ui';
@@ -28,8 +29,17 @@ export const NAV = [
   ] },
   { group: 'Sitio', items: [
     { to: '/admin/sitio', label: 'Contenido del sitio', icon: Globe, keywords: 'home enlaces aliados partners' },
+    { to: '/admin/accesos', label: 'Accesos', icon: ShieldCheck, keywords: 'permisos administradores usuarios correos' },
   ] },
 ];
+
+/** Menú filtrado por los permisos del usuario (secciones de la colección isAdmin). */
+const useNav = () => {
+  const access = useAccess();
+  return useMemo(() => NAV
+    .map((g) => ({ ...g, items: g.items.filter((i) => canSee(access, sectionOfPath(i.to))) }))
+    .filter((g) => g.items.length), [access]);
+};
 
 const ALL_ITEMS = NAV.flatMap((g) => g.items);
 const THEME_KEY = 'admin:theme';
@@ -89,9 +99,10 @@ function ThemeToggle({ pref, setPref }) {
 }
 
 function SidebarNav({ onNavigate }) {
+  const nav = useNav();
   return (
     <nav aria-label="Secciones del panel" className="flex-1 space-y-5 overflow-y-auto overscroll-contain px-3 py-4">
-      {NAV.map((group) => (
+      {nav.map((group) => (
         <div key={group.group}>
           <p className="px-3 pb-1.5 text-[11px] font-semibold uppercase tracking-wider text-adm-muted">{group.group}</p>
           <ul className="space-y-0.5">
@@ -127,13 +138,14 @@ function CommandPalette({ open, onClose, setPref }) {
   const [q, setQ] = useState('');
   const [active, setActive] = useState(0);
   const inputRef = useRef(null);
+  const allowedItems = useNav().flatMap((g) => g.items);
 
   const commands = useMemo(() => [
-    ...ALL_ITEMS.map((item) => ({ id: item.to, label: `Ir a ${item.label}`, icon: item.icon, keywords: item.keywords, run: () => navigate(item.to) })),
+    ...allowedItems.map((item) => ({ id: item.to, label: `Ir a ${item.label}`, icon: item.icon, keywords: item.keywords, run: () => navigate(item.to) })),
     { id: 'theme-light', label: 'Tema claro', icon: Sun, keywords: 'modo luz', run: () => setPref('light') },
     { id: 'theme-dark', label: 'Tema oscuro', icon: Moon, keywords: 'modo noche', run: () => setPref('dark') },
     { id: 'site', label: 'Abrir sitio público', icon: ExternalLink, keywords: 'web', run: () => window.open('/', '_blank', 'noopener') },
-  ], [navigate, setPref]);
+  ], [navigate, setPref, allowedItems]);
 
   const results = useMemo(() => {
     const term = q.trim().toLowerCase();

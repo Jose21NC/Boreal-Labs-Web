@@ -2,7 +2,9 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from '@/components/ui/use-toast';
-import { auth } from '@/firebase';
+import { auth, db } from '@/firebase';
+import { doc, getDoc } from 'firebase/firestore';
+import { AccessContext, BASE_ADMINS, SUPER_ADMINS } from '@/admin/access';
 import { onAuthStateChanged, signInWithEmailAndPassword, signInWithPopup, signInWithRedirect, getRedirectResult, GoogleAuthProvider, signOut, setPersistence, browserLocalPersistence } from 'firebase/auth';
 
 // Gate de autenticación con Firebase Auth (email/contraseña o Google) + allowlist de correos.
@@ -10,8 +12,22 @@ import { onAuthStateChanged, signInWithEmailAndPassword, signInWithPopup, signIn
 
 // Admins base (mismos que firestore.rules/storage.rules y functions/index.js). VITE_ADMIN_EMAILS SUMA correos,
 // nunca reemplaza: antes un .env con otra lista dejaba fuera a estas cuentas y el login con Google era rechazado.
-const BASE_ADMINS = 'contacto@borealabs.org,admin@borealabs.org,jose@borealabs.org';
-const EMAILS_ENV = `${BASE_ADMINS},${import.meta.env.VITE_ADMIN_EMAILS || ''}`;
+const EMAILS_ENV = `${BASE_ADMINS.join(',')},${import.meta.env.VITE_ADMIN_EMAILS || ''}`;
+
+/** Acceso de un correo: admin base (todo) o isAdmin/{correo} activo (sección Accesos). null = sin acceso. */
+async function resolveAccess(mail, allowed) {
+  const email = mail.toLowerCase();
+  const isSuper = SUPER_ADMINS.includes(email);
+  if (allowed.includes(email)) return { email, isSuper, permissions: 'all' };
+  try {
+    const snap = await getDoc(doc(db, 'isAdmin', email));
+    if (snap.exists() && snap.data().active !== false) {
+      const p = snap.data().permissions;
+      return { email, isSuper, permissions: p === 'all' || !Array.isArray(p) ? 'all' : p };
+    }
+  } catch { /* sin permiso de lectura = no es admin */ }
+  return null;
+}
 
 // Mensajes claros para los fallos de Google más comunes (el código crudo no ayuda a nadie).
 const GOOGLE_ERRORS = {
@@ -24,7 +40,8 @@ const GOOGLE_ERRORS = {
 export default function AdminGate({ children }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [authed, setAuthed] = useState(false);
+  const [access, setAccess] = useState(null);
+  const authed = !!access;
   const [submitting, setSubmitting] = useState(false);
 
   const allowedEmails = useMemo(() => [...new Set(EMAILS_ENV.split(',').map(e => e.trim().toLowerCase()).filter(Boolean))], []);
@@ -36,12 +53,8 @@ export default function AdminGate({ children }) {
     getRedirectResult(auth).catch((err) => {
       toast({ title: 'No se pudo ingresar con Google', description: GOOGLE_ERRORS[err?.code] || err?.code || 'Error desconocido', variant: 'destructive' });
     });
-    const unsub = onAuthStateChanged(auth, (user) => {
-      if (user?.email && allowedEmails.includes(user.email.toLowerCase())) {
-        setAuthed(true);
-      } else {
-        setAuthed(false);
-      }
+    const unsub = onAuthStateChanged(auth, async (user) => {
+      setAccess(user?.email ? await resolveAccess(user.email, allowedEmails) : null);
     });
     return () => unsub();
   }, [allowedEmails]);
@@ -50,12 +63,12 @@ export default function AdminGate({ children }) {
     e.preventDefault();
     setSubmitting(true);
     try {
-      const okEmail = allowedEmails.includes((email || '').toLowerCase());
-      if (!okEmail) {
-        toast({ title: 'Acceso denegado', description: 'Este correo no está permitido', variant: 'destructive' });
+      const { user } = await signInWithEmailAndPassword(auth, email, password);
+      if (!(await resolveAccess(user.email, allowedEmails))) {
+        await signOut(auth);
+        toast({ title: 'Acceso denegado', description: `${user.email} no tiene acceso al panel.`, variant: 'destructive' });
         return;
       }
-      await signInWithEmailAndPassword(auth, email, password);
       toast({ title: 'Acceso concedido', description: 'Sesión iniciada con Firebase' });
     } catch {
       toast({ title: 'No se pudo ingresar', description: 'Correo o contraseña incorrectos', variant: 'destructive' });
@@ -80,7 +93,7 @@ export default function AdminGate({ children }) {
         }
         throw err;
       }
-      if (!allowedEmails.includes((user.email || '').toLowerCase())) {
+      if (!(await resolveAccess(user.email || '', allowedEmails))) {
         await signOut(auth);
         toast({ title: 'Acceso denegado', description: `${user.email} no está en la lista de administradores.`, variant: 'destructive' });
         return;
@@ -96,12 +109,12 @@ export default function AdminGate({ children }) {
   };
 
   const logout = () => {
-    signOut(auth).finally(() => setAuthed(false));
+    signOut(auth).finally(() => setAccess(null));
   };
 
   // Modo de prueba: sin login. `import.meta.env.MODE` es 'production' en todo build, así que esto no se publica.
   if (import.meta.env.MODE === 'demo') {
-    return children;
+    return <AccessContext.Provider value={{ email: auth?.currentUser?.email, isSuper: true, permissions: 'all' }}>{children}</AccessContext.Provider>;
   }
 
   if (!auth) {
@@ -136,7 +149,7 @@ export default function AdminGate({ children }) {
   return (
     <div className="relative">
       {/* Botón de cerrar sesión eliminado; ahora está dentro del menú del panel Admin */}
-      {children}
+      <AccessContext.Provider value={access}>{children}</AccessContext.Provider>
     </div>
   );
 }
