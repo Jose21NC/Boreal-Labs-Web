@@ -53,3 +53,15 @@ export async function resolveMemberImage(member) {
   }
   return null;
 }
+
+// Único correo que puede aprobar/rechazar solicitudes de perfil (igual que firestore.rules: teamSubmissions).
+export const TEAM_APPROVER = 'admin@borealabs.org';
+
+// Campos de perfil que un integrante puede proponer por enlace (teamSubmissions) y que se copian a teamMembers.
+export const PROFILE_FIELDS = [
+  ['name', 'Nombre'], ['role', 'Cargo'], ['description', 'Descripción'], ['email', 'Email'],
+  ['linkedinUrl', 'LinkedIn'], ['instagramUrl', 'Instagram'], ['whatsappUrl', 'WhatsApp'],
+  ['externalUrl', 'Enlace externo'], ['imageUrl', 'Foto'],
+];
+
+export const inviteUrl = (token) => `${window.location.origin}/equipo/perfil/${token}`;

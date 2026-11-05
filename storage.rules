@@ -29,6 +29,15 @@ service firebase.storage {
       allow list, update, delete: if isAdmin();
     }
 
+    // Foto que sube un miembro desde su enlace de invitación (pendiente de aprobación).
+    match /team-pending/{token}/{file} {
+      allow create: if request.resource.size < 5 * 1024 * 1024
+        && request.resource.contentType.matches('image/.*')
+        && firestore.exists(/databases/(default)/documents/teamInvites/$(token));
+      allow get: if true;
+      allow list, update, delete: if isAdmin();
+    }
+
     // Imágenes que las páginas públicas resuelven con getDownloadURL (EventsPage, TeamPage).
     match /events/{path=**}       { allow read: if true; allow write: if isAdmin(); }
     match /team-members/{path=**} { allow read: if true; allow write: if isAdmin(); }

@@ -21,13 +21,14 @@ const docsOf = (snap) => snap?.docs.map((d) => ({ id: d.id, ...d.data() })) || [
 
 async function loadDashboard() {
   const weekAgo = new Date(Date.now() - 7 * DAY);
-  const [eventsSnap, recentRegs, presentSnap, logsSnap, certsSnap, activitySnap] = await Promise.all([
+  const [eventsSnap, recentRegs, presentSnap, logsSnap, certsSnap, activitySnap, teamSubs] = await Promise.all([
     safe(getDocs(collection(db, 'events')), 'events'),
     safe(getCountFromServer(query(collection(db, 'registrations'), where('registrationDate', '>=', weekAgo))), 'inscritos 7 días'),
     safe(getDocs(query(collection(db, 'registrations'), where('statusAsistencia', 'in', PRESENT_VALUES))), 'presentes'),
     safe(getDocs(query(collection(db, 'volunteerAttendanceLogs'), where('creditsProcessed', '==', false))), 'horas pendientes'),
     safe(getDocs(collection(db, 'certificados')), 'certificados'),
     safe(getDocs(query(collection(db, 'adminActivity'), orderBy('at', 'desc'), limit(10))), 'actividad'),
+    safe(getCountFromServer(query(collection(db, 'teamSubmissions'), where('status', '==', 'pending'))), 'solicitudes de perfil'),
   ]);
 
   const events = docsOf(eventsSnap).map((e) => ({ ...e, when: toDate(e.date) }));
@@ -45,6 +46,7 @@ async function loadDashboard() {
     pendingLogs: docsOf(logsSnap).filter((l) => !l.rejected && l.creditStatus !== 'rejected'),
     certs: certsSnap ? docsOf(certsSnap) : null,
     activity: activitySnap ? docsOf(activitySnap) : null,
+    teamSubs: teamSubs?.data().count || 0,
   };
 }
 
@@ -101,6 +103,13 @@ export default function Dashboard() {
         id: 'logs', tone: 'warning',
         text: `${data.pendingLogs.length} registro${data.pendingLogs.length === 1 ? '' : 's'} de horas de voluntariado por aprobar (${hoursOf(data.pendingLogs)} h)`,
         to: '/admin/voluntariado?tab=aprobaciones', cta: 'Revisar',
+      });
+    }
+    if (data.teamSubs) {
+      pending.push({
+        id: 'team-subs', tone: 'info',
+        text: `${data.teamSubs} solicitud${data.teamSubs === 1 ? '' : 'es'} de perfil del equipo por revisar`,
+        to: '/admin/equipo/solicitudes', cta: 'Revisar',
       });
     }
     [...missingByEvent.values()].forEach(({ ev, count }) => pending.push({

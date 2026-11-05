@@ -47,6 +47,37 @@ service cloud.firestore {
         && getAfter(/databases/$(database)/documents/registrations/$(request.resource.data.lastRegistrationId)).data.eventId == id;
     }
     match /teamMembers/{id} { allow read: if true; allow write: if isAdmin(); }
+
+    // Perfiles del equipo por invitación: el admin crea teamInvites/{token} (el token es el secreto del enlace).
+    // El público solo puede leer UNA invitación por su token (get, nunca list).
+    match /teamInvites/{token} {
+      allow get: if true;
+      allow list, write: if isAdmin();
+    }
+
+    // Una solicitud por invitación (id = token). Queda pendiente hasta que la apruebe el aprobador.
+    match /teamSubmissions/{token} {
+      function invite() { return get(/databases/$(database)/documents/teamInvites/$(token)).data; }
+      allow create: if exists(/databases/$(database)/documents/teamInvites/$(token))
+        && invite().get('active', true) == true
+        && invite().expiresAt > request.time
+        && request.resource.data.keys().hasOnly([
+            'mode','memberId','teamSection','teamTag','name','role','description','email',
+            'linkedinUrl','instagramUrl','whatsappUrl','externalUrl','imageUrl','imagePath','status','submittedAt'])
+        && request.resource.data.mode == invite().mode
+        && request.resource.data.get('memberId', null) == invite().get('memberId', null)
+        && request.resource.data.teamSection == invite().teamSection
+        && request.resource.data.teamTag == invite().teamTag
+        && request.resource.data.status == 'pending'
+        && request.resource.data.submittedAt == request.time
+        && request.resource.data.name is string && request.resource.data.name.size() > 0 && request.resource.data.name.size() <= 120
+        && str('role', 120) && str('description', 1200) && str('email', 200)
+        && str('linkedinUrl', 500) && str('instagramUrl', 500) && str('whatsappUrl', 500) && str('externalUrl', 500)
+        && str('imageUrl', 2000) && str('imagePath', 500);
+      allow read: if isAdmin();
+      // Aprobar/rechazar: solo el aprobador del equipo.
+      allow update, delete: if isAdmin() && request.auth.token.email == 'admin@borealabs.org';
+    }
     match /siteConfig/{id}  { allow read: if true; allow write: if isAdmin(); }
     match /certificados/{id} { allow read: if true; allow write: if isAdmin(); }
 
