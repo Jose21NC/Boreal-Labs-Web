@@ -11,6 +11,7 @@ export const AREAS = {
   equipo: 'Equipo',
   sitio: 'Sitio',
   puntos: 'Puntos',
+  accesos: 'Accesos',
 };
 
 export const areaOf = (action) => String(action || '').split('.')[0] || 'otros';
