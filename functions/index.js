@@ -1,10 +1,12 @@
 import { onCall, HttpsError } from 'firebase-functions/v2/https';
-import { defineString } from 'firebase-functions/params';
+import { defineSecret, defineString } from 'firebase-functions/params';
+import { onDocumentCreated } from 'firebase-functions/v2/firestore';
 import { initializeApp } from 'firebase-admin/app';
 import { getFirestore, FieldValue } from 'firebase-admin/firestore';
 import { getStorage } from 'firebase-admin/storage';
 import { getAuth } from 'firebase-admin/auth';
 import { PDFDocument } from 'pdf-lib';
+import { certificateEmail, registrationEmail, sendOnce } from './email.js';
 import {
   mergeLayout, renderCertificate, resolveRole, resolveModality, templateCandidates, formatCiudadFecha, normalizeTemplateSet,
 } from './certificate.js';
@@ -32,7 +34,7 @@ const assertAdmin = (request) => {
 };
 
 export const generateCertificates = onCall({ cors: true, region: 'us-central1', timeoutSeconds: 540, memory: '512MiB' }, async (request) => {
-  const { eventName, templateSet, addPoints, points } = request.data || {};
+  const { eventName, templateSet, addPoints, points, notify } = request.data || {};
 
   if (!eventName) throw new HttpsError('invalid-argument', 'Falta eventName');
   // Requerir admin (no basta con estar autenticado)
@@ -237,6 +239,8 @@ export const generateCertificates = onCall({ cors: true, region: 'us-central1', 
         nombreEvento: eventTitleForThis || eventName,
         nombreUsuario: r.userName || '',
         urlPdf,
+        // El trigger onCertificateCreated solo envía correo si el admin lo pidió en el asistente.
+        notify: notify === true,
       });
       
     existingByEmailRole.add(`${email}|${roleLower}|${eventTitleForThis || eventName}`);
@@ -380,3 +384,25 @@ export const mergeCertificatesPdf = onCall({ cors: true, region: 'us-central1', 
 
 // processVolunteerAttendanceCredits eliminado: acreditaba cualquier envío público sin aprobación.
 // Los créditos los asigna un admin desde VolunteerAdminPanel (assignPendingCredits).
+
+// ---------------- Correos automáticos (SMTP de Google Workspace, ver functions/email.js) ----------------
+const SMTP_PASSWORD = defineSecret('SMTP_PASSWORD');
+// maxInstances 1: respeta el límite de conexiones SMTP de Gmail al emitir muchos certificados a la vez.
+const emailTrigger = (document) => ({ document, region: 'us-central1', secrets: [SMTP_PASSWORD], maxInstances: 1, retry: false });
+
+export const onRegistrationCreated = onDocumentCreated(emailTrigger('registrations/{id}'), async (event) => {
+  if (!event.data) return;
+  await sendOnce(db, event.data.ref, async (reg) => {
+    const eventSnap = reg.eventId ? await db.collection('events').doc(String(reg.eventId)).get() : null;
+    const ev = eventSnap?.exists ? eventSnap.data() : null;
+    // Solo inscripciones públicas a eventos con el correo activado (por defecto sí).
+    if (!ev || ev.confirmationEmail === false) return null;
+    return registrationEmail(reg, ev);
+  }, { password: SMTP_PASSWORD.value() });
+});
+
+export const onCertificateCreated = onDocumentCreated(emailTrigger('certificados/{id}'), async (event) => {
+  if (!event.data) return;
+  const base = process.env.VALIDATION_URL_BASE || 'https://borealabs.org/validacion?id=';
+  await sendOnce(db, event.data.ref, async (cert) => (cert.notify === true ? certificateEmail(cert, base) : null), { password: SMTP_PASSWORD.value() });
+});

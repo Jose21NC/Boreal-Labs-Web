@@ -93,6 +93,7 @@ export default function Wizard() {
   const [sets, setSets] = useState(null);
   const [templateSet, setTemplateSet] = useState('');
   const [addPoints, setAddPoints] = useState(false);
+  const [notify, setNotify] = useState(true);
   const [points, setPoints] = useState('10');
   const [previewOpen, setPreviewOpen] = useState(false);
   const [generating, setGenerating] = useState(false);
@@ -160,6 +161,7 @@ export default function Wizard() {
         templateSet: templateSet === AUTO ? null : (templateSet || '').trim() || null,
         addPoints,
         points: addPoints ? pointsValue : null,
+        notify,
       });
       const r = { created: 0, skipped: 0, errors: [], pointsApplied: 0, pointsErrors: [], pointsPending: [], ...res, addPoints };
       setResult(r);
@@ -265,7 +267,14 @@ export default function Wizard() {
         )}
       </Step>
 
-      <Step n={3} title="Puntos" description="Opcional: suma puntos a cada persona por certificado nuevo." disabled={!event}>
+      <Step n={3} title="Correo" description="Cada persona recibe su PDF y el enlace de validación desde contacto@borealabs.org." disabled={!event}>
+        <div className="flex items-center gap-3">
+          <Switch label="Enviar el certificado por correo" checked={notify} onChange={setNotify} disabled={!event} />
+          <span className="text-sm text-adm-text">Enviar el certificado por correo</span>
+        </div>
+      </Step>
+
+      <Step n={4} title="Puntos" description="Opcional: suma puntos a cada persona por certificado nuevo." disabled={!event}>
         <div className="flex flex-wrap items-end gap-4">
           <div className="flex items-center gap-3">
             <Switch label="Otorgar puntos" checked={addPoints} onChange={setAddPoints} disabled={!event} />
