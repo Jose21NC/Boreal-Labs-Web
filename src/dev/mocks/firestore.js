@@ -182,7 +182,14 @@ const runQuery = (q) => {
 const later = (fn) => new Promise((resolve, reject) => setTimeout(() => { try { resolve(fn()); } catch (e) { reject(e); } }, 120));
 
 export const getDocs = (q) => later(() => runQuery(q.type === 'collection' ? { ...q, constraints: [] } : q));
-export const getDoc = (ref) => later(() => makeSnap(ref, readDoc(ref)));
+export const getDoc = (ref) => later(() => {
+  // Emula la única regla que el cliente usa como verificación: eventSecrets/{id}/check/{código} (ver firestore.rules).
+  const check = ref.path.match(/^eventSecrets\/([^/]+)\/check\/(.+)$/);
+  if (check && store.eventSecrets?.[check[1]]?.code !== check[2]) {
+    throw Object.assign(new Error('Missing or insufficient permissions.'), { code: 'permission-denied' });
+  }
+  return makeSnap(ref, readDoc(ref));
+});
 export const getCountFromServer = (q) => later(() => {
   const { size } = runQuery(q.type === 'collection' ? { ...q, constraints: [] } : q);
   return { data: () => ({ count: size }) };

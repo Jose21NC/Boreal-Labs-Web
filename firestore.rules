@@ -1,15 +1,27 @@
 rules_version = '2';
-// BORRADOR revisado contra el código (no desplegado). Comparar con las reglas vivas antes de publicar.
+// BORRADOR revisado contra el código de la web y de la Wallet (no desplegado). Comparar con las reglas vivas antes de publicar.
 service cloud.firestore {
   match /databases/{database}/documents {
 
     function isAdmin() {
       // Mantener sincronizado con VITE_ADMIN_EMAILS, storage.rules y functions/.env (en minúsculas).
       let adminEmails = ['contacto@borealabs.org', 'admin@borealabs.org', 'jose@borealabs.org'];
+      let email = request.auth.token.get('email', '');
       return request.auth != null
         && request.auth.token.firebase.sign_in_provider != 'anonymous'
         && (request.auth.token.get('admin', false) == true
-            || request.auth.token.get('email', '') in adminEmails);
+            || email in adminEmails
+            // Admins de la Wallet: isAdmin/{correo} (docs de Rowy con id aleatorio no se pueden verificar aquí).
+            || (email != '' && exists(/databases/$(database)/documents/isAdmin/$(email))
+                && get(/databases/$(database)/documents/isAdmin/$(email)).data.get('active', true) != false));
+    }
+
+    function signedIn() {
+      return request.auth != null && request.auth.token.firebase.sign_in_provider != 'anonymous';
+    }
+
+    function myEmail() {
+      return request.auth.token.get('email', '').lower();
     }
 
     function validEmail(e) {
@@ -43,7 +55,7 @@ service cloud.firestore {
       allow create: if request.resource.data.keys().hasOnly([
           'eventName','eventId','userName','userEmail','userWhatsapp','userUniversity',
           'userCountry','userDepartment','isCommunityMember','tipoAsistencia',
-          'recaptchaTokenV2','registrationDate'])
+          'recaptchaTokenV2','registrationDate','answers','accessCode'])
         && request.resource.data.eventId is string && request.resource.data.eventId.size() <= 200
         && validEmail(request.resource.data.userEmail)
         // ID = eventId_correo: impide registros duplicados (un create sobre un doc existente se rechaza).
@@ -52,8 +64,31 @@ service cloud.firestore {
         && str('eventName', 300) && str('userName', 200) && str('userWhatsapp', 50)
         && str('userUniversity', 300) && str('userCountry', 100) && str('userDepartment', 100)
         && str('tipoAsistencia', 100) && str('recaptchaTokenV2', 4000)
-        && request.resource.data.registrationDate == request.time;
+        && request.resource.data.registrationDate == request.time
+        // Respuestas a campos personalizados del evento: mapa acotado (el contenido lo valida el formulario).
+        && (!('answers' in request.resource.data) || (request.resource.data.answers is map && request.resource.data.answers.size() <= 40))
+        && validAccessCode(request.resource.data.eventId);
       allow read, update, delete: if isAdmin();
+    }
+
+    // Código secreto de inscripción: el evento solo publica `requiresCode`; el código vive aquí (solo admin)
+    // y las reglas lo comparan con lo que envía el formulario sin exponerlo.
+    function validAccessCode(eventId) {
+      return !get(/databases/$(database)/documents/events/$(eventId)).data.get('requiresCode', false)
+        || (request.resource.data.get('accessCode', '') is string
+            && request.resource.data.get('accessCode', '') != ''
+            && request.resource.data.accessCode == get(/databases/$(database)/documents/eventSecrets/$(eventId)).data.code);
+    }
+
+    match /eventSecrets/{eventId} {
+      allow read, write: if isAdmin();
+
+      // Verificación previa del código (antes de mostrar el formulario) sin revelarlo: el cliente hace
+      // getDoc(eventSecrets/{id}/check/{código}). Si el código es correcto la lectura se permite (el doc no
+      // existe); si no, permission-denied. Nunca hay datos que leer aquí.
+      match /check/{code} {
+        allow get: if code == get(/databases/$(database)/documents/eventSecrets/$(eventId)).data.code;
+      }
     }
 
     // Inscripción de voluntarios (VolunteerPage.jsx)
@@ -83,14 +118,132 @@ service cloud.firestore {
         && validEmail(request.resource.data.email)
         && str('fullName', 200) && str('activityName', 300) && str('attendanceDate', 20)
         && str('startTime', 10) && str('endTime', 10) && str('startAtIso', 40) && str('endAtIso', 40)
-        && str('proofImageUrl', 2000) && str('proofImagePath', 500) && str('originalImageName', 300)
+        && str('proofImageUrl', 2000)
+        && (request.resource.data.get('proofImageUrl', '') == '' || request.resource.data.proofImageUrl.matches('^https://.*')) && str('proofImagePath', 500) && str('originalImageName', 300)
         && str('creditsFormula', 100)
         && request.resource.data.createdAt == request.time;
       // hasOnly excluye approved, creditos, creditsAssigned*, creditsGranted, creditStatus: los créditos los asigna solo el admin.
       allow read, update, delete: if isAdmin();
     }
 
-    // Todo lo demás (adminEvents, eventTemplates, userPoints/**, etc.): solo admin.
+    // ---------------------------------------------------------------------------------------------
+    // Wallet (repo Boreal-Labs-Wallet, mismo proyecto). Los canjes y compras se hacen desde el cliente,
+    // así que las reglas validan la aritmética contra los documentos que cambian en la misma transacción.
+    // REQUIERE en la Wallet: escribir `lastRedemption: <id del doc de pointCodes>` en userPoints al canjear
+    // y usar ese mismo id para redemptions/{id}. Sin ese cambio los canjes fallan con estas reglas.
+    // ---------------------------------------------------------------------------------------------
+
+    match /isAdmin/{id} {
+      allow read: if isAdmin() || (signedIn() && (id == myEmail() || resource.data.get('email', '') == myEmail()));
+      allow write: if isAdmin();
+    }
+
+    match /productos/{id} {
+      allow read: if signedIn();
+      allow write: if isAdmin();
+      // Compra: solo descontar stock (el pago se valida en purchases).
+      allow update: if signedIn()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['stock', 'lastPurchasedAt'])
+        && request.resource.data.stock is int && request.resource.data.stock >= 0
+        && request.resource.data.stock < resource.data.stock
+        && request.resource.data.lastPurchasedAt == request.time;
+    }
+
+    match /pointCodes/{code} {
+      allow read: if signedIn();
+      allow write: if isAdmin();
+      // Canje de un solo uso: queda marcado como usado por este usuario y debe existir su redemption.
+      allow update: if signedIn()
+        && resource.data.get('multiUse', false) == false
+        && resource.data.get('used', false) == false
+        && resource.data.get('active', true) != false
+        && (!('expiresAt' in resource.data) || resource.data.expiresAt == null || resource.data.expiresAt > request.time)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['used', 'active', 'usedBy', 'usedAt', 'userEmail'])
+        && request.resource.data.used == true && request.resource.data.active == false
+        && request.resource.data.usedBy == request.auth.uid && request.resource.data.usedAt == request.time
+        && existsAfter(/databases/$(database)/documents/userPoints/$(request.auth.uid)/redemptions/$(code));
+      // Canje multiuso: +1 al contador, con registro en uses/{uid}.
+      allow update: if signedIn()
+        && resource.data.get('multiUse', false) == true
+        && resource.data.get('active', true) != false
+        && (!('expiresAt' in resource.data) || resource.data.expiresAt == null || resource.data.expiresAt > request.time)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['redeemedCount', 'lastUsedAt'])
+        && request.resource.data.redeemedCount == resource.data.get('redeemedCount', 0) + 1
+        && request.resource.data.lastUsedAt == request.time
+        && !exists(/databases/$(database)/documents/pointCodes/$(code)/uses/$(request.auth.uid))
+        && existsAfter(/databases/$(database)/documents/pointCodes/$(code)/uses/$(request.auth.uid));
+
+      match /uses/{uid} {
+        allow read: if isAdmin() || (signedIn() && uid == request.auth.uid);
+        allow create: if signedIn() && uid == request.auth.uid
+          && request.resource.data.uid == uid && request.resource.data.usedAt == request.time;
+        allow update, delete: if isAdmin();
+      }
+    }
+
+    match /userPoints/{uid} {
+      function isOwner() { return signedIn() && uid == request.auth.uid; }
+      function balanceAfter() { return request.resource.data.balance; }
+      function balanceBefore() { return resource == null ? 0 : resource.data.get('balance', 0); }
+      function redemption() {
+        return /databases/$(database)/documents/userPoints/$(uid)/redemptions/$(request.resource.data.lastRedemption);
+      }
+
+      allow read: if isAdmin() || isOwner();
+      allow delete: if isAdmin();
+      allow create, update: if isAdmin();
+      // Dueño: solo balance/email/updatedAt (+ lastRedemption). Subir saldo exige un canje nuevo por el mismo monto;
+      // bajarlo solo pasa al comprar (la compra valida el total en purchases).
+      allow create, update: if isOwner()
+        && request.resource.data.keys().hasOnly(['balance', 'email', 'updatedAt', 'lastRedemption', 'lastEvent'])
+        && (resource == null || request.resource.data.diff(resource.data).affectedKeys().hasOnly(['balance', 'email', 'updatedAt', 'lastRedemption']))
+        && request.resource.data.get('email', myEmail()) in [myEmail(), null]
+        && request.resource.data.updatedAt == request.time
+        && balanceAfter() is number
+        && (
+          balanceAfter() <= balanceBefore()
+          || (
+            'lastRedemption' in request.resource.data
+            && !exists(redemption())
+            && existsAfter(redemption())
+            && balanceAfter() == balanceBefore() + getAfter(redemption()).data.amount
+          )
+        );
+
+      match /redemptions/{codeId} {
+        allow read: if isAdmin() || (signedIn() && uid == request.auth.uid);
+        // El monto debe ser el del código y el código debe quedar consumido en la misma transacción.
+        allow create: if signedIn() && uid == request.auth.uid
+          && exists(/databases/$(database)/documents/pointCodes/$(codeId))
+          && request.resource.data.amount == get(/databases/$(database)/documents/pointCodes/$(codeId)).data.amount
+          && request.resource.data.redeemedAt == request.time
+          && (
+            getAfter(/databases/$(database)/documents/pointCodes/$(codeId)).data.get('usedBy', '') == request.auth.uid
+            || existsAfter(/databases/$(database)/documents/pointCodes/$(codeId)/uses/$(request.auth.uid))
+          );
+        allow update, delete: if isAdmin();
+      }
+
+      match /purchases/{purchaseId} {
+        allow read: if isAdmin() || (signedIn() && uid == request.auth.uid);
+        // El total debe ser precio × cantidad y el saldo debe bajar exactamente eso en la misma transacción.
+        allow create: if signedIn() && uid == request.auth.uid
+          && request.resource.data.quantity is int && request.resource.data.quantity >= 1
+          && request.resource.data.total == get(/databases/$(database)/documents/productos/$(request.resource.data.productId)).data.price * request.resource.data.quantity
+          && getAfter(/databases/$(database)/documents/userPoints/$(uid)).data.balance
+             == get(/databases/$(database)/documents/userPoints/$(uid)).data.balance - request.resource.data.total
+          && getAfter(/databases/$(database)/documents/userPoints/$(uid)).data.balance >= 0
+          && request.resource.data.purchasedAt == request.time;
+        allow update, delete: if isAdmin();
+      }
+
+      match /adminGrants/{grantId} {
+        allow read: if isAdmin() || (signedIn() && uid == request.auth.uid);
+        allow write: if isAdmin();
+      }
+    }
+
+    // Todo lo demás (adminEvents, eventTemplates, adminActivity, etc.): solo admin.
     match /{document=**} {
       allow read, write: if isAdmin();
     }

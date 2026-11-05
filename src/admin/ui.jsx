@@ -1,6 +1,7 @@
 // Kit de UI del panel admin. Usa solo los tokens `adm-*` (tailwind.config.js) para que el tema
 // claro/oscuro funcione en todo el panel. No usar aquí los componentes públicos de src/components/ui.
 import React, { createContext, useCallback, useContext, useEffect, useId, useRef, useState } from 'react';
+import { AnimatePresence, motion } from 'framer-motion';
 import { Loader2, Search, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -30,7 +31,8 @@ export const Button = React.forwardRef(function Button(
       type={type}
       disabled={disabled || loading}
       className={cn(
-        'inline-flex items-center justify-center rounded-lg font-medium whitespace-nowrap transition-colors',
+        'inline-flex items-center justify-center rounded-lg font-medium whitespace-nowrap',
+        'transition-[color,background-color,border-color,box-shadow,transform] duration-150 ease-out active:scale-[.98]',
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-adm-accent focus-visible:ring-offset-2 focus-visible:ring-offset-adm-bg',
         'disabled:opacity-50 disabled:pointer-events-none',
         BUTTON_VARIANTS[variant],
@@ -102,13 +104,13 @@ export function Switch({ checked, onChange, label, disabled, className }) {
       disabled={disabled}
       onClick={() => onChange?.(!checked)}
       className={cn(
-        'relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors',
+        'relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors duration-150',
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-adm-accent disabled:opacity-50',
         checked ? 'bg-adm-accent' : 'bg-adm-border',
         className,
       )}
     >
-      <span className={cn('inline-block h-5 w-5 rounded-full bg-white shadow transition-transform', checked ? 'translate-x-5' : 'translate-x-0.5')} />
+      <span className={cn('inline-block h-5 w-5 rounded-full bg-white shadow transition-transform duration-200 [transition-timing-function:cubic-bezier(.34,1.36,.64,1)]', checked ? 'translate-x-5' : 'translate-x-0.5')} />
     </button>
   );
 }
@@ -156,8 +158,8 @@ export function StatCard({ label, value, hint, icon: Icon, tone = 'accent', onCl
     <Comp
       onClick={onClick}
       className={cn(
-        'rounded-xl border border-adm-border bg-adm-surface p-4 text-left',
-        onClick && 'transition-colors hover:border-adm-accent/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-adm-accent',
+        'adm-fade-in rounded-xl border border-adm-border bg-adm-surface p-4 text-left',
+        onClick && 'transition-[border-color,transform] duration-150 hover:border-adm-accent/60 active:scale-[.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-adm-accent',
       )}
     >
       <div className="flex items-center justify-between gap-2">
@@ -227,8 +229,11 @@ export function EmptyState({ icon: Icon, title, description, action, className }
   );
 }
 
-/** Pestañas controladas: items = [{ value, label, count? }]. */
+const EASE_OUT = [0.23, 1, 0.32, 1];
+
+/** Pestañas controladas: items = [{ value, label, count? }]. El subrayado activo se desliza (layoutId). */
 export function Tabs({ items, value, onChange, className }) {
+  const indicatorId = useId();
   return (
     <div role="tablist" className={cn('flex gap-1 overflow-x-auto border-b border-adm-border', className)}>
       {items.map((item) => {
@@ -241,13 +246,21 @@ export function Tabs({ items, value, onChange, className }) {
             aria-selected={active}
             onClick={() => onChange(item.value)}
             className={cn(
-              '-mb-px flex items-center gap-2 whitespace-nowrap border-b-2 px-3 py-2.5 text-sm font-medium transition-colors',
-              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-adm-accent rounded-t',
-              active ? 'border-adm-accent text-adm-text' : 'border-transparent text-adm-muted hover:text-adm-text',
+              'relative flex items-center gap-2 whitespace-nowrap px-3 py-2.5 text-sm font-medium transition-colors duration-150',
+              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-adm-accent rounded-t',
+              active ? 'text-adm-text' : 'text-adm-muted hover:text-adm-text',
             )}
           >
             {item.label}
             {item.count != null && <span className="rounded-full bg-adm-surface-2 px-1.5 text-xs tabular-nums text-adm-muted">{item.count}</span>}
+            {active && (
+              <motion.span
+                layoutId={indicatorId}
+                className="absolute inset-x-0 bottom-0 h-0.5 rounded-full bg-adm-accent"
+                transition={{ duration: 0.2, ease: EASE_OUT }}
+                aria-hidden="true"
+              />
+            )}
           </button>
         );
       })}
@@ -256,70 +269,104 @@ export function Tabs({ items, value, onChange, className }) {
 }
 
 // ---------- Tabla ----------
-export const Table = ({ className, children }) => (
-  <div className="overflow-x-auto">
+/** `sticky`: cabecera fija dentro de un contenedor con scroll propio (tablas largas). */
+export const Table = ({ className, sticky, children }) => (
+  <div className={cn('overflow-x-auto', sticky && 'max-h-[min(70vh,760px)] overflow-y-auto overscroll-contain')} data-sticky={sticky || undefined}>
     <table className={cn('w-full text-sm', className)}>{children}</table>
   </div>
 );
 export const THead = ({ children }) => (
-  <thead className="border-b border-adm-border bg-adm-surface-2/60 text-left text-xs font-semibold uppercase tracking-wide text-adm-muted">{children}</thead>
+  <thead className="border-b border-adm-border bg-adm-surface-2/60 text-left text-xs font-semibold uppercase tracking-wide text-adm-muted [[data-sticky]_&]:sticky [[data-sticky]_&]:top-0 [[data-sticky]_&]:z-[1] [[data-sticky]_&]:bg-adm-surface-2 [[data-sticky]_&]:shadow-[inset_0_-1px_0_rgb(var(--adm-border))]">{children}</thead>
 );
 export const TH = ({ className, sort, onSort, children, ...props }) => (
   <th className={cn('px-4 py-3 font-semibold', className)} aria-sort={sort === 'asc' ? 'ascending' : sort === 'desc' ? 'descending' : undefined} {...props}>
     {onSort ? (
-      <button type="button" onClick={onSort} className="inline-flex items-center gap-1 uppercase hover:text-adm-text">
+      <button type="button" onClick={onSort} className="inline-flex items-center gap-1 uppercase transition-colors duration-150 hover:text-adm-text">
         {children}
         <span aria-hidden="true">{sort === 'asc' ? '↑' : sort === 'desc' ? '↓' : '↕'}</span>
       </button>
     ) : children}
   </th>
 );
+// adm-fade-in corre solo al montar la fila (filas nuevas o al pasar de skeleton a datos), no en cada render.
 export const TR = ({ className, selected, ...props }) => (
-  <tr className={cn('border-b border-adm-border/70 last:border-0 transition-colors hover:bg-adm-surface-2/50', selected && 'bg-adm-accent/5', className)} {...props} />
+  <tr className={cn('adm-fade-in border-b border-adm-border/70 last:border-0 transition-colors duration-150 hover:bg-adm-surface-2/50', selected && 'bg-adm-accent/5', className)} {...props} />
 );
 export const TD = ({ className, ...props }) => <td className={cn('px-4 py-3 align-middle text-adm-text', className)} {...props} />;
 
 // ---------- Modal ----------
-export function Modal({ open, onClose, title, description, children, footer, size = 'md' }) {
+// Pila de modales abiertos: Escape cierra solo el de arriba (p. ej. una confirmación sobre un formulario).
+const openModals = [];
+const smUp = () => window.matchMedia?.('(min-width: 640px)').matches ?? true;
+
+/**
+ * Mientras sale (animación de cierre) muestra el último contenido abierto: así un modal con
+ * `open={!!item}` no parpadea vacío al cerrarse.
+ */
+export function Modal({ open, ...props }) {
+  const last = useRef(props);
+  if (open) last.current = props;
+  return <AnimatePresence>{open && <ModalPanel key="modal" {...last.current} />}</AnimatePresence>;
+}
+
+function ModalPanel({ onClose, title, description, children, footer, size = 'md' }) {
   const panelRef = useRef(null);
+  // onClose suele ser una función nueva en cada render: con un ref el efecto corre solo al abrir y no roba el foco.
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+  const [desktop] = useState(smUp);
+
   useEffect(() => {
-    if (!open) return undefined;
+    const token = {};
+    openModals.push(token);
     const previous = document.activeElement;
-    const onKey = (e) => { if (e.key === 'Escape') onClose?.(); };
+    const onKey = (e) => { if (e.key === 'Escape' && openModals[openModals.length - 1] === token) onCloseRef.current?.(); };
     document.addEventListener('keydown', onKey);
     const focusable = panelRef.current?.querySelector('input, select, textarea, button:not([data-close])');
     (focusable || panelRef.current)?.focus();
     return () => {
+      openModals.splice(openModals.indexOf(token), 1);
       document.removeEventListener('keydown', onKey);
       previous?.focus?.();
     };
-  }, [open, onClose]);
+  }, []);
 
-  if (!open) return null;
   const width = { sm: 'max-w-md', md: 'max-w-lg', lg: 'max-w-2xl', xl: 'max-w-4xl', full: 'max-w-6xl' }[size];
+  // Escritorio: escala .98→1 + fade. Móvil: hoja que sube desde abajo. La salida es más corta que la entrada.
+  const hidden = desktop ? { opacity: 0, scale: 0.98 } : { opacity: 1, y: '100%' };
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center p-0 sm:items-center sm:p-4">
-      <div className="absolute inset-0 bg-black/50 backdrop-blur-[2px]" onClick={onClose} aria-hidden="true" />
-      <div
+      <motion.div
+        className="absolute inset-0 bg-black/50 backdrop-blur-[2px]"
+        onClick={() => onCloseRef.current?.()}
+        aria-hidden="true"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1, transition: { duration: 0.2 } }}
+        exit={{ opacity: 0, transition: { duration: 0.15 } }}
+      />
+      <motion.div
         ref={panelRef}
         role="dialog"
         aria-modal="true"
         aria-label={typeof title === 'string' ? title : undefined}
         tabIndex={-1}
-        className={cn('relative flex max-h-[92vh] w-full flex-col rounded-t-2xl border border-adm-border bg-adm-surface shadow-2xl sm:rounded-2xl', width)}
+        className={cn('relative flex max-h-[92vh] w-full flex-col rounded-t-2xl border border-adm-border bg-adm-surface shadow-2xl outline-none sm:rounded-2xl', width)}
+        initial={hidden}
+        animate={{ opacity: 1, scale: 1, y: 0, transition: { duration: desktop ? 0.2 : 0.28, ease: desktop ? EASE_OUT : [0.32, 0.72, 0, 1] } }}
+        exit={{ ...hidden, transition: { duration: desktop ? 0.12 : 0.2, ease: 'easeOut' } }}
       >
         <div className="flex items-start justify-between gap-4 border-b border-adm-border px-5 py-4">
-          <div>
+          <div className="min-w-0">
             <h2 className="text-base font-semibold text-adm-text">{title}</h2>
             {description && <p className="mt-0.5 text-sm text-adm-muted">{description}</p>}
           </div>
-          <Button data-close variant="ghost" size="icon" onClick={onClose} aria-label="Cerrar">
+          <Button data-close variant="ghost" size="icon" onClick={() => onCloseRef.current?.()} aria-label="Cerrar">
             <X className="h-4 w-4" />
           </Button>
         </div>
-        <div className="overflow-y-auto px-5 py-4">{children}</div>
+        <div className="overflow-y-auto overscroll-contain px-5 py-4">{children}</div>
         {footer && <div className="flex flex-wrap justify-end gap-2 border-t border-adm-border px-5 py-3">{footer}</div>}
-      </div>
+      </motion.div>
     </div>
   );
 }

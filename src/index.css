@@ -92,7 +92,7 @@
     --adm-surface-2: 241 244 249;
     --adm-border: 222 228 238;
     --adm-text: 15 23 42;
-    --adm-muted: 92 106 128;
+    --adm-muted: 82 96 118; /* ≥5.5:1 sobre surface y surface-2 (WCAG AA) */
     --adm-accent: 4 120 87;
     --adm-accent-fg: 255 255 255;
     --adm-danger: 200 30 30;
@@ -100,6 +100,30 @@
     --adm-success: 21 128 61;
     --adm-info: 29 78 216;
     color-scheme: light;
+  }
+
+  /* Anillo de foco del panel: el global usa colores del sitio público (offset oscuro en tema claro). */
+  .admin-root :is(a, button, [role='button'], summary):focus-visible {
+    --tw-ring-color: rgb(var(--adm-accent));
+    --tw-ring-offset-color: rgb(var(--adm-bg));
+  }
+
+  /* overflow-x:hidden en html/body/#root los vuelve contenedores de scroll y rompe todo `sticky` del panel
+     (header, cabeceras de tabla, barras de acción). clip recorta igual sin crear scroll. */
+  html:has(.admin-root), html:has(.admin-root) body, #root:has(.admin-root) { overflow-x: clip; }
+
+  /* Al cambiar de tema se cortan las transiciones un frame: sin esto unos elementos se funden y otros saltan. */
+  .admin-root[data-theme-switching] *, .admin-root[data-theme-switching] *::before { transition: none !important; }
+
+  /* Movimiento del panel: solo opacity/transform, ease-out fuerte. Se anula con prefers-reduced-motion (regla global). */
+  .adm-enter { animation: adm-enter 220ms cubic-bezier(0.23, 1, 0.32, 1) both; }
+  .adm-fade-in { animation: adm-fade 180ms ease-out both; }
+  .adm-pop { animation: adm-pop 140ms cubic-bezier(0.23, 1, 0.32, 1) both; }
+  @keyframes adm-enter { from { opacity: 0; transform: translateY(6px); } }
+  @keyframes adm-fade { from { opacity: 0; } }
+  @keyframes adm-pop { from { opacity: 0; transform: scale(0.98); } }
+  @media (prefers-reduced-motion: reduce) {
+    .adm-enter, .adm-pop { animation-name: adm-fade; }
   }
 }
 

@@ -81,6 +81,9 @@ export function downloadCsv(filename, columns, rows) {
 }
 
 /** Normaliza texto para búsquedas sin tildes ni mayúsculas. */
+/** URL pública de validación de un certificado (aquí y no en templates/engine para no arrastrar pdf-lib). */
+export const validationUrlFor = (id) => `${window.location.origin}/validacion?id=${encodeURIComponent(id)}`;
+
 export const normalize = (value) => String(value ?? '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 
 /** Mismo criterio que functions/index.js para "asistió". */

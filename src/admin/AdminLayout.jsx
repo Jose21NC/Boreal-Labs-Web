@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
+import { AnimatePresence, MotionConfig, motion } from 'framer-motion';
 import { signOut } from 'firebase/auth';
 import {
   LayoutDashboard, CalendarDays, Award, FileImage, HeartHandshake, Users, Star, Globe, History,
@@ -47,6 +48,10 @@ function useAdminTheme() {
     return () => mq.removeEventListener('change', onChange);
   }, []);
   const update = (next) => {
+    // Corta transiciones durante el cambio de tema (ver .admin-root[data-theme-switching] en index.css).
+    const root = document.querySelector('.admin-root');
+    root?.setAttribute('data-theme-switching', '');
+    requestAnimationFrame(() => requestAnimationFrame(() => root?.removeAttribute('data-theme-switching')));
     setPref(next);
     try { localStorage.setItem(THEME_KEY, next); } catch { /* modo privado */ }
   };
@@ -71,7 +76,7 @@ function ThemeToggle({ pref, setPref }) {
           title={label}
           onClick={() => setPref(value)}
           className={cn(
-            'rounded-md p-1.5 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-adm-accent',
+            'rounded-md p-1.5 transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-adm-accent',
             pref === value ? 'bg-adm-surface-2 text-adm-text' : 'text-adm-muted hover:text-adm-text',
           )}
         >
@@ -85,10 +90,10 @@ function ThemeToggle({ pref, setPref }) {
 
 function SidebarNav({ onNavigate }) {
   return (
-    <nav aria-label="Secciones del panel" className="flex-1 space-y-6 overflow-y-auto px-3 py-4">
+    <nav aria-label="Secciones del panel" className="flex-1 space-y-5 overflow-y-auto overscroll-contain px-3 py-4">
       {NAV.map((group) => (
         <div key={group.group}>
-          <p className="px-3 pb-2 text-[11px] font-semibold uppercase tracking-wider text-adm-muted/80">{group.group}</p>
+          <p className="px-3 pb-1.5 text-[11px] font-semibold uppercase tracking-wider text-adm-muted">{group.group}</p>
           <ul className="space-y-0.5">
             {group.items.map(({ to, label, icon: Icon, end }) => (
               <li key={to}>
@@ -97,9 +102,11 @@ function SidebarNav({ onNavigate }) {
                   end={end}
                   onClick={onNavigate}
                   className={({ isActive }) => cn(
-                    'flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
+                    'relative flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors duration-150',
                     'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-adm-accent',
-                    isActive ? 'bg-adm-accent/10 text-adm-accent' : 'text-adm-muted hover:bg-adm-surface-2 hover:text-adm-text',
+                    // Indicador activo: barra de acento a la izquierda (estático: navegar es frecuente).
+                    "before:absolute before:inset-y-2 before:left-0 before:w-0.5 before:rounded-full before:bg-adm-accent before:content-['']",
+                    isActive ? 'bg-adm-accent/10 text-adm-accent before:opacity-100' : 'text-adm-muted before:opacity-0 hover:bg-adm-surface-2 hover:text-adm-text',
                   )}
                 >
                   <Icon className="h-4 w-4 shrink-0" aria-hidden="true" />
@@ -134,11 +141,11 @@ function CommandPalette({ open, onClose, setPref }) {
     return commands.filter((c) => `${c.label} ${c.keywords || ''}`.toLowerCase().includes(term));
   }, [commands, q]);
 
+  // Se limpia al cerrar (no al abrir): así nunca se ve la búsqueda anterior ni se pisa lo que se teclea tras ⌘K.
   useEffect(() => {
-    if (open) {
+    if (!open) {
       setQ('');
       setActive(0);
-      setTimeout(() => inputRef.current?.focus(), 0);
     }
   }, [open]);
 
@@ -153,12 +160,13 @@ function CommandPalette({ open, onClose, setPref }) {
 
   return (
     <div className="fixed inset-0 z-[60] flex items-start justify-center p-4 pt-[12vh]">
-      <div className="absolute inset-0 bg-black/40" onClick={onClose} aria-hidden="true" />
-      <div role="dialog" aria-modal="true" aria-label="Paleta de comandos" className="relative w-full max-w-lg overflow-hidden rounded-xl border border-adm-border bg-adm-surface shadow-2xl">
+      <div className="adm-fade-in absolute inset-0 bg-black/40" onClick={onClose} aria-hidden="true" />
+      <div role="dialog" aria-modal="true" aria-label="Paleta de comandos" className="adm-pop relative w-full max-w-lg overflow-hidden rounded-xl border border-adm-border bg-adm-surface shadow-2xl">
         <div className="flex items-center gap-2 border-b border-adm-border px-4">
           <Search className="h-4 w-4 text-adm-muted" aria-hidden="true" />
           <input
             ref={inputRef}
+            autoFocus
             value={q}
             onChange={(e) => { setQ(e.target.value); setActive(0); }}
             onKeyDown={onKeyDown}
@@ -178,7 +186,7 @@ function CommandPalette({ open, onClose, setPref }) {
                   type="button"
                   onMouseEnter={() => setActive(i)}
                   onClick={() => run(cmd)}
-                  className={cn('flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm', i === active ? 'bg-adm-surface-2 text-adm-text' : 'text-adm-muted')}
+                  className={cn('flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm focus-visible:outline-none', i === active ? 'bg-adm-surface-2 text-adm-text' : 'text-adm-muted')}
                 >
                   <Icon className="h-4 w-4" aria-hidden="true" />
                   {cmd.label}
@@ -217,12 +225,16 @@ export default function AdminLayout() {
   }, []);
 
   useEffect(() => { setDrawerOpen(false); }, [location.pathname]);
+  // Primera carga sin animación: solo se anima al navegar entre secciones.
+  const animateSections = useRef(false);
+  useEffect(() => { animateSections.current = true; }, []);
 
   const logout = async () => {
     try { await signOut(auth); } finally { navigate('/'); }
   };
 
   return (
+    <MotionConfig reducedMotion="user">
     <div data-theme={resolved} className="admin-root min-h-screen bg-adm-bg font-sans text-adm-text antialiased">
       <Helmet>
         <title>{current ? `${current.label} · Admin Boreal Labs` : 'Admin Boreal Labs'}</title>
@@ -232,25 +244,40 @@ export default function AdminLayout() {
         {/* Sidebar escritorio */}
         <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 flex-col border-r border-adm-border bg-adm-surface lg:flex">
           <div className="flex h-16 items-center gap-2 border-b border-adm-border px-5">
-            <img src="/logoBoreal.svg" alt="" className="h-7 w-auto" />
+            {/* El logo trae texto blanco: en tema claro invert + hue-rotate lo vuelve oscuro conservando el azul. */}
+            <img src="/logoBoreal.svg" alt="" className="h-7 w-auto [[data-theme=light]_&]:hue-rotate-180 [[data-theme=light]_&]:invert" />
             <span className="text-sm font-semibold">Admin</span>
           </div>
           <SidebarNav />
         </aside>
 
         {/* Drawer móvil */}
-        {drawerOpen && (
+        <AnimatePresence>
+          {drawerOpen && (
           <div className="fixed inset-0 z-40 lg:hidden">
-            <div className="absolute inset-0 bg-black/50" onClick={() => setDrawerOpen(false)} aria-hidden="true" />
-            <aside className="relative flex h-full w-72 flex-col border-r border-adm-border bg-adm-surface">
+            <motion.div
+              className="absolute inset-0 bg-black/50"
+              onClick={() => setDrawerOpen(false)}
+              aria-hidden="true"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1, transition: { duration: 0.2 } }}
+              exit={{ opacity: 0, transition: { duration: 0.15 } }}
+            />
+            <motion.aside
+              className="relative flex h-full w-72 max-w-[85vw] flex-col border-r border-adm-border bg-adm-surface shadow-2xl"
+              initial={{ x: '-100%' }}
+              animate={{ x: 0, transition: { duration: 0.26, ease: [0.32, 0.72, 0, 1] } }}
+              exit={{ x: '-100%', transition: { duration: 0.18, ease: 'easeOut' } }}
+            >
               <div className="flex h-16 items-center justify-between border-b border-adm-border px-5">
                 <span className="text-sm font-semibold">Boreal Labs · Admin</span>
                 <Button variant="ghost" size="icon" onClick={() => setDrawerOpen(false)} aria-label="Cerrar menú"><X className="h-4 w-4" /></Button>
               </div>
               <SidebarNav onNavigate={() => setDrawerOpen(false)} />
-            </aside>
+            </motion.aside>
           </div>
-        )}
+          )}
+        </AnimatePresence>
 
         <div className="lg:pl-64">
           {IS_DEMO && (
@@ -259,7 +286,7 @@ export default function AdminLayout() {
               Modo de prueba: datos ficticios en este navegador, sin login y sin conexión a Firebase.
             </div>
           )}
-          <header className="sticky top-0 z-20 flex h-16 items-center gap-3 border-b border-adm-border bg-adm-bg/85 px-4 backdrop-blur sm:px-6">
+          <header className="sticky top-0 z-20 flex h-16 items-center gap-3 border-b border-adm-border/80 bg-adm-bg/80 px-4 backdrop-blur-md backdrop-saturate-150 sm:px-6">
             <Button variant="ghost" size="icon" className="lg:hidden" onClick={() => setDrawerOpen(true)} aria-label="Abrir menú">
               <Menu className="h-5 w-5" />
             </Button>
@@ -268,7 +295,7 @@ export default function AdminLayout() {
               <button
                 type="button"
                 onClick={() => setPaletteOpen(true)}
-                className="hidden h-9 items-center gap-2 rounded-lg border border-adm-border bg-adm-surface px-3 text-sm text-adm-muted hover:text-adm-text sm:flex focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-adm-accent"
+                className="hidden h-9 items-center gap-2 rounded-lg border border-adm-border bg-adm-surface px-3 text-sm text-adm-muted transition-colors duration-150 hover:border-adm-muted/40 hover:text-adm-text sm:flex focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-adm-accent"
               >
                 <Search className="h-4 w-4" aria-hidden="true" />
                 Buscar
@@ -291,12 +318,16 @@ export default function AdminLayout() {
           </header>
 
           <main className="mx-auto w-full max-w-[1400px] px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
-            <Outlet />
+            {/* Fade + 6px al cambiar de sección (CSS: corre fuera del hilo principal mientras carga el chunk). */}
+            <div key={current?.to || 'admin'} className={animateSections.current ? 'adm-enter' : undefined}>
+              <Outlet />
+            </div>
           </main>
         </div>
 
         <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} setPref={setPref} />
       </ConfirmProvider>
     </div>
+    </MotionConfig>
   );
 }

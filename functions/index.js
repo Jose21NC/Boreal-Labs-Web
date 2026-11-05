@@ -3,9 +3,11 @@ import { defineString } from 'firebase-functions/params';
 import { initializeApp } from 'firebase-admin/app';
 import { getFirestore, FieldValue } from 'firebase-admin/firestore';
 import { getStorage } from 'firebase-admin/storage';
-import { PDFDocument, rgb, StandardFonts } from 'pdf-lib';
-import fontkit from '@pdf-lib/fontkit';
-import QRCode from 'qrcode';
+import { getAuth } from 'firebase-admin/auth';
+import { PDFDocument } from 'pdf-lib';
+import {
+  mergeLayout, renderCertificate, resolveRole, resolveModality, templateCandidates, formatCiudadFecha, normalizeTemplateSet,
+} from './certificate.js';
 
 initializeApp();
 const db = getFirestore();
@@ -29,7 +31,7 @@ const assertAdmin = (request) => {
   if (!token.email || !allowed.includes(token.email.toLowerCase())) throw new HttpsError('permission-denied', 'Solo administradores');
 };
 
-export const generateCertificates = onCall({ cors: true, region: 'us-central1' }, async (request) => {
+export const generateCertificates = onCall({ cors: true, region: 'us-central1', timeoutSeconds: 540, memory: '512MiB' }, async (request) => {
   const { eventName, templateSet, addPoints, points } = request.data || {};
 
   if (!eventName) throw new HttpsError('invalid-argument', 'Falta eventName');
@@ -41,9 +43,16 @@ export const generateCertificates = onCall({ cors: true, region: 'us-central1' }
   const regs = regsSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
 
   // Traer certificados existentes de este evento para evitar duplicados por rol
-  const certsSnap = await db.collection('certificados').where('nombreEvento', '==', eventName).get();
+  // Los ponentes con título propio guardan nombreEvento = customEventName: también hay que buscar esos,
+  // o cada corrida les emitiría otro certificado.
+  const titles = [...new Set([eventName, ...regs.map((r) => r.customEventName).filter(Boolean)])];
+  const certDocs = [];
+  for (let i = 0; i < titles.length; i += 30) {
+    const snap = await db.collection('certificados').where('nombreEvento', 'in', titles.slice(i, i + 30)).get();
+    certDocs.push(...snap.docs);
+  }
   const existingByEmailRole = new Set(
-    certsSnap.docs.map((d) => {
+    certDocs.map((d) => {
       const email = (d.get('correoUsuario') || '').toLowerCase();
       // Algunos certificados antiguos no tenían 'tipo'; inferir: si modalidad es 'ponente' o 'staff' tomarlos como tal; de lo contrario, 'participante'
       const tipo = (d.get('tipo') || '').toLowerCase() || ((d.get('modalidad') || '').toLowerCase().match(/^(ponente|staff)$/)?.[0] || 'participante');
@@ -114,16 +123,6 @@ export const generateCertificates = onCall({ cors: true, region: 'us-central1' }
     console.warn('No se pudo leer fecha del evento', e?.message || e);
   }
 
-  const normalizeTemplateSet = (value) => {
-    if (!value) return null;
-    let cleaned = String(value).trim().replace(/\\/g, '/');
-    cleaned = cleaned.replace(/^\/+/, '').replace(/\/+$/, '');
-    // Si viene como ruta completa, quitar el prefijo cert-templates/
-    cleaned = cleaned.replace(/^cert-templates\//, '');
-    if (!cleaned || cleaned.includes('..')) return null;
-    return cleaned;
-  };
-
   const templateSetSafe = normalizeTemplateSet(templateSet) || normalizeTemplateSet(inferredTemplateSet);
   const templateRoot = templateSetSafe ? `cert-templates/${templateSetSafe}` : 'cert-templates';
 
@@ -139,18 +138,18 @@ export const generateCertificates = onCall({ cors: true, region: 'us-central1' }
     try {
       const idValidacion = (globalThis.crypto?.randomUUID?.() || `${Date.now()}_${Math.random().toString(36).slice(2,8)}`);
 
-      // Helpers para layout
+      // Helpers para cargar archivos opcionales de Storage
       const loadOptional = async (path) => {
-      try {
-        const file = bucket.file(path);
-        const [exists] = await file.exists();
-        if (!exists) return null;
-        const [buf] = await file.download();
-        return buf;
-      } catch {
-        return null;
-      }
-    };
+        try {
+          const file = bucket.file(path);
+          const [exists] = await file.exists();
+          if (!exists) return null;
+          const [buf] = await file.download();
+          return buf;
+        } catch {
+          return null;
+        }
+      };
 
       const loadFirst = async (paths) => {
         for (const p of paths) {
@@ -160,251 +159,56 @@ export const generateCertificates = onCall({ cors: true, region: 'us-central1' }
         return null;
       };
 
-      const defaultLayout = {
-      canvas: { widthPx: 2000, heightPx: 1414, orientation: 'landscape', paperHint: '≈ A4' },
-      safeMarginPx: 35,
-      elements: {
-        nombreUsuario: {
-          rel: { x: 0.10, y: 0.297, width: 0.80, height: 0.078 },
-          style: { fontFamily: 'Libre Franklin', fontSizePx: 64, fontWeight: 800, fontStyle: 'normal', color: '#373737', textAlign: 'center', transform: 'uppercase', tracking: '0.5px' }
-        },
-        nombreEvento: {
-          rel: { x: 0.15, y: 0.431, width: 0.70, height: 0.056 },
-          style: { fontFamily: 'Libre Franklin', fontSizePx: 42, fontWeight: 700, fontStyle: 'normal', color: '#373737', textAlign: 'center' }
-        },
-        ciudadFecha: {
-          rel: { x: 0.125, y: 0.622, width: 0.75, height: 0.035 },
-          style: { fontFamily: 'Libre Franklin', fontSizePx: 26, fontWeight: 700, fontStyle: 'italic', color: '#373737', textAlign: 'center' }
-        },
-        tipoParticipacion: {
-          rel: { x: 0.15, y: 0.75, width: 0.70, height: 0.035 },
-          style: { fontFamily: 'Libre Franklin', fontSizePx: 22, fontWeight: 600, fontStyle: 'normal', color: '#373737', textAlign: 'center' }
-        },
-        idValidacion: {
-            rel: { x: 0.865, y: 0.93, width: 0.10, height: 0.03 },
-            style: { fontFamily: 'Libre Franklin', fontSizePx: 18, fontWeight: 400, fontStyle: 'normal', color: '#373737', textAlign: 'center' }
-        },
-        qrValidacion: {
-            rel: { x: 0.865, y: 0.78, width: 0.10, height: 0.141 }
-        }
-      }
-    };
-
       const layoutPick = await loadFirst([
         `${templateRoot}/layout.json`,
         'cert-templates/layout.json',
       ]);
       const loadedLayout = layoutPick?.buf ? JSON.parse(layoutPick.buf.toString('utf8')) : null;
-      // Mezclar con defaults para asegurar campos como 'ciudadFecha' aunque el JSON subido no los tenga
-      const layout = loadedLayout
-        ? {
-            ...defaultLayout,
-            ...loadedLayout,
-            elements: {
-              ...defaultLayout.elements,
-              ...(loadedLayout.elements || {}),
-            },
-          }
-        : defaultLayout;
+      const layout = mergeLayout(loadedLayout);
 
-    // 1) Generar PDF: usar plantilla si existe, sino lienzo vacío
-  // Determinar rol (tipo) y modalidad por registro
-  const roleLower = (r.tipo || '').toLowerCase() || ((r.tipoAsistencia || '').toLowerCase().match(/^(ponente|staff|participante)$/)?.[0] || 'participante');
-  const modalityLower = (r.modalidad || r.tipoParticipacion || r.tipoAsistencia || '').toLowerCase();
-  const isPonente = roleLower === 'ponente';
-  const isStaff = roleLower === 'staff';
-  const isParticipante = roleLower === 'participante';
-  const isVirtualParticipant = isParticipante && modalityLower === 'virtual';
-  const templateCandidates = (() => {
-    if (isPonente) {
-      return ['base-ponente.pdf', 'ponente.pdf', 'speaker.pdf', 'ponente-virtual.pdf'];
-    }
-    if (isStaff) {
-      return ['base-staff.pdf', 'staff.pdf'];
-    }
-    if (isVirtualParticipant) {
-      return ['base-virtual.pdf', 'virtual.pdf', 'base.pdf'];
-    }
-    return ['base-volunt.pdf', 'base.pdf', 'participante.pdf'];
-  })();
-  const templatePick = await loadFirst([
-    ...templateCandidates.map((p) => `${templateRoot}/${p}`),
-    ...templateCandidates.map((p) => `cert-templates/${p}`),
-  ]);
-  if (!templatePick?.buf) {
-    console.warn('[generateCertificates] No se encontró plantilla. Usando fallback A4 en blanco.', {
-      templateRoot,
-      templateCandidates,
-      role: roleLower,
-      event: eventName,
-    });
-  } else {
-    console.info('[generateCertificates] Template usado:', templatePick.path, 'role=', roleLower, 'event=', eventName);
-  }
-      let pdfDoc;
-      if (templatePick?.buf) {
-        pdfDoc = await PDFDocument.load(templatePick.buf);
+      // 1) Generar PDF: usar plantilla si existe, sino lienzo vacío (ver functions/certificate.js)
+      const roleLower = resolveRole(r);
+      const modalidadText = resolveModality(r);
+      const isPonente = roleLower === 'ponente';
+      const candidates = templateCandidates(roleLower, modalidadText.toLowerCase());
+      const templatePick = await loadFirst([
+        ...candidates.map((p) => `${templateRoot}/${p}`),
+        ...candidates.map((p) => `cert-templates/${p}`),
+      ]);
+      if (!templatePick?.buf) {
+        console.warn('[generateCertificates] No se encontró plantilla. Usando fallback A4 en blanco.', {
+          templateRoot,
+          templateCandidates: candidates,
+          role: roleLower,
+          event: eventName,
+        });
       } else {
-        // A4 landscape aprox (pts)
-        pdfDoc = await PDFDocument.create();
-        pdfDoc.addPage([842, 595]);
+        console.info('[generateCertificates] Template usado:', templatePick.path, 'role=', roleLower, 'event=', eventName);
       }
-      // Registrar fontkit para permitir incrustar fuentes TTF personalizadas
-      try { pdfDoc.registerFontkit(fontkit); } catch {}
-      const page = pdfDoc.getPage(0);
 
-    // Fuentes: tratar de cargar fuentes personalizadas
-  const helvetica = await pdfDoc.embedFont(StandardFonts.Helvetica);
-  const helveticaBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
-  const helveticaOblique = await pdfDoc.embedFont(StandardFonts.HelveticaOblique);
-  const helveticaBoldOblique = await pdfDoc.embedFont(StandardFonts.HelveticaBoldOblique);
-  const ffBold = await loadOptional('cert-templates/fonts/LibreFranklin-Bold.ttf');
-  const ffRegular = await loadOptional('cert-templates/fonts/LibreFranklin-Regular.ttf');
-  const ffItalic = await loadOptional('cert-templates/fonts/LibreFranklin-Italic.ttf');
-  const ffBoldItalic = await loadOptional('cert-templates/fonts/LibreFranklin-BoldItalic.ttf');
-      const fontMap = {};
-      const tryEmbed = async (buf, key) => {
-        try { if (buf) return await pdfDoc.embedFont(buf); } catch (e) { console.warn('Font embed failed', key, e?.message || e); }
-        return null;
-      };
-  const boldFont = await tryEmbed(ffBold, 'LibreFranklin-Bold');
-  const regularFont = await tryEmbed(ffRegular, 'LibreFranklin-Regular');
-  const italicFont = await tryEmbed(ffItalic, 'LibreFranklin-Italic');
-  const boldItalicFont = await tryEmbed(ffBoldItalic, 'LibreFranklin-BoldItalic');
-  if (boldFont) fontMap['Libre Franklin:bold'] = boldFont;
-  if (regularFont) fontMap['Libre Franklin:normal'] = regularFont;
-  if (italicFont) fontMap['Libre Franklin:italic'] = italicFont;
-  if (boldItalicFont) fontMap['Libre Franklin:bolditalic'] = boldItalicFont;
-
-      const { width: pageW, height: pageH } = page.getSize();
-
-  const sx = pageW / (layout.canvas?.widthPx || 2000);
-  const sy = pageH / (layout.canvas?.heightPx || 1414);
-
-      const hexToRgb = (hex) => {
-      const m = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex || '#000000');
-      if (!m) return rgb(0, 0, 0);
-      return rgb(parseInt(m[1], 16) / 255, parseInt(m[2], 16) / 255, parseInt(m[3], 16) / 255);
-    };
-
-      const pickFont = (style) => {
-        const fam = (style.fontFamily || '').trim().toLowerCase();
-        let weightRaw = style.fontWeight;
-        let weight;
-        if (typeof weightRaw === 'number') weight = weightRaw;
-        else if (typeof weightRaw === 'string') {
-          const w = weightRaw.trim().toLowerCase();
-          if (w === 'bold' || w === 'bolder') weight = 700;
-          else if (w === 'normal' || w === 'regular') weight = 400;
-          else {
-            const parsed = Number(w);
-            weight = Number.isFinite(parsed) ? parsed : 400;
-          }
-        } else {
-          weight = 400;
-        }
-        const italic = (style.fontStyle || '').toLowerCase().includes('italic');
-
-        const wantsLibre = fam.includes('libre franklin');
-        if (wantsLibre) {
-          if (italic && weight >= 700) {
-            // Prefer exact BoldItalic if available
-            if (fontMap['Libre Franklin:bolditalic']) return fontMap['Libre Franklin:bolditalic'];
-            if (fontMap['Libre Franklin:italic']) return fontMap['Libre Franklin:italic'];
-            if (fontMap['Libre Franklin:bold']) return fontMap['Libre Franklin:bold'];
-            return helveticaBoldOblique;
-          }
-          if (italic) {
-            if (fontMap['Libre Franklin:italic']) return fontMap['Libre Franklin:italic'];
-            return helveticaOblique;
-          }
-          if (weight >= 700) {
-            if (fontMap['Libre Franklin:bold']) return fontMap['Libre Franklin:bold'];
-            return helveticaBold;
-          }
-          if (fontMap['Libre Franklin:normal']) return fontMap['Libre Franklin:normal'];
-          return helvetica;
-        }
-
-        // Cualquier otra familia: aproximar con Helvetica variantes
-        if (italic && weight >= 700) return helveticaBoldOblique;
-        if (italic) return helveticaOblique;
-        if (weight >= 700) return helveticaBold;
-        return helvetica;
+      const fonts = {
+        bold: await loadOptional('cert-templates/fonts/LibreFranklin-Bold.ttf'),
+        regular: await loadOptional('cert-templates/fonts/LibreFranklin-Regular.ttf'),
+        italic: await loadOptional('cert-templates/fonts/LibreFranklin-Italic.ttf'),
+        boldItalic: await loadOptional('cert-templates/fonts/LibreFranklin-BoldItalic.ttf'),
       };
 
-      const drawTextBox = (text, boxRel, style) => {
-      if (!text && text !== 0) return;
-      const font = pickFont(style);
-      const color = hexToRgb(style.color || '#000000');
-  // Usar escala horizontal para una medición de ancho más fiel
-  const fontSize = (style.fontSizePx || 20) * sx;
-  const charSpacing = parseFloat(String(style.tracking || 0).replace('px', '')) * sx || 0;
-      const toUpper = (style.transform || '').toLowerCase() === 'uppercase';
-      const content = toUpper ? String(text).toUpperCase() : String(text);
-
-      const x = (boxRel.x || 0) * pageW;
-      const yTop = (boxRel.y || 0) * pageH;
-      const w = (boxRel.width || 1) * pageW;
-      const h = (boxRel.height || 0) * pageH;
-      // pdf-lib usa bottom-left, así que convertimos top-left a base-line approx
-      const y = pageH - yTop - h + (h - fontSize) / 2; // centrado vertical dentro de la caja
-
-      const textWidth = font.widthOfTextAtSize(content, fontSize) + charSpacing * (content.length - 1);
-      let drawX = x;
-      const align = (style.textAlign || 'left').toLowerCase();
-      if (align === 'center') drawX = x + (w - textWidth) / 2;
-      else if (align === 'right') drawX = x + (w - textWidth);
-
-      page.drawText(content, { x: drawX, y, size: fontSize, font, color, characterSpacing: charSpacing, maxWidth: w });
-    };
-
-      // Fecha y ciudad (Managua) usando la fecha del evento
-      const ciudadFechaText = (() => {
-        const d = eventDate || new Date();
-        try {
-          const day = new Intl.DateTimeFormat('es-NI', { day: 'numeric', timeZone: 'America/Managua' }).format(d);
-          const month = new Intl.DateTimeFormat('es-NI', { month: 'long', timeZone: 'America/Managua' }).format(d);
-          const year = new Intl.DateTimeFormat('es-NI', { year: 'numeric', timeZone: 'America/Managua' }).format(d);
-          return `Dado en la ciudad de Managua, a los ${day} días del mes de ${month} de ${year}`;
-        } catch {
-          const months = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
-          return `Dado en la ciudad de Managua, a los ${d.getDate()} días del mes de ${months[d.getMonth()]} de ${d.getFullYear()}`;
-        }
-      })();
-
-      // URL de validación y QR
       const base = process.env.VALIDATION_URL_BASE || 'https://borealabs.org/validacion?id=';
-      const validationUrl = `${base}${encodeURIComponent(idValidacion)}`;
-      const qrBox = layout.elements?.qrValidacion?.rel;
-      if (qrBox) {
-        const qrWidth = Math.max(64, Math.round((qrBox.width || 0.1) * pageW));
-        const qrPng = await QRCode.toBuffer(validationUrl, { width: qrWidth });
-        const qrImage = await pdfDoc.embedPng(qrPng);
-        const x = (qrBox.x || 0) * pageW;
-        const yTop = (qrBox.y || 0) * pageH;
-        const w = (qrBox.width || 0.1) * pageW;
-        const h = (qrBox.height || 0.1) * pageH;
-        const y = pageH - yTop - h;
-        page.drawImage(qrImage, { x, y, width: w, height: h });
-      }
-
-      // Campos de texto
-    const L = layout.elements || {};
-    if (L.nombreUsuario?.rel) drawTextBox(r.userName || '', L.nombreUsuario.rel, L.nombreUsuario.style || {});
-  const eventTitleForThis = isPonente && r.customEventName ? r.customEventName : (r.eventName || eventName || '');
-  if (L.nombreEvento?.rel) drawTextBox(eventTitleForThis, L.nombreEvento.rel, L.nombreEvento.style || {});
-    // Soportar 'modalidad' o 'tipoParticipacion' según el layout
-    const modalidadBox = L.modalidad || L.tipoParticipacion;
-    const modalidadText = (r.modalidad || r.tipoParticipacion || r.tipoAsistencia || '').toString();
-    // Solo dibujar modalidad para los participantes
-    if (modalidadBox?.rel && modalidadText && isParticipante) {
-      drawTextBox(modalidadText, modalidadBox.rel, modalidadBox.style || {});
-    }
-  if (L.idValidacion?.rel) drawTextBox(`${idValidacion}`, L.idValidacion.rel, L.idValidacion.style || {});
-    if (L.ciudadFecha?.rel) drawTextBox(ciudadFechaText, L.ciudadFecha.rel, L.ciudadFecha.style || {});
-
-      const pdfBytes = await pdfDoc.save();
+      const eventTitleForThis = isPonente && r.customEventName ? r.customEventName : (r.eventName || eventName || '');
+      const pdfBytes = await renderCertificate({
+        templateBytes: templatePick?.buf || null,
+        layout,
+        fonts,
+        data: {
+          nombreUsuario: r.userName || '',
+          nombreEvento: eventTitleForThis,
+          modalidad: modalidadText,
+          rol: roleLower,
+          idValidacion,
+          validationUrl: `${base}${encodeURIComponent(idValidacion)}`,
+          ciudadFecha: formatCiudadFecha(eventDate),
+        },
+      });
 
       // 2) Subir a Storage y obtener URL pública de descarga
       const safeEvent = eventName.replace(/[^a-zA-Z0-9_-]+/g, '_');
@@ -448,28 +252,48 @@ export const generateCertificates = onCall({ cors: true, region: 'us-central1' }
 
   let pointsApplied = 0;
   const pointsErrors = [];
+  const pointsPending = [];
   if (addPointsEnabled && pointsByEmail.size > 0) {
     const grantedBy = request.auth?.token?.email || request.auth?.uid || 'system';
     for (const [email, count] of pointsByEmail.entries()) {
       const amount = pointsPerCertificate * count;
       try {
-        const snap = await db.collection('userPoints').where('email', '==', email).limit(1).get();
+        // La Wallet solo lee userPoints/{uid}: resolver la cuenta por correo antes de escribir.
+        let uid = null;
+        try {
+          uid = (await getAuth().getUserByEmail(email)).uid;
+        } catch (e) {
+          if (e?.code !== 'auth/user-not-found') throw e;
+        }
         let userRef;
-        if (!snap.empty) {
-          userRef = snap.docs[0].ref;
-          await userRef.update({
+        if (uid) {
+          userRef = db.collection('userPoints').doc(uid);
+          await userRef.set({
+            email,
             balance: FieldValue.increment(amount),
             updatedAt: FieldValue.serverTimestamp(),
             lastEvent: eventName,
-          });
+          }, { merge: true });
         } else {
-          userRef = db.collection('userPoints').doc();
-          await userRef.set({
-            email,
-            balance: amount,
-            updatedAt: FieldValue.serverTimestamp(),
-            lastEvent: eventName,
-          });
+          // Sin cuenta Wallet todavía: se guarda como antes y se avisa al admin (pointsPending).
+          const snap = await db.collection('userPoints').where('email', '==', email).limit(1).get();
+          if (!snap.empty) {
+            userRef = snap.docs[0].ref;
+            await userRef.update({
+              balance: FieldValue.increment(amount),
+              updatedAt: FieldValue.serverTimestamp(),
+              lastEvent: eventName,
+            });
+          } else {
+            userRef = db.collection('userPoints').doc();
+            await userRef.set({
+              email,
+              balance: amount,
+              updatedAt: FieldValue.serverTimestamp(),
+              lastEvent: eventName,
+            });
+          }
+          pointsPending.push(email);
         }
 
         await userRef.collection('adminGrants').add({
@@ -488,7 +312,7 @@ export const generateCertificates = onCall({ cors: true, region: 'us-central1' }
     }
   }
 
-  return { created, skipped, errors, pointsApplied, pointsErrors };
+  return { created, skipped, errors, pointsApplied, pointsErrors, pointsPending };
 });
 
 export const mergeCertificatesPdf = onCall({ cors: true, region: 'us-central1', timeoutSeconds: 540, memory: '1GiB' }, async (request) => {
@@ -496,7 +320,15 @@ export const mergeCertificatesPdf = onCall({ cors: true, region: 'us-central1', 
   if (!eventName) throw new HttpsError('invalid-argument', 'Falta eventName');
   assertAdmin(request);
 
-  const certsSnap = await db.collection('certificados').where('nombreEvento', '==', eventName).get();
+  // Incluye a los ponentes con título propio (su certificado se guarda con nombreEvento = customEventName).
+  const regsSnap = await db.collection('registrations').where('eventName', '==', eventName).get();
+  const titles = [...new Set([eventName, ...regsSnap.docs.map((d) => d.get('customEventName')).filter(Boolean)])];
+  const certDocs = [];
+  for (let i = 0; i < titles.length; i += 30) {
+    const snap = await db.collection('certificados').where('nombreEvento', 'in', titles.slice(i, i + 30)).get();
+    certDocs.push(...snap.docs);
+  }
+  const certsSnap = { empty: certDocs.length === 0, docs: certDocs };
   if (certsSnap.empty) return { merged: false, reason: 'Sin certificados' };
 
   const safeEvent = eventName.replace(/[^a-zA-Z0-9_-]+/g, '_');

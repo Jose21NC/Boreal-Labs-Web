@@ -16,7 +16,17 @@ service firebase.storage {
     match /attendance-proofs/{file} {
       allow create: if request.resource.size < 5 * 1024 * 1024
         && request.resource.contentType.matches('image/.*');
-      allow read, update, delete: if isAdmin();
+      // get (no list): el formulario necesita getDownloadURL justo después de subir. La ruta lleva timestamp + nombre.
+      allow get: if true;
+      allow list, update, delete: if isAdmin();
+    }
+
+    // Imágenes que adjunta quien se inscribe a un evento (campos personalizados tipo imagen).
+    match /registration-uploads/{eventId}/{file} {
+      allow create: if request.resource.size < 5 * 1024 * 1024
+        && request.resource.contentType.matches('image/.*');
+      allow get: if true;
+      allow list, update, delete: if isAdmin();
     }
 
     // Imágenes que las páginas públicas resuelven con getDownloadURL (EventsPage, TeamPage).

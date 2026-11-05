@@ -1,8 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { Link } from 'react-router-dom';
-// Se agregó el ícono de 'Instagram'
-import { ArrowRight, Zap, Mic, Heart, Award, School as University, Building, Instagram, Star, Users } from 'lucide-react';
+import { ArrowRight, Zap, Mic, Building, Instagram } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import headerImage from '@/images/headear.webp';
 import headerImageMobile from '@/images/headear-mobile.webp';
@@ -11,28 +10,8 @@ import workshopImage from '@/images/taller.webp';
 import workshopImage768 from '@/images/taller-768.webp';
 import workshopImageMobile from '@/images/taller-mobile.webp';
 import workshopImageMobile480 from '@/images/taller-mobile-480.webp';
-import partnerUam from '@/images/partners/uam.webp';
-import partnerUni from '@/images/partners/uni.webp';
-import partnerInatec from '@/images/partners/inatec.webp';
-import partnerUnanNuevo from '@/images/partners/unanNuevo.webp';
-import partnerAspire from '@/images/partners/aspire.webp';
-import partnerTedx from '@/images/partners/logo-white.webp';
-
-const FALLBACK_HOME_CONFIG = {
-  impacts: [
-    { icon: 'Heart', metric: '+850', description: 'Jóvenes impactados a nivel nacional.' },
-    { icon: 'Award', metric: '12', description: 'Eventos y talleres realizados con éxito.' },
-    { icon: 'University', metric: '7', description: 'Alianzas con universidades y centros de innovación.' }
-  ],
-  partners: [
-    { name: 'Universidad Americana (UAM)', alt: 'Logo UAM', imgSrc: partnerUam, width: 256, height: 91 },
-    { name: 'Universidad Nacional de Ingeniería', alt: 'Logo UNI', imgSrc: partnerUni, width: 207, height: 128 },
-    { name: 'Tecnologico Nacional (INATEC)', alt: 'Logo INATEC', imgSrc: partnerInatec, width: 218, height: 128 },
-    { name: 'Universidad Nacional Autonoma de Nicaragua, Managua - UNAN', alt: 'Logo UNAN', imgSrc: partnerUnanNuevo, width: 181, height: 128 },
-    { name: 'Aspire Institute Inc.', alt: 'Logo Aspire', imgSrc: partnerAspire, width: 256, height: 97 },
-    { name: 'TEDx Avenida Bolivar', alt: 'Logo TEDx Avenida Bolivar', imgSrc: partnerTedx, width: 256, height: 89 },
-  ]
-};
+import { ImpactGrid, PartnerGrid } from '@/components/HomeConfigSections';
+import { useHomeConfig, useSiteLinks } from '@/lib/useSiteConfig';
 
 const ScrollAnimatedSection = ({ children, className }) => {
   return <section className={className}>{children}</section>;
@@ -44,7 +23,9 @@ const HomePage = () => {
   const instagramRef = useRef(null);
   const [shouldLoadInstagramWidget, setShouldLoadInstagramWidget] = useState(false);
 
-  const [homeConfig] = useState(FALLBACK_HOME_CONFIG);
+  // Defaults al instante; se reemplazan con siteConfig/home y siteConfig/links (editables en /admin/sitio).
+  const homeConfig = useHomeConfig();
+  const links = useSiteLinks();
   
   const programs = [
     {
@@ -63,37 +44,6 @@ const HomePage = () => {
       description: 'Contamos con oficina presencial y eventos para colaborar con otros jóvenes apasionados.',
     },
   ];
-
-  // Mapeamos los nombres de los iconos guardados en BD a los componentes importados de Lucide
-  const iconMap = {
-    Heart, Award, University, Zap, Building, Mic, Instagram, Star, Users
-  };
-
-  const impacts = homeConfig.impacts.map(item => ({
-    ...item,
-    icon: iconMap[item.icon] || Heart // Por defecto Heart si no se encuentra
-  })).filter((item) => {
-    const metric = String(item.metric || '').trim();
-    const description = String(item.description || '').toLowerCase();
-    return !(metric === '8' && description.includes('emprendimiento'));
-  });
-  const hasCertificatesImpact = impacts.some((item) => {
-    const metric = String(item.metric || '').toLowerCase();
-    const description = String(item.description || '').toLowerCase();
-    return metric.includes('280') && description.includes('certificado');
-  });
-  const impactsWithCertificates = hasCertificatesImpact
-    ? impacts
-    : [
-        ...impacts,
-        {
-          metric: '280',
-          description: 'certificados digitales emitidos',
-          icon: Award,
-        },
-      ];
-
-  const partners = homeConfig.partners;
 
   useEffect(() => {
     if (!instagramRef.current || shouldLoadInstagramWidget) return;
@@ -161,6 +111,9 @@ const HomePage = () => {
         <section className="relative min-h-[100svh] flex items-center justify-center text-center text-white overflow-hidden">
           <div className="absolute inset-0 z-10 bg-gradient-to-b from-boreal-dark/75 via-boreal-dark/60 to-boreal-dark"></div>
           <div className="absolute inset-0 z-0">
+             {homeConfig.images.hero ? (
+              <img alt="Grupo de jovenes en evento de Boreal Labs" className="w-full h-full object-cover" src={homeConfig.images.hero} width="1920" height="1080" fetchpriority="high" decoding="async" />
+             ) : (
              <picture>
               <source
                 media="(max-width: 768px)"
@@ -169,6 +122,7 @@ const HomePage = () => {
               />
               <img alt="Grupo de jovenes en evento de lanzamiento de Boreal Labs" className="w-full h-full object-cover" src={headerImage} width="1920" height="1080" fetchpriority="high" decoding="async" />
              </picture>
+             )}
           </div>
           <div className="relative z-20 max-w-4xl mx-auto px-4 min-h-[350px] md:min-h-[380px] flex flex-col items-center justify-center">
             <h1 className="text-4xl sm:text-5xl md:text-7xl font-black tracking-tighter leading-[1.05]">
@@ -228,6 +182,17 @@ const HomePage = () => {
               Boreal Labs es una organización sin fines de lucro, liderada por jóvenes, que articula esfuerzos y crea espacios para el desarrollo de habilidades en innovación y emprendimiento en la juventud nicaragüense.
             </p>
             <div className="mt-12 flex justify-center">
+              {homeConfig.images.workshop ? (
+                <img
+                  src={homeConfig.images.workshop}
+                  alt="Jóvenes de Boreal Labs en un taller"
+                  className="rounded-2xl shadow-xl object-cover w-full max-w-3xl h-auto"
+                  width="1280"
+                  height="720"
+                  loading="lazy"
+                  decoding="async"
+                />
+              ) : (
               <picture>
                 <source
                   media="(max-width: 768px)"
@@ -246,6 +211,7 @@ const HomePage = () => {
                   decoding="async"
                 />
               </picture>
+              )}
             </div>
             <div className="mt-12">
               <Button asChild variant="outline" size="lg" className="border-2 border-boreal-aqua bg-transparent text-boreal-aqua hover:bg-boreal-aqua/10 hover:text-boreal-aqua px-8 text-base font-semibold">
@@ -285,15 +251,7 @@ const HomePage = () => {
                 </h2>
                 <p className="text-lg text-gray-400 max-w-2xl mx-auto">Construyendo una comunidad, un joven a la vez.</p>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 text-center">
-              {impactsWithCertificates.map((impact, index) => (
-                <div key={index} className="glass-effect rounded-2xl p-8 border border-white/10">
-                  <impact.icon className="w-12 h-12 mx-auto mb-4 text-boreal-aqua" />
-                  <div className="text-4xl md:text-5xl font-extrabold tracking-tight tabular-nums text-white">{impact.metric}</div>
-                  <p className="mt-2 text-gray-400">{impact.description}</p>
-                </div>
-              ))}
-            </div>
+            <ImpactGrid impacts={homeConfig.impacts} />
           </div>
         </ScrollAnimatedSection>
 
@@ -304,22 +262,7 @@ const HomePage = () => {
               <h2 className="text-3xl md:text-5xl font-bold tracking-tight mb-4">Nuestros Aliados Estratégicos</h2>
               <p className="text-lg text-gray-400">Colaborando con los mejores para potenciar el talento nicaragüense.</p>
             </div>
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 md:gap-5">
-              {partners.map((partner, index) => (
-                <div key={index} className="flex flex-col items-center justify-center text-center gap-y-3 rounded-2xl border border-white/10 bg-white/[0.03] p-4 transition-colors hover:border-white/20 hover:bg-white/[0.06]">
-                   <img 
-                     src={partner.imgSrc} 
-                     alt={partner.alt} 
-                     className="h-14 w-full max-w-[8rem] object-contain"
-                     width={partner.width || 128}
-                     height={partner.height || 64}
-                     loading="lazy"
-                     decoding="async"
-                   />
-                   <span className="text-gray-400 text-xs sm:text-sm font-semibold leading-snug">{partner.name}</span>
-                </div>
-              ))}
-            </div>
+            <PartnerGrid partners={homeConfig.partners} />
           </div>
         </ScrollAnimatedSection>
 
@@ -338,7 +281,7 @@ const HomePage = () => {
                 size="lg"
                 className="bg-gradient-to-r from-[#da5def] to-[#3162ed] text-white font-bold transition-transform hover:scale-105"
               >
-                <a href="https://instagram.com/boreal.labs" target="_blank" rel="noopener noreferrer">
+                <a href={links.instagramUrl} target="_blank" rel="noopener noreferrer">
                   <Instagram className="mr-2 w-5 h-5" />
                   @boreal.labs
                 </a>
@@ -383,7 +326,7 @@ const HomePage = () => {
               Únete a nuestra comunidad de jóvenes innovadores. Participa en nuestros eventos, conecta con mentores y lleva tus ideas al siguiente nivel.
             </p>
             <Button asChild size="lg" className="bg-gradient-to-r from-boreal-aqua to-boreal-blue text-boreal-dark px-8 py-6 text-lg font-bold">
-              <a href="https://chat.whatsapp.com/HAaxnHFYsuaBltQ812XhRW?mode=wwc" target="_blank" rel="noopener noreferrer">¡Únete a la Comunidad!</a>
+              <a href={links.communityUrl} target="_blank" rel="noopener noreferrer">¡Únete a la Comunidad!</a>
             </Button>
           </div>
         </ScrollAnimatedSection>

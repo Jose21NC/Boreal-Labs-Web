@@ -15,6 +15,7 @@ import 'swiper/css/navigation';
 // import './swiper-custom.css'; 
 
 import quienesImage from '@/images/quienes.webp';
+import { useHomeConfig } from '@/lib/useSiteConfig';
 import carouselB from '@/images/carrusel/b.webp';
 import carouselC from '@/images/carrusel/c.webp';
 import carouselD from '@/images/carrusel/d.webp';
@@ -25,6 +26,7 @@ import carouselH from '@/images/carrusel/h.webp';
 import carouselI from '@/images/carrusel/i.webp';
 
 const AboutPage = () => {
+  const aboutImage = useHomeConfig().images.about || quienesImage;
   const values = [
     {
       icon: Heart,
@@ -102,7 +104,7 @@ const AboutPage = () => {
               <img
                 alt="Foto de miembros de Boreal Labs"
                 className="rounded-2xl shadow-2xl"
-                src={quienesImage}
+                src={aboutImage}
                 width="1280"
                 height="853"
                 loading="lazy"

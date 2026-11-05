@@ -11,16 +11,12 @@ import HomePage from '@/pages/HomePage';
 
 const AboutPage = lazy(() => import('@/pages/AboutPage'));
 const TeamPage = lazy(() => import('@/pages/TeamPage'));
-const TeamEditorPage = lazy(() => import('@/pages/TeamEditorPage'));
 const EventsPage = lazy(() => import('@/pages/EventsPage'));
 const VolunteerPage = lazy(() => import('@/pages/VolunteerPage'));
 const VolunteerAttendancePage = lazy(() => import('@/pages/VolunteerAttendancePage'));
 const VolunteerPersonalPage = lazy(() => import('@/pages/VolunteerPersonalPage'));
 const NotFoundPage = lazy(() => import('@/pages/NotFoundPage'));
-const LayoutEditor = lazy(() => import('@/pages/LayoutEditor'));
 const PaginaValidacion = lazy(() => import('@/pages/PaginaValidacion'));
-const AdminPanel = lazy(() => import('@/pages/AdminPanel'));
-const VolunteerAdminPanel = lazy(() => import('@/pages/VolunteerAdminPanel'));
 const AdminGate = lazy(() => import('@/components/AdminGate'));
 const AdminApp = lazy(() => import('@/admin/AdminApp'));
 const VoxlabPage = lazy(() => import('@/pages/VoxlabPage'));
@@ -70,7 +66,7 @@ function App() {
                     {/* Rutas en español */}
                     <Route path="/nosotros" element={<AboutPage />} />
                     <Route path="/equipo" element={<TeamPage />} />
-                    <Route path="/equipo/editar" element={<AdminGate><TeamEditorPage /></AdminGate>} />
+                    <Route path="/equipo/editar" element={<Navigate to="/admin/equipo" replace />} />
                     <Route path="/eventos" element={<EventsPage />} />
                     <Route path="/voluntariado" element={<VolunteerPage />} />
                     <Route path="/voluntariado/asistencia" element={<VolunteerAttendancePage />} />
@@ -79,10 +75,6 @@ function App() {
                     {/* Admin */}
                     <Route path="/admin/*" element={<AdminGate><AdminApp /></AdminGate>} />
                     <Route path="/voluntariado/admin" element={<Navigate to="/admin/voluntariado" replace />} />
-                    {/* TEMPORAL durante el refactor: paneles anteriores para comparar. */}
-                    <Route path="/admin-legacy" element={<AdminGate><AdminPanel /></AdminGate>} />
-                    <Route path="/admin-legacy/layout" element={<AdminGate><LayoutEditor /></AdminGate>} />
-                    <Route path="/admin-legacy/voluntariado" element={<AdminGate><VolunteerAdminPanel /></AdminGate>} />
 
 
                     {/* Voxlab */}

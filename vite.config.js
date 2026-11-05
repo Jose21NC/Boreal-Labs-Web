@@ -37,6 +37,9 @@ export default defineConfig(({ command, mode }) => {
             if (!id.includes('node_modules')) return;
 
             if (id.includes('firebase')) return 'vendor-firebase';
+            // Motor de certificados (solo panel admin): fuera del chunk 'vendor' que carga el sitio público.
+            if (id.includes('pdfjs-dist')) return 'vendor-pdfjs';
+            if (/[\\/]node_modules[\\/](pdf-lib|@pdf-lib|qrcode|pako|dijkstrajs)[\\/]/.test(id)) return 'vendor-pdf';
             if (id.includes('framer-motion')) return 'vendor-motion';
             if (id.includes('react-router')) return 'vendor-router';
             if (id.includes('react-helmet-async')) return 'vendor-helmet';
@@ -46,6 +49,8 @@ export default defineConfig(({ command, mode }) => {
       },
     },
     resolve: {
+      // functions/certificate.js importa pdf-lib/qrcode: usar siempre la copia de la raíz (CI no instala functions/).
+      dedupe: ['pdf-lib', '@pdf-lib/fontkit', 'qrcode'],
       alias: [
         ...(mode === 'demo' ? firebaseMocks : []),
         { find: '@', replacement: path.resolve(__dirname, 'src') },

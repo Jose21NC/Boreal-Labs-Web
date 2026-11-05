@@ -1,7 +1,15 @@
-// Placeholder: lo reemplaza la implementación de la sección.
+// Sección Equipo: /admin/equipo (listado), /admin/equipo/nuevo y /admin/equipo/:id (editor).
 import React from 'react';
-import { PageHeader } from '@/admin/ui';
+import { Route, Routes } from 'react-router-dom';
+import TeamList from './TeamList';
+import MemberEditor from './MemberEditor';
 
-export default function Section() {
-  return <PageHeader title="Equipo" description="En construcción." />;
+export default function TeamSection() {
+  return (
+    <Routes>
+      <Route index element={<TeamList />} />
+      <Route path="nuevo" element={<MemberEditor />} />
+      <Route path=":id" element={<MemberEditor />} />
+    </Routes>
+  );
 }
