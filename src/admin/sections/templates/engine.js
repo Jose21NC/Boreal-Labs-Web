@@ -1,8 +1,8 @@
 // Puente entre el panel y el motor compartido (functions/certificate.js): carga plantillas, layout y
 // fuentes desde Storage con el MISMO orden de búsqueda que la Cloud Function, para que la vista previa
 // sea idéntica al certificado real.
-import { ref, getBytes, listAll, uploadBytes } from 'firebase/storage';
-import { collection, getDocs } from 'firebase/firestore';
+import { ref, getBytes, listAll, uploadBytes, deleteObject } from 'firebase/storage';
+import { collection, deleteDoc, doc, getDocs } from 'firebase/firestore';
 import { PDFDocument } from 'pdf-lib';
 import { db, storage } from '@/firebase';
 import {
@@ -224,4 +224,28 @@ export async function saveLayout(set, layout) {
   const blob = new Blob([JSON.stringify(json, null, 2)], { type: 'application/json' });
   await uploadBytes(ref(storage, `${setPath(set)}/layout.json`), blob, { contentType: 'application/json' });
   return json;
+}
+
+/** Todos los archivos bajo una carpeta, incluidas subcarpetas. */
+async function listDeep(storageRefDir) {
+  const res = await listAll(storageRefDir);
+  const nested = await Promise.all(res.prefixes.map(listDeep));
+  return [...res.items, ...nested.flat()];
+}
+
+/**
+ * Borra una carpeta de plantillas (PDFs + layout.json) y quita su asignación en los eventos
+ * (esos eventos pasan a la plantilla automática). Nunca la raíz: es el respaldo de todas.
+ * @returns {Promise<{files: number, events: string[]}>}
+ */
+export async function deleteTemplateSet(set, events = []) {
+  const cleaned = normalizeTemplateSet(set);
+  if (!cleaned) throw new Error('No se puede eliminar la carpeta raíz.');
+  const files = await listDeep(ref(storage, setPath(cleaned)));
+  await Promise.all(files.map((f) => deleteObject(f)));
+  await Promise.all(events.map((name) => deleteDoc(doc(db, 'eventTemplates', encodeURIComponent(name)))));
+  try {
+    localStorage.setItem(LOCAL_SETS_KEY, JSON.stringify(readLocalSets().filter((s) => s !== cleaned)));
+  } catch { /* modo privado */ }
+  return { files: files.length, events };
 }

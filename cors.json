@@ -3,10 +3,19 @@
     "origin": [
       "http://localhost:3000",
       "http://127.0.0.1:3000",
-      "https://borealabs.org"
+      "https://borealabs.org",
+      "https://www.borealabs.org"
     ],
-    "method": ["GET", "HEAD", "OPTIONS"],
-    "responseHeader": ["Content-Type", "Authorization", "x-goog-resumable"],
+    "method": [
+      "GET",
+      "HEAD",
+      "OPTIONS"
+    ],
+    "responseHeader": [
+      "Content-Type",
+      "Authorization",
+      "x-goog-resumable"
+    ],
     "maxAgeSeconds": 3600
   }
 ]

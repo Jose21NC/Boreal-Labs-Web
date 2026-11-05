@@ -1,13 +1,13 @@
 // Certificados emitidos: búsqueda, filtros, enlaces de validación, descarga y PDF combinado por evento.
 import React, { useDeferredValue, useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Award, Copy, Download, ExternalLink, FileStack, FileDown, Sparkles, CalendarDays } from 'lucide-react';
+import { Award, Copy, Download, ExternalLink, FileStack, FileDown, Sparkles, CalendarDays, Trash2 } from 'lucide-react';
 import {
-  Badge, Button, Card, Checkbox, EmptyState, PageHeader, SearchInput, Select, Skeleton, StatCard, Table, TD, TH, THead, TR,
+  Badge, Button, Card, Checkbox, EmptyState, PageHeader, SearchInput, Select, Skeleton, StatCard, Table, TD, TH, THead, TR, useDangerConfirm,
 } from '@/admin/ui';
 import { useToast } from '@/components/ui/use-toast';
 import { downloadCsv, formatDate, logActivity, normalize, toDate, validationUrlFor } from '@/admin/lib';
-import { callFunction, getCallableErrorMessage, loadCertificates, loadPointsByEmail } from './api';
+import { callFunction, deleteCertificates, getCallableErrorMessage, loadCertificates, loadPointsByEmail } from './api';
 import PointsCell from './PointsCell';
 
 const PAGE = 100;
@@ -50,10 +50,37 @@ export default function CertificateList() {
   const [limit, setLimit] = useState(PAGE);
   const [merging, setMerging] = useState(false);
   const [points, setPoints] = useState(null);
+  const [deleting, setDeleting] = useState(false);
+  const confirmDanger = useDangerConfirm();
 
   const load = useCallback(async () => setRows(await loadCertificates()), []);
   useEffect(() => { load(); }, [load]);
   useEffect(() => { loadPointsByEmail().then(setPoints); }, []);
+
+  const removeSelected = async () => {
+    const list = selectedRows;
+    const n = list.length;
+    const ok = await confirmDanger({
+      title: `¿Eliminar ${n} certificado${n === 1 ? '' : 's'}?`,
+      description: 'Se borran el registro y el PDF. Sus códigos de validación dejarán de funcionar y los puntos otorgados no se revierten.',
+      phrase: n === 1 ? list[0].correoUsuario : `ELIMINAR ${n}`,
+      confirmLabel: 'Eliminar certificados',
+    });
+    if (!ok) return;
+    setDeleting(true);
+    try {
+      await deleteCertificates(list);
+      await logActivity('certificados.eliminados', n === 1 ? `Eliminó el certificado de ${list[0].nombreUsuario || list[0].correoUsuario} ("${list[0].nombreEvento}")` : `Eliminó ${n} certificados`, { ids: list.map((r) => r.id).slice(0, 50) });
+      const ids = new Set(list.map((r) => r.id));
+      setRows((prev) => prev.filter((r) => !ids.has(r.id)));
+      setSelected(new Set());
+      toast({ title: 'Certificados eliminados', description: `${n} eliminado${n === 1 ? '' : 's'}` });
+    } catch (error) {
+      toast({ title: 'No se pudieron eliminar', description: error?.message, variant: 'destructive' });
+    } finally {
+      setDeleting(false);
+    }
+  };
 
   const setEvent = (value) => {
     const next = new URLSearchParams(params);
@@ -145,6 +172,7 @@ export default function CertificateList() {
             <span className="text-adm-text">{selectedRows.length} seleccionados</span>
             <Button size="sm" variant="ghost" onClick={() => copy(selectedRows.map((r) => validationUrlFor(r.idValidacion)).join('\n'), 'Enlaces copiados')}><Copy className="h-3.5 w-3.5" aria-hidden="true" />Copiar enlaces</Button>
             <Button size="sm" variant="ghost" onClick={() => downloadCsv('certificados-seleccion', CSV_COLUMNS, selectedRows)}><FileDown className="h-3.5 w-3.5" aria-hidden="true" />Exportar CSV</Button>
+            <Button size="sm" variant="danger-ghost" loading={deleting} onClick={removeSelected}><Trash2 className="h-3.5 w-3.5" aria-hidden="true" />Eliminar</Button>
             <Button size="sm" variant="ghost" onClick={() => setSelected(new Set())}>Quitar selección</Button>
           </div>
         )}

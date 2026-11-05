@@ -5,7 +5,7 @@ import { ArrowLeft, Award, CalendarDays, Eye, EyeOff, MapPin, RefreshCw, Trash2,
 import { Badge, Button, Card, CardBody, EmptyState, PageHeader, Skeleton, StatCard, Tabs } from '@/admin/ui';
 import { formatDate, formatDateTime, logActivity } from '@/admin/lib';
 import { useToast } from '@/components/ui/use-toast';
-import { useConfirm } from '@/admin/ui';
+import { useConfirm, useDangerConfirm } from '@/admin/ui';
 import { useEventsStore } from './store';
 import { STATUS } from './data';
 import { deleteEvent, recalcCounts, saveManualEvent, savePublicEvent, setEventFlags } from './actions';
@@ -21,6 +21,7 @@ export default function EventDetail() {
   const tab = params.get('tab') === 'detalles' ? 'detalles' : 'inscritos';
   const navigate = useNavigate();
   const confirm = useConfirm();
+  const confirmDanger = useDangerConfirm();
   const { toast } = useToast();
   const [busy, setBusy] = useState(null);
 
@@ -71,11 +72,11 @@ export default function EventDetail() {
   });
 
   const remove = async () => {
-    const ok = await confirm({
+    const ok = await confirmDanger({
       title: `¿Eliminar "${g.name}"?`,
-      description: `Se eliminarán el evento${g.total ? ` y sus ${g.total} registros` : ''}. Los certificados ya emitidos no se tocan. Esta acción no se puede deshacer.`,
+      description: `Se eliminarán el evento${g.total ? ` y sus ${g.total} registros` : ''}. Los certificados ya emitidos no se tocan.`,
+      phrase: g.name,
       confirmLabel: 'Eliminar evento',
-      tone: 'danger',
     });
     if (!ok) return;
     const deleted = await run('delete', () => deleteEvent(g), {

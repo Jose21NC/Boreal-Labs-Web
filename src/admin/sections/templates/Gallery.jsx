@@ -1,10 +1,11 @@
 // Galería de carpetas de plantillas (cert-templates/<carpeta>/) con miniatura del certificado real.
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FileText, FolderPlus, LayoutTemplate } from 'lucide-react';
-import { Badge, Button, Card, EmptyState, Field, Input, Modal, PageHeader, SearchInput, Skeleton } from '@/admin/ui';
-import { normalize } from '@/admin/lib';
-import { loadTemplateSets, normalizeTemplateSet, rememberSet, renderPreview, resolveVariants, setLabel } from './engine';
+import { FileText, FolderPlus, LayoutTemplate, Trash2 } from 'lucide-react';
+import { Badge, Button, Card, EmptyState, Field, Input, Modal, PageHeader, SearchInput, Skeleton, useDangerConfirm } from '@/admin/ui';
+import { useToast } from '@/components/ui/use-toast';
+import { logActivity, normalize } from '@/admin/lib';
+import { deleteTemplateSet, loadTemplateSets, normalizeTemplateSet, rememberSet, renderPreview, resolveVariants, setLabel } from './engine';
 import { renderFirstPage } from './pdfImage';
 
 export const editorPath = (set) => `/admin/plantillas/editar/${set ? set.split('/').map(encodeURIComponent).join('/') : '~'}`;
@@ -41,7 +42,7 @@ function Thumb({ set }) {
   return <img src={state.url} alt={`Ejemplo de certificado de ${setLabel(set)}`} className="aspect-[1.414] w-full bg-white object-contain" />;
 }
 
-function SetCard({ set, files, rootFiles, events, onOpen }) {
+function SetCard({ set, files, rootFiles, events, onOpen, onDelete }) {
   const variants = resolveVariants(files, set ? rootFiles : []);
   return (
     <Card className="overflow-hidden">
@@ -72,6 +73,11 @@ function SetCard({ set, files, rootFiles, events, onOpen }) {
           </p>
         </div>
       </button>
+      {onDelete && (
+        <div className="flex justify-end border-t border-adm-border px-3 py-2">
+          <Button size="sm" variant="danger-ghost" onClick={onDelete}><Trash2 className="h-3.5 w-3.5" aria-hidden="true" />Eliminar carpeta</Button>
+        </div>
+      )}
     </Card>
   );
 }
@@ -83,6 +89,8 @@ export default function Gallery() {
   const [newOpen, setNewOpen] = useState(false);
   const [newName, setNewName] = useState('');
   const [newError, setNewError] = useState('');
+  const confirmDanger = useDangerConfirm();
+  const { toast } = useToast();
 
   const load = useCallback(async () => setData(await loadTemplateSets()), []);
   useEffect(() => { load(); }, [load]);
@@ -92,6 +100,24 @@ export default function Gallery() {
     const q = normalize(search);
     return data.sets.filter((s) => !q || normalize(s.name).includes(q) || s.events.some((e) => normalize(e).includes(q)));
   }, [data, search]);
+
+  const removeSet = async (s) => {
+    const ok = await confirmDanger({
+      title: `¿Eliminar la carpeta "${s.name}"?`,
+      description: `Se borran sus ${s.files.length} archivo(s) (PDFs y diseño) de Storage.${s.events.length ? ` ${s.events.length} evento(s) que la usan pasarán a la plantilla automática.` : ''} Los certificados ya emitidos no cambian.`,
+      phrase: s.name,
+      confirmLabel: 'Eliminar carpeta',
+    });
+    if (!ok) return;
+    try {
+      const res = await deleteTemplateSet(s.name, s.events);
+      await logActivity('plantillas.eliminada', `Eliminó la carpeta de plantillas "${s.name}" (${res.files} archivos)`, { set: s.name, events: res.events });
+      toast({ title: 'Carpeta eliminada', description: s.name });
+      load();
+    } catch (error) {
+      toast({ title: 'No se pudo eliminar', description: error?.message, variant: 'destructive' });
+    }
+  };
 
   const createSet = () => {
     const cleaned = normalizeTemplateSet(newName);
@@ -122,7 +148,7 @@ export default function Gallery() {
             <SetCard set="" files={data.rootFiles} rootFiles={data.rootFiles} events={[]} onOpen={() => navigate(editorPath(''))} />
           )}
           {visible.map((s) => (
-            <SetCard key={s.name} set={s.name} files={s.files} rootFiles={data.rootFiles} events={s.events} onOpen={() => navigate(editorPath(s.name))} />
+            <SetCard key={s.name} set={s.name} files={s.files} rootFiles={data.rootFiles} events={s.events} onOpen={() => navigate(editorPath(s.name))} onDelete={() => removeSet(s)} />
           ))}
           {search && !visible.length && (
             <Card className="sm:col-span-2 xl:col-span-3">

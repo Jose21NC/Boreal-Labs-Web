@@ -376,11 +376,14 @@ const ConfirmContext = createContext(null);
 
 export function ConfirmProvider({ children }) {
   const [state, setState] = useState(null);
-  const confirm = useCallback((options) => new Promise((resolve) => setState({ ...options, resolve })), []);
+  const [typed, setTyped] = useState('');
+  const confirm = useCallback((options) => new Promise((resolve) => { setTyped(''); setState({ ...options, resolve }); }), []);
   const close = (result) => {
     state?.resolve(result);
     setState(null);
   };
+  // `typeToConfirm`: el botón solo se habilita al escribir ese texto exacto (segunda confirmación).
+  const blocked = !!state?.typeToConfirm && typed.trim() !== state.typeToConfirm;
   return (
     <ConfirmContext.Provider value={confirm}>
       {children}
@@ -393,13 +396,19 @@ export function ConfirmProvider({ children }) {
         footer={(
           <>
             <Button variant="ghost" onClick={() => close(false)}>{state?.cancelLabel || 'Cancelar'}</Button>
-            <Button variant={state?.tone === 'danger' ? 'danger' : 'primary'} onClick={() => close(true)}>
+            <Button variant={state?.tone === 'danger' ? 'danger' : 'primary'} disabled={blocked} onClick={() => close(true)}>
               {state?.confirmLabel || 'Confirmar'}
             </Button>
           </>
         )}
       >
         {state?.body || null}
+        {state?.typeToConfirm && (
+          <form onSubmit={(e) => { e.preventDefault(); if (!blocked) close(true); }} className="mt-3 space-y-1.5">
+            <Label htmlFor="confirm-type">Escribe <span className="font-mono normal-case text-adm-text">{state.typeToConfirm}</span> para confirmar</Label>
+            <Input id="confirm-type" value={typed} onChange={(e) => setTyped(e.target.value)} autoComplete="off" spellCheck={false} />
+          </form>
+        )}
       </Modal>
     </ConfirmContext.Provider>
   );
@@ -407,3 +416,22 @@ export function ConfirmProvider({ children }) {
 
 /** `const confirm = useConfirm(); if (await confirm({ title, description, tone: 'danger' })) …` */
 export const useConfirm = () => useContext(ConfirmContext);
+
+/**
+ * Doble confirmación para borrados irreversibles: primero un aviso, luego escribir `phrase`.
+ * `const confirmDanger = useDangerConfirm(); if (await confirmDanger({ title, description, phrase })) …`
+ */
+export function useDangerConfirm() {
+  const confirm = useConfirm();
+  return useCallback(async ({ title, description, phrase, confirmLabel = 'Eliminar' }) => {
+    const first = await confirm({ title, description, tone: 'danger', confirmLabel: 'Continuar' });
+    if (!first) return false;
+    return confirm({
+      title: 'Confirmación final',
+      description: 'Esta acción no se puede deshacer.',
+      tone: 'danger',
+      confirmLabel,
+      typeToConfirm: phrase,
+    });
+  }, [confirm]);
+}

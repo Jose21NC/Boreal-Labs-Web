@@ -1,7 +1,8 @@
 // Datos y llamadas de la sección Certificados.
-import { collection, doc, getDocs, serverTimestamp, setDoc } from 'firebase/firestore';
+import { collection, doc, getDocs, serverTimestamp, setDoc, writeBatch } from 'firebase/firestore';
+import { deleteObject, ref as storageRef } from 'firebase/storage';
 import { getFunctions, httpsCallable } from 'firebase/functions';
-import { auth, db } from '@/firebase';
+import { auth, db, storage } from '@/firebase';
 import { isPresent, toDate } from '@/admin/lib';
 import { resolveRole } from '../../../../functions/roles.js';
 import { peopleByEmail } from '../points/wallet';
@@ -92,4 +93,27 @@ export function eligibility(event, certificados) {
     out.byRole[rol] = (out.byRole[rol] || 0) + 1;
   });
   return out;
+}
+
+/** Ruta en Storage a partir de la URL de descarga (…/o/<ruta codificada>?alt=media…). */
+const storagePathFromUrl = (url) => {
+  const m = String(url || '').match(/\/o\/([^?]+)/);
+  return m ? decodeURIComponent(m[1]) : null;
+};
+
+/**
+ * Elimina certificados (doc + PDF). El código de validación deja de funcionar.
+ * Los puntos otorgados al emitirlos NO se revierten.
+ */
+export async function deleteCertificates(rows) {
+  for (let i = 0; i < rows.length; i += 450) {
+    const batch = writeBatch(db);
+    rows.slice(i, i + 450).forEach((r) => batch.delete(doc(db, 'certificados', r.id)));
+    await batch.commit();
+  }
+  // El PDF se borra después: si falla, solo queda un archivo huérfano, nunca un certificado sin PDF.
+  await Promise.all(rows.map((r) => {
+    const path = storagePathFromUrl(r.urlPdf);
+    return path ? deleteObject(storageRef(storage, path)).catch(() => {}) : null;
+  }));
 }
