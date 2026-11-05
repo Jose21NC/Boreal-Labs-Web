@@ -28,7 +28,7 @@ const IS_DEMO = import.meta.env.MODE === 'demo';
 import { RecaptchaContext } from '@/App.jsx';
 // --- MODIFICACIÓN 1: Imports de Firebase ---
 import { db, storage } from '@/firebase.jsx'; // Asegúrate que la ruta sea correcta
-import { collection, getDocs, query, orderBy, serverTimestamp, doc, getDoc, setDoc, writeBatch, increment } from 'firebase/firestore';
+import { collection, getDocs, query, orderBy, serverTimestamp, doc, getDoc, writeBatch, increment } from 'firebase/firestore';
 import { useFormGuard, EMAIL_RE } from '@/lib/antiSpam';
 import { ref as storageRef, getDownloadURL, uploadBytes } from 'firebase/storage';
 import EventCustomFields, { FieldShell, OptionCards, inputCls } from '@/components/EventCustomFields';
@@ -174,18 +174,17 @@ const EventRegistrationForm = ({ event, onSuccess, onShowConfirmation }) => {
         // Mayúsculas y sin espacios, igual que lo guarda el admin en eventSecrets (ver normalizeCode).
         ...(event.requiresCode ? { accessCode: normalizeCode(accessCode) } : {}),
       };
-      try {
-        await writeBatch(db)
-          .set(regRef, payload)
-          .update(doc(db, 'events', event.id), { registeredCount: increment(1), lastRegistrationId: regRef.id })
-          .commit();
-      } catch (batchError) {
-        if (batchError?.code !== 'permission-denied') throw batchError;
-        // Reglas anteriores (sin permiso público sobre events): guardar solo la inscripción.
-        // Con las reglas del repo esto también se rechaza (exigen el +1 en el mismo batch), así que no salta el cupo.
-        // shortcut: el contador no sube en este caso; "Recalcular cupo" en el admin lo corrige. Quitar al desplegar firestore.rules.
-        await setDoc(regRef, payload);
+      // Cupo con el dato fresco del servidor (no el de cuando se abrió la página): así un rechazo posterior
+      // de las reglas casi siempre significa "ya inscrito" y el mensaje puede ser claro.
+      const fresh = (await getDoc(doc(db, 'events', event.id))).data() || {};
+      const cap = Number(fresh.capacity);
+      if (fresh.soldOut === true || (Number.isFinite(cap) && cap > 0 && (Number(fresh.registeredCount) || 0) >= cap)) {
+        throw Object.assign(new Error('Sin cupos'), { code: 'full' });
       }
+      await writeBatch(db)
+        .set(regRef, payload)
+        .update(doc(db, 'events', event.id), { registeredCount: increment(1), lastRegistrationId: regRef.id })
+        .commit();
 
       toast({
         title: "¡Registro Exitoso!",
@@ -217,11 +216,11 @@ const EventRegistrationForm = ({ event, onSuccess, onShowConfirmation }) => {
       console.error("Error al registrar: ", error);
       toast({
         title: "Error en el registro",
-        description: error?.code === 'permission-denied'
-          ? event.requiresCode
-            ? "Código incorrecto, ya estás registrado con este correo o no quedan cupos."
-            : "Es posible que ya estés registrado con este correo o que no queden cupos."
-          : "Hubo un problema al enviar tu registro. Intenta de nuevo.",
+        description: error?.code === 'full'
+          ? "Ya no quedan cupos para este evento."
+          : error?.code === 'permission-denied'
+            ? "Ya existe una inscripción con este correo para este evento. Si crees que es un error, escríbenos a contacto@borealabs.org."
+            : "Hubo un problema al enviar tu registro. Intenta de nuevo.",
         variant: "destructive",
       });
     } finally {
