@@ -18,7 +18,7 @@ service firebase.storage {
     // Comprobantes de asistencia: subida pública, solo crear, imagen < 5 MB.
     match /attendance-proofs/{file} {
       allow create: if request.resource.size < 5 * 1024 * 1024
-        && request.resource.contentType.matches('image/.*');
+        && request.resource.contentType.matches('image/(jpeg|png|webp|heic)');
       // get (no list): el formulario necesita getDownloadURL justo después de subir. La ruta lleva timestamp + nombre.
       allow get: if true;
       allow list, update, delete: if isAdmin();
@@ -27,7 +27,7 @@ service firebase.storage {
     // Imágenes que adjunta quien se inscribe a un evento (campos personalizados tipo imagen).
     match /registration-uploads/{eventId}/{file} {
       allow create: if request.resource.size < 5 * 1024 * 1024
-        && request.resource.contentType.matches('image/.*');
+        && request.resource.contentType.matches('image/(jpeg|png|webp|heic)');
       allow get: if true;
       allow list, update, delete: if isAdmin();
     }
@@ -35,7 +35,7 @@ service firebase.storage {
     // Foto que sube un miembro desde su enlace de invitación (pendiente de aprobación).
     match /team-pending/{token}/{file} {
       allow create: if request.resource.size < 5 * 1024 * 1024
-        && request.resource.contentType.matches('image/.*')
+        && request.resource.contentType.matches('image/(jpeg|png|webp|heic)')
         && firestore.exists(/databases/(default)/documents/teamInvites/$(token));
       allow get: if true;
       allow list, update, delete: if isAdmin();
