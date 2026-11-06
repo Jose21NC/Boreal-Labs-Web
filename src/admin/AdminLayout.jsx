@@ -329,12 +329,12 @@ export default function AdminLayout() {
             </div>
           </header>
 
-          <main className="mx-auto w-full max-w-[1400px] px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
+          <div className="mx-auto w-full max-w-[1400px] px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
             {/* Fade + 6px al cambiar de sección (CSS: corre fuera del hilo principal mientras carga el chunk). */}
             <div key={current?.to || 'admin'} className={animateSections.current ? 'adm-enter' : undefined}>
               <Outlet />
             </div>
-          </main>
+          </div>
         </div>
 
         <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} setPref={setPref} />

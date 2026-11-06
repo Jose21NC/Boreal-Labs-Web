@@ -46,8 +46,9 @@ function App() {
           <ScrollToTop behavior="smooth" />
 
           <div className="min-h-screen flex flex-col bg-boreal-dark">
+            <a href="#contenido" className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[100] focus:rounded-lg focus:bg-white focus:p-3 focus:text-black">Saltar al contenido</a>
             <Navbar />
-            <main className="flex-grow">
+            <main id="contenido" tabIndex={-1} className="flex-grow focus:outline-none">
               <ErrorBoundary> {/* ErrorBoundary envuelve las Rutas */}
                 <Suspense
                   fallback={(
