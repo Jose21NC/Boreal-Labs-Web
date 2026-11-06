@@ -32,7 +32,7 @@ service cloud.firestore {
     }
 
     function validEmail(e) {
-      return e is string && e.size() <= 200 && e.matches('^[^@\\s/]+@[^@\\s/]+\\.[^@\\s/]+$');
+      return e is string && e.size() <= 200 && e == e.lower() && e.matches('^[^@\\s/]+@[^@\\s/]+\\.[^@\\s/]+$');
     }
 
     function str(field, max) {
