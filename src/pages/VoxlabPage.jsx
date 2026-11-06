@@ -184,7 +184,7 @@ export default function VoxlabPage() {
         </motion.header>
 
         {/* Hero */}
-        <main className="max-w-5xl mx-auto w-full px-4 pb-16 pt-8 sm:pt-12 flex flex-col items-center text-center">
+        <div className="max-w-5xl mx-auto w-full px-4 pb-16 pt-8 sm:pt-12 flex flex-col items-center text-center">
           <motion.div
             initial={{ opacity: 0, scale: 0.8, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -323,7 +323,7 @@ export default function VoxlabPage() {
             <InstallButton href={voxlabDownloadUrl} variant="section" />
           </motion.section>
 
-          </main>
+          </div>
 
         {/* Footer */}
         <motion.footer

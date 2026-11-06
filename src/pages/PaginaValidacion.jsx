@@ -96,6 +96,7 @@ const PaginaValidacion = () => {
     <>
       <Helmet>
         <title>Validar Certificado - Boreal Labs</title>
+        <meta name="robots" content="noindex, nofollow" />
         <meta name="description" content="Verifica la autenticidad de un certificado emitido por Boreal Labs." />
       </Helmet>
 

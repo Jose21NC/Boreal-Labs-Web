@@ -2,7 +2,7 @@ import React, { Suspense, lazy, useState, createContext } from 'react';
 import ErrorBoundary from '@/components/ErrorBoundary'; // Assuming you have this component
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 // Se importa HelmetProvider y Helmet (si necesitas Helmet global)
-import { HelmetProvider, Helmet } from 'react-helmet-async'; 
+import { HelmetProvider } from 'react-helmet-async'; 
 import { Toaster } from '@/components/ui/toaster';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
@@ -44,16 +44,11 @@ function App() {
         <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
           {/* Fuerza scroll al tope en cada navegación */}
           <ScrollToTop behavior="smooth" />
-          {/* --- CÓDIGO RESTAURADO: Helmet original --- */}
-          <Helmet>
-            <title>Boreal Labs - Juventud que Innova Transforma crea Nicaragua</title>
-            <meta name="description" content="Boreal Labs is a Nicaraguan youth-led non-profit fostering innovation and entrepreneurship through workshops, talks, and events." />
-          </Helmet>
-          {/* --- FIN CÓDIGO RESTAURADO --- */}
 
           <div className="min-h-screen flex flex-col bg-boreal-dark">
+            <a href="#contenido" className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[100] focus:rounded-lg focus:bg-white focus:p-3 focus:text-black">Saltar al contenido</a>
             <Navbar />
-            <main className="flex-grow">
+            <main id="contenido" tabIndex={-1} className="flex-grow focus:outline-none">
               <ErrorBoundary> {/* ErrorBoundary envuelve las Rutas */}
                 <Suspense
                   fallback={(

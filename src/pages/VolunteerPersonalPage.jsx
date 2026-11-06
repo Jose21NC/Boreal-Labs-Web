@@ -158,6 +158,7 @@ const VolunteerPersonalPage = () => {
 
       <Helmet>
         <title>Mi Resumen de Voluntariado - Boreal Labs</title>
+        <meta name="robots" content="noindex, nofollow" />
         <meta
           name="description"
           content="Consulta personal de horas, creditos e historial de asistencias del voluntariado Boreal Labs."

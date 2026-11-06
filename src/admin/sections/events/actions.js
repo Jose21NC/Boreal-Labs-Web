@@ -176,7 +176,7 @@ export async function savePublicEvent(existing, form, imageFile) {
   }
   if (!existing) {
     const ref = doc(collection(db, 'events'));
-    await withSecret(writeBatch(db).set(ref, { ...payload, registeredCount: 0, createdAt: serverTimestamp(), createdBy: me() }), ref.id).commit();
+    await withSecret(writeBatch(db).set(ref, { ...payload, registeredCount: 0, createdAt: serverTimestamp() }), ref.id).commit();
     return ref.id;
   }
   const batch = writeBatch(db).update(doc(db, 'events', existing.id), { ...payload, updatedAt: serverTimestamp(), updatedBy: me() });
