@@ -8,7 +8,7 @@ Sitio web de Boreal Labs construido con React + Vite, Tailwind CSS y Firebase. I
 - Tailwind CSS con diseño responsive y paleta de colores personalizada (boreal-*)
 - Componentes UI con Radix (AlertDialog, Dialog, Toast, Tabs, etc.) y tailwindcss-animate.
 - React Router v6 con rutas en español y redirecciones desde rutas antiguas.
-- Firebase (Firestore, Auth anónima, Storage, Analytics) listo para usar.
+- Firebase (Firestore, Auth, Storage) listo para usar; Auth anónima es opt-in (`VITE_ENABLE_ANON_AUTH=true`).
 - ReCAPTCHA v2 (clave configurable por variable de entorno).
 - Alias de importación `@` apuntando a `src`.
 
@@ -131,8 +131,8 @@ El directorio `dist/` es estático y puede desplegarse en:
 
 ## 🔒 Firebase y autenticación
 
-- `src/firebase.jsx` inicializa Firebase (Firestore, Auth, Storage, Analytics).
-- Se intenta iniciar sesión anónima al cargar la app. Asegúrate de permitir Auth anónima en la consola de Firebase si la necesitas.
+- `src/firebase.jsx` inicializa Firebase (Firestore, Auth, Storage) solo si la config `VITE_FIREBASE_*` está completa.
+- La sesión anónima solo se intenta si `VITE_ENABLE_ANON_AUTH=true`. Si la usas, permite Auth anónima en la consola de Firebase.
 - Considera mover las claves a `.env` para producción.
 
 ## 🎨 Tailwind y diseño
@@ -144,7 +144,8 @@ El directorio `dist/` es estático y puede desplegarse en:
 ## 🧩 Calidad y scripts
 
 - Linter: ESLint instalado (sin script dedicado en package.json). Puedes ejecutar ESLint con configuración propia si lo deseas.
-- No hay tests configurados por defecto.
+- Tests: `cd functions && npm test` (correo y certificados en `functions/`). El frontend no tiene tests.
+- Modo de prueba del panel admin: `npm run dev:demo` (`vite --mode demo`, datos en memoria).
 
 ## 🤝 Contribuir
 

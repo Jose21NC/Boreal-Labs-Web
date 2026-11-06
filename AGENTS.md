@@ -11,7 +11,7 @@ npm run build     # vite build
 npm run preview   # sirve dist/ en puerto 3000
 ```
 
-- **No hay tests, ni script de lint, ni typecheck.** ESLint está instalado pero sin config en el repo (`eslint` + `eslint-config-react-app`, sin `.eslintrc*`). No inventes `npm test` ni `npm run lint`.
+- **Tests solo en `functions/`** (`cd functions && npm test`). El frontend no tiene tests, ni script de lint, ni typecheck. ESLint está instalado pero sin config en el repo (`eslint` + `eslint-config-react-app`, sin `.eslintrc*`). No inventes `npm test` ni `npm run lint`.
 - `node_modules/` no está instalado en el checkout por defecto.
 
 ## Variables de entorno (gotcha importante)
