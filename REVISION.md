@@ -224,3 +224,25 @@ Etiquetas: **[Auto]** un modelo pequeño lo aplica sin decisiones de producto ni
 | **Total** | **33** | **12** | **20** | **1** |
 
 Auto: R-11, R-13, R-17, R-18, R-19, R-20, R-21, R-23 (Medio); R-26, R-28, R-29, R-32 (Bajo). Mixto: R-08 (`npm audit fix` = Auto; majors de `nodemailer`/`firebase-admin` = Manual). Recordatorio: los cambios en reglas/Functions requieren despliegue manual por el dueño.
+
+---
+
+## Estado de aplicación
+
+Aplicados los hallazgos [Auto] en la rama `claude/aplicar-revision-614728`. Build (`npx vite build --outDir /tmp/build-aplicar`) y `cd functions && npm test` (9/9) pasan. Las reglas (`firestore.rules`, `storage.rules`) y `functions/` solo surten efecto al desplegarlos (acción manual del dueño).
+
+| ID | Estado | Nota |
+|---|---|---|
+| R-08 | Aplicado (parcial) | `npm audit fix` sin `--force` en raíz y `functions/`. Quedan vulnerabilidades que requieren majors (**[Manual]**: `nodemailer@10`, `firebase-admin@14`). |
+| R-11 | Aplicado | Plantilla, layout y fuentes se cachean por ejecución (`functions/index.js`). |
+| R-13 | Aplicado | `validEmail` exige minúsculas en `firestore.rules`. |
+| R-17 | Aplicado (parcial) | Tipos de imagen limitados a jpeg/png/webp/heic (sin SVG). **Omitido:** la comprobación de `active`/`expiresAt` en `team-pending` (requiere confirmar el esquema real de `teamInvites`). |
+| R-18 | Aplicado | Ya no se escribe `createdBy` en `events`. **Pendiente:** limpiar los `createdBy` de documentos existentes (script admin, no automatizable aquí). |
+| R-19 | Omitido | Las consultas leen documentos completos porque la lógica los necesita (`certKeys`, presentes por evento). Pasarlas a conteos cambia el cálculo; requiere rediseño. |
+| R-20 | Aplicado (parcial) | Helmet global en inglés eliminado, favicon con tipo correcto, `og:url`, `twitter:card`, `noindex` en validación y resumen personal, sitemap completado (se quitó `/validacion`). **Omitido:** `og:image` 1200×630 (no hay imagen en el repo). |
+| R-21 | Aplicado (parcial) | `<main>` anidados eliminados y enlace "Saltar al contenido". **Omitido:** objetivos táctiles ≥44 px y contraste WCAG (requieren revisión visual y medición). |
+| R-23 | Aplicado | 7 dependencias sin uso desinstaladas; 5 scripts huérfanos y `.htacces` eliminados. |
+| R-26 | Aplicado | `esbuild.pure` elimina `console.log`/`console.debug` en build; `warn`/`error` se conservan. |
+| R-28 | Omitido | No expresable en reglas (límite por valor). Requiere validación en la callable de R-03 o en el formulario; no es [Auto]. |
+| R-29 | Aplicado | HTML con `Cache-Control: no-cache` en `public/.htaccess`. |
+| R-32 | Aplicado | README y AGENTS.md actualizados (tests en `functions/`, modo demo, auth anónima opt-in, sin Analytics). |
