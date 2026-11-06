@@ -19,6 +19,8 @@ export default defineConfig(({ command, mode }) => {
     // Permite publicar assets en un CDN si se define VITE_ASSET_BASE.
     // Ejemplo: VITE_ASSET_BASE=https://cdn.tudominio.com/
     base: process.env.VITE_ASSET_BASE || '/',
+    // Quita console.log/debug en build de producción; console.warn y console.error se conservan.
+    esbuild: { pure: command === 'build' ? ['console.log', 'console.debug'] : [] },
     plugins: [
       react(),
       ViteImageOptimizer({
