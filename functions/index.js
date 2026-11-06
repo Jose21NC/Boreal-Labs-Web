@@ -132,6 +132,34 @@ export const generateCertificates = onCall({ cors: true, region: 'us-central1', 
   const templateSetSafe = normalizeTemplateSet(templateSet) || normalizeTemplateSet(inferredTemplateSet);
   const templateRoot = templateSetSafe ? `cert-templates/${templateSetSafe}` : 'cert-templates';
 
+  // Plantillas, layout y fuentes se descargan una sola vez por ejecución (cachear la promesa).
+  // shortcut: un fallo de descarga queda cacheado como null durante esta ejecución; reintentar en la siguiente.
+  const optionalCache = new Map();
+  const loadOptional = (path) => {
+    if (!optionalCache.has(path)) {
+      optionalCache.set(path, (async () => {
+        try {
+          const file = bucket.file(path);
+          const [exists] = await file.exists();
+          if (!exists) return null;
+          const [buf] = await file.download();
+          return buf;
+        } catch {
+          return null;
+        }
+      })());
+    }
+    return optionalCache.get(path);
+  };
+
+  const loadFirst = async (paths) => {
+    for (const p of paths) {
+      const buf = await loadOptional(p);
+      if (buf) return { buf, path: p };
+    }
+    return null;
+  };
+
   for (const r of regs) {
     if (!isPresent(r.statusAsistencia)) continue; // solo presentes
     const email = (r.userEmail || '').toLowerCase();
@@ -143,27 +171,6 @@ export const generateCertificates = onCall({ cors: true, region: 'us-central1', 
 
     try {
       const idValidacion = (globalThis.crypto?.randomUUID?.() || `${Date.now()}_${Math.random().toString(36).slice(2,8)}`);
-
-      // Helpers para cargar archivos opcionales de Storage
-      const loadOptional = async (path) => {
-        try {
-          const file = bucket.file(path);
-          const [exists] = await file.exists();
-          if (!exists) return null;
-          const [buf] = await file.download();
-          return buf;
-        } catch {
-          return null;
-        }
-      };
-
-      const loadFirst = async (paths) => {
-        for (const p of paths) {
-          const buf = await loadOptional(p);
-          if (buf) return { buf, path: p };
-        }
-        return null;
-      };
 
       const layoutPick = await loadFirst([
         `${templateRoot}/layout.json`,
