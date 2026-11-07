@@ -38,6 +38,7 @@ export const publicFormFrom = (ev = {}, categories = []) => {
     visible: ev.visible !== false,
     soldOut: ev.soldOut === true || ev.isFull === true || ev.cupoLleno === true,
     confirmationEmail: ev.confirmationEmail !== false,
+    remindersEnabled: ev.remindersEnabled === true,
     emailSubject: String(ev.emailSubject || ''),
     emailBody: String(ev.emailBody || ''),
     formFields: (Array.isArray(ev.formFields) ? ev.formFields : []).map((f) => ({ ...f, options: f.options ? [...f.options] : undefined })),
@@ -212,6 +213,17 @@ export function PublicEventForm({ initial, onSubmit, submitting, submitLabel = '
         <div className="flex items-center gap-3">
           <Switch checked={form.confirmationEmail} onChange={set('confirmationEmail')} label="Enviar correo de confirmación al inscribirse" />
           <span className="text-sm text-adm-text">Enviar correo de confirmación al inscribirse</span>
+        </div>
+        <div className="flex items-start gap-3">
+          <Switch checked={form.remindersEnabled} onChange={set('remindersEnabled')} label="Recordatorio automático por correo" />
+          <span className="text-sm text-adm-text">
+            Recordatorio automático por correo
+            <span className="block text-xs text-adm-muted">
+              {form.time || form.timeLegacy
+                ? 'Presencial: 1 día antes. Virtual: 15 minutos antes (con el enlace de Meet).'
+                : 'Necesita una hora de inicio para poder programarse.'}
+            </span>
+          </span>
         </div>
       </div>
 

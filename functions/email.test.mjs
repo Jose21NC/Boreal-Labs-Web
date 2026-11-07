@@ -165,3 +165,18 @@ test('hora: selector HH:mm, formato visible y texto no reconocido se conserva', 
   assert.equal(formatEventTime('00:30'), '12:30 a. m.');
   assert.equal(formatEventTime('de 2 a 4'), 'de 2 a 4');
 });
+
+test('recordatorios: presencial 1 día antes, virtual 15 min antes, una sola vez y nunca después del inicio', async () => {
+  const { duePhases, isVirtualReg } = await import('./reminders.js');
+  const start = new Date('2026-12-01T20:00:00Z');
+  const ev = { remindersEnabled: true, startAt: start };
+  const at = (iso) => new Date(iso).getTime();
+  assert.deepEqual(duePhases(ev, at('2026-11-30T19:00:00Z')), []); // 25 h antes
+  assert.deepEqual(duePhases(ev, at('2026-11-30T20:05:00Z')), ['presencial']);
+  assert.deepEqual(duePhases({ ...ev, reminderPresencialSentAt: new Date() }, at('2026-12-01T19:46:00Z')), ['virtual']);
+  assert.deepEqual(duePhases({ ...ev, reminderPresencialSentAt: 1, reminderVirtualSentAt: 1 }, at('2026-12-01T19:50:00Z')), []);
+  assert.deepEqual(duePhases(ev, at('2026-12-01T20:01:00Z')), []); // ya empezó
+  assert.deepEqual(duePhases({ ...ev, remindersEnabled: false }, at('2026-12-01T19:50:00Z')), []);
+  assert.equal(isVirtualReg({ tipoAsistencia: 'Virtual' }), true);
+  assert.equal(isVirtualReg({ tipoAsistencia: 'Presencial' }), false);
+});

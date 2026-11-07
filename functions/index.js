@@ -6,7 +6,9 @@ import { getFirestore, FieldValue } from 'firebase-admin/firestore';
 import { getStorage } from 'firebase-admin/storage';
 import { getAuth } from 'firebase-admin/auth';
 import { PDFDocument } from 'pdf-lib';
-import { certificateEmail, customEmail, registrationEmail, sendOnce } from './email.js';
+import { certificateEmail, customEmail, registrationEmail, reminderEmail, sendOnce } from './email.js';
+import { onSchedule } from 'firebase-functions/v2/scheduler';
+import { LOOKAHEAD_MS, duePhases, isVirtualReg } from './reminders.js';
 import Anthropic from '@anthropic-ai/sdk';
 import { buildAiPrompt } from './aiText.js';
 import {
@@ -498,3 +500,34 @@ export const generateText = onCall({ cors: true, region: 'us-central1', secrets:
   if (!text) throw new HttpsError('internal', 'La IA devolvió una respuesta vacía.');
   return { text: text.slice(0, prompt.maxChars) };
 });
+
+// ---------------- Recordatorios automáticos (opcional por evento: events.remindersEnabled) ----------------
+// Cada 5 min mira solo los eventos que empiezan en las próximas 25 h (consulta por startAt). Los inscritos se
+// leen únicamente cuando toca una tanda (presencial 1 día antes, virtual 15 min antes), una vez por tanda.
+export const sendEventReminders = onSchedule(
+  { schedule: 'every 5 minutes', timeZone: 'America/Managua', region: 'us-central1', secrets: [SMTP_PASSWORD], timeoutSeconds: 300, maxInstances: 1, retryCount: 0 },
+  async () => {
+    const now = Date.now();
+    const snap = await db.collection('events')
+      .where('startAt', '>=', new Date(now))
+      .where('startAt', '<=', new Date(now + LOOKAHEAD_MS))
+      .get();
+    for (const evDoc of snap.docs) {
+      const ev = evDoc.data();
+      const phases = duePhases(ev, now);
+      if (!phases.length) continue;
+      const regs = await db.collection('registrations').where('eventId', '==', evDoc.id).get();
+      for (const phase of phases) {
+        let sent = 0;
+        for (const regDoc of regs.docs) {
+          if ((phase === 'virtual') !== isVirtualReg(regDoc.data())) continue;
+          // Campo propio por tanda: si la corrida se corta a la mitad, la siguiente no duplica correos.
+          const result = await sendOnce(db, regDoc.ref, async (reg) => reminderEmail(reg, ev, phase), { password: SMTP_PASSWORD.value(), field: `reminder_${phase}` });
+          if (result === 'sent') sent += 1;
+        }
+        await evDoc.ref.update({ [phase === 'virtual' ? 'reminderVirtualSentAt' : 'reminderPresencialSentAt']: FieldValue.serverTimestamp() });
+        console.log(`[recordatorios] ${evDoc.id} ${phase}: ${sent} enviados`);
+      }
+    }
+  },
+);

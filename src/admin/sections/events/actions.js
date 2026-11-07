@@ -7,6 +7,7 @@ import { getDownloadURL, ref as storageRef, uploadBytes } from 'firebase/storage
 import { auth, db, storage } from '@/firebase';
 import { cleanFields, normalizeCode } from '@/lib/eventForms';
 import { attendanceValue } from './data';
+import { eventStart } from '../../../../functions/eventTime.js';
 
 const CHUNK = 450; // límite de 500 operaciones por batch, con margen
 
@@ -154,6 +155,9 @@ export async function savePublicEvent(existing, form, imageFile) {
     visible: form.visible,
     soldOut: form.soldOut,
     confirmationEmail: form.confirmationEmail !== false,
+    // Recordatorios automáticos (Function sendEventReminders): necesitan el instante exacto de inicio.
+    remindersEnabled: form.remindersEnabled === true,
+    startAt: eventStart(dateFromInput(form.date), form.time || form.timeLegacy) || null,
     // Vacío = correo por defecto (functions/emailTemplates.js#registrationEmail).
     emailSubject: (form.emailSubject || '').trim().slice(0, 200),
     emailBody: (form.emailBody || '').trim().slice(0, 5000),
@@ -180,6 +184,10 @@ export async function savePublicEvent(existing, form, imageFile) {
     await withSecret(writeBatch(db).set(ref, { ...payload, registeredCount: 0, createdAt: serverTimestamp() }), ref.id).commit();
     return ref.id;
   }
+  // Si cambió el inicio, los recordatorios de esta fecha vuelven a quedar pendientes.
+  // shortcut: quien ya recibió el recordatorio de la fecha anterior no lo vuelve a recibir (marca por inscrito); crear un evento nuevo si hace falta reenviarlo.
+  const prevStart = existing.startAt?.toMillis?.() ?? null;
+  if (prevStart !== (payload.startAt?.getTime() ?? null)) Object.assign(payload, { reminderPresencialSentAt: null, reminderVirtualSentAt: null });
   const batch = writeBatch(db).update(doc(db, 'events', existing.id), { ...payload, updatedAt: serverTimestamp(), updatedBy: me() });
   if (!payload.requiresCode) batch.delete(doc(db, 'eventSecrets', existing.id));
   await withSecret(batch, existing.id).commit();
