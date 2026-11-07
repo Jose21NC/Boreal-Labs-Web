@@ -155,3 +155,13 @@ test('correo: {hora} con ambas horas fuera de Nicaragua y una sola dentro', asyn
   const dentro = customEmail({ subject: 's', body: 'Hora: {hora}' }, { userEmail: 'a@example.com', userTimeZone: 'America/Managua' }, event);
   assert.doesNotMatch(dentro.text, /tu hora/);
 });
+
+test('hora: selector HH:mm, formato visible y texto no reconocido se conserva', async () => {
+  const { toTimeInput, formatEventTime } = await import('./eventTime.js');
+  assert.equal(toTimeInput('2:00 PM'), '14:00');
+  assert.equal(toTimeInput('9:00AM'), '09:00');
+  assert.equal(toTimeInput('de 2 a 4'), '');
+  assert.equal(formatEventTime('14:00'), '2:00 p. m.');
+  assert.equal(formatEventTime('00:30'), '12:30 a. m.');
+  assert.equal(formatEventTime('de 2 a 4'), 'de 2 a 4');
+});
