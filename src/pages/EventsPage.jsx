@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef, useContext, useMemo } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { motion, AnimatePresence, MotionConfig } from 'framer-motion';
-import { Calendar, MapPin, Users, Clock, Share2, Copy, X as XIcon, CheckCircle } from 'lucide-react'; // Icono Share2 añadido
+import { Calendar, CalendarPlus, MapPin, Users, Clock, Share2, Copy, X as XIcon, CheckCircle } from 'lucide-react';
+import { calendarEvent, downloadIcs, findMeetLink, googleCalendarUrl } from '@/lib/calendar'; // Icono Share2 añadido
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -209,7 +210,14 @@ const EventRegistrationForm = ({ event, onSuccess, onShowConfirmation }) => {
         : '';
       const finalMsg = [baseMsg + asistenciaMsg, extraMsg, virtualMsg].filter(Boolean).join("\n\n");
 
-      onShowConfirmation(finalMsg || baseMsg);
+      const isVirtual = (tipoAsistencia || '').toLowerCase().includes('virtual');
+      // Recordatorio de calendario: si hay enlace de Meet (del evento o escrito en el mensaje) se guarda en el evento.
+      const cal = calendarEvent({
+        title: event.title, date: event.date, time: event.time, location: event.location, virtual: isVirtual,
+        meetLink: isVirtual ? (meet?.trim() || findMeetLink(finalMsg)) : findMeetLink(extraMsg),
+        details: extraMsg,
+      });
+      onShowConfirmation(finalMsg || baseMsg, cal);
       onSuccess(); // Llama a la función onSuccess para cerrar el modal
 
     } catch (error) {
@@ -403,6 +411,7 @@ const EventsPage = () => {
   const [loading, setLoading] = useState(true);
   const [showConfirmation, setShowConfirmation] = useState(false);
   const [confirmationMsg, setConfirmationMsg] = useState('');
+  const [confirmationCal, setConfirmationCal] = useState(null);
   const [visibleCount, setVisibleCount] = useState(10);
   // Integradas + personalizadas (siteConfig/eventCategories); sin Firebase quedan las integradas.
   const [eventCategories, setEventCategories] = useState(BUILTIN_CATEGORIES);
@@ -885,7 +894,7 @@ const EventsPage = () => {
                 <EventRegistrationForm key={selectedEvent.id}
                   event={selectedEvent} 
                   onSuccess={handleCloseModal} 
-                  onShowConfirmation={(msg) => { setConfirmationMsg(msg); setShowConfirmation(true); }}
+                  onShowConfirmation={(msg, cal) => { setConfirmationMsg(msg); setConfirmationCal(cal || null); setShowConfirmation(true); }}
                 />
               </div>
 
@@ -927,6 +936,28 @@ const EventsPage = () => {
               <div className="mb-4 mt-2 text-gray-300 whitespace-pre-line text-left">{confirmationMsg.split(/(https?:\/\/[^\s]+?)(?=[.,;:!?)]*(?:\s|$))/g).map((part, i) => (safeUrl(part) && i % 2 === 1
                 ? <a key={i} href={part} target="_blank" rel="noopener noreferrer" className="break-all text-boreal-aqua underline">{part}</a>
                 : part))}</div>
+              {confirmationCal && (
+                <div className="mb-4 rounded-xl border border-boreal-aqua/30 bg-white/5 p-3">
+                  <p className="mb-2 flex items-center gap-2 text-sm font-semibold text-white"><CalendarPlus className="h-4 w-4 text-boreal-aqua" aria-hidden="true" /> Agrega un recordatorio a tu calendario</p>
+                  <div className="flex flex-wrap gap-2">
+                    <a
+                      href={googleCalendarUrl(confirmationCal)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex min-h-[44px] items-center gap-2 rounded-md bg-white px-4 text-sm font-semibold text-boreal-dark hover:bg-white/90"
+                    >
+                      Google Calendar
+                    </a>
+                    <button
+                      type="button"
+                      onClick={() => downloadIcs(confirmationCal)}
+                      className="inline-flex min-h-[44px] items-center gap-2 rounded-md border border-white/20 px-4 text-sm font-semibold text-white hover:bg-white/10"
+                    >
+                      Apple / Outlook (.ics)
+                    </button>
+                  </div>
+                </div>
+              )}
               <div className="flex gap-3 justify-end">
                 <Button
                   variant="outline"
