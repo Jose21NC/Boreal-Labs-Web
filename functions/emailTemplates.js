@@ -146,3 +146,30 @@ export function customEmail({ subject, body }, reg, event) {
   const plain = stripMarkup(text);
   return { to: reg?.userEmail, subject: stripMarkup(finalSubject), html, text: meet ? `${plain}\n\nGoogle Meet: ${meet}` : plain };
 }
+
+/** Recordatorio automático: presencial (1 día antes) o virtual (15 minutos antes, con botón de Meet). */
+export function reminderEmail(reg, event, phase) {
+  const title = event?.title || reg?.eventName || 'tu evento';
+  const virtual = phase === 'virtual';
+  const meet = virtual ? safeHttpsUrl(event?.meetLink) : null;
+  const hora = eventTimeFor(event, reg);
+  const subject = virtual ? `Empieza en 15 minutos: ${title}` : `Recordatorio: ${title} es mañana`;
+  const details = [
+    ['Fecha', formatDate(event?.date)],
+    ['Hora', hora],
+    ['Lugar', virtual ? 'Virtual' : event?.location],
+  ].filter(([, v]) => v);
+  const html = layout(virtual ? '¡Ya casi empezamos!' : 'Te esperamos mañana', `
+<p style="margin:0 0 16px">Hola ${escapeHtml(reg?.userName || '')},</p>
+<p style="margin:0 0 16px">${virtual ? 'En 15 minutos empieza' : 'Mañana es'} <strong>${escapeHtml(title)}</strong>.</p>
+${details.length ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:8px 0 24px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px">${details.map(([k, v]) => `<tr><td style="padding:10px 16px;color:#64748b;font-size:14px;width:110px">${escapeHtml(k)}</td><td style="padding:10px 16px;font-weight:bold;font-size:15px">${escapeHtml(v)}</td></tr>`).join('')}</table>` : ''}
+${meet ? button(meet, 'Entrar a Google Meet') : ''}
+<p style="margin:0 0 16px">${virtual ? 'Te recomendamos conectarte unos minutos antes.' : 'Si ya no puedes asistir, respóndenos este correo para liberar tu lugar.'}</p>`);
+  const text = [
+    `Hola ${reg?.userName || ''},`,
+    `${virtual ? 'En 15 minutos empieza' : 'Mañana es'} ${title}.`,
+    ...details.map(([k, v]) => `${k}: ${v}`),
+    meet ? `Google Meet: ${meet}` : '',
+  ].filter(Boolean).join('\n\n');
+  return { to: reg?.userEmail, subject, html, text };
+}
