@@ -121,3 +121,14 @@ test('negrita **texto** en HTML, sin asteriscos en texto plano, y sin inyectar e
   assert.doesNotMatch(msg.text, /\*\*/);
   assert.match(msg.html, /logo-boreal\.png/);
 });
+
+test('buildAiPrompt: datos del evento, indicaciones y tipo inválido', async () => {
+  const { buildAiPrompt } = await import('./aiText.js');
+  const p = buildAiPrompt('certificate', { title: 'Taller IA', location: 'UNI', date: '' }, 'tono formal');
+  assert.match(p.user, /- Evento: Taller IA/);
+  assert.match(p.user, /- Lugar: UNI/);
+  assert.doesNotMatch(p.user, /- Fecha:/);
+  assert.match(p.user, /Indicaciones del equipo: tono formal/);
+  assert.equal(p.maxChars, 300);
+  assert.throws(() => buildAiPrompt('otro'), /Tipo no válido/);
+});

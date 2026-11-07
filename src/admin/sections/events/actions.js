@@ -146,6 +146,7 @@ export async function savePublicEvent(existing, form, imageFile) {
     category: form.category,
     categoryName: form.categoryName,
     description: form.description.trim(),
+    certificateDescription: (form.certificateDescription || '').trim().slice(0, 300),
     capacity: form.capacity === '' ? null : Number(form.capacity),
     tipoAsistencia: form.attendanceOptions,
     tipoAsistenciaOptions: form.attendanceOptions,

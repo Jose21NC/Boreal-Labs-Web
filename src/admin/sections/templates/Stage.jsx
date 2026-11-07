@@ -7,6 +7,7 @@ export const FIELDS = [
   { key: 'nombreUsuario', label: 'Nombre', sample: (d) => d.nombreUsuario },
   { key: 'nombreEvento', label: 'Evento', sample: (d) => d.nombreEvento },
   { key: 'ciudadFecha', label: 'Ciudad y fecha', sample: (d) => d.ciudadFecha },
+  { key: 'descripcion', label: 'Descripción', sample: (d) => d.descripcion, hint: 'Párrafo del evento ("Descripción para el certificado"); si el evento no tiene, no se imprime.' },
   { key: 'tipoParticipacion', label: 'Modalidad', sample: (d) => d.modalidad, hint: 'Solo se imprime en certificados de participantes.' },
   { key: 'idValidacion', label: 'Código de validación', sample: (d) => d.idValidacion },
   { key: 'qrValidacion', label: 'Código QR', qr: true, hint: 'Enlaza a la página pública de validación.' },
