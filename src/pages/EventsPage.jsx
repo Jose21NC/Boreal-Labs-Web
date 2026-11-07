@@ -3,7 +3,7 @@ import { Helmet } from 'react-helmet-async';
 import { motion, AnimatePresence, MotionConfig } from 'framer-motion';
 import { Calendar, CalendarPlus, MapPin, Users, Clock, Share2, Copy, X as XIcon, CheckCircle } from 'lucide-react';
 import { calendarEvent, downloadIcs, findMeetLink, googleCalendarUrl } from '@/lib/calendar';
-import { dualTime, eventStart } from '../../functions/eventTime.js';
+import { dualTime, eventStart, formatEventTime } from '../../functions/eventTime.js';
 
 // Zona horaria del navegador: define "tu hora" en la confirmación, el correo y el calendario.
 const browserTimeZone = () => { try { return Intl.DateTimeFormat().resolvedOptions().timeZone || ''; } catch { return ''; } }; // Icono Share2 añadido
@@ -782,7 +782,7 @@ const EventsPage = () => {
                         {event.time && (
                           <div className="flex items-center text-gray-300">
                             <Clock className="w-5 h-5 mr-3 text-boreal-aqua" />
-                            <span>{event.time}</span>
+                            <span>{formatEventTime(event.time)}</span>
                           </div>
                         )}
                          <div className="flex items-center text-gray-300">
@@ -879,7 +879,7 @@ const EventsPage = () => {
                         {selectedEvent.time && (
                           <div className="flex items-center">
                             <Clock className="w-5 h-5 mr-3 text-boreal-aqua" />
-                            <span>{selectedEvent.time}</span>
+                            <span>{formatEventTime(selectedEvent.time)}</span>
                           </div>
                         )}
                         <div className="flex items-center">

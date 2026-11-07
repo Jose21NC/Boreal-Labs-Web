@@ -1,4 +1,5 @@
 // Plantillas de texto para "Descripción" y "Mensaje de confirmación" del evento.
+import { formatEventTime } from '../../../../functions/eventTime.js';
 // Marcadores: {evento} {fecha} {hora} {lugar} {enlace} (= página /eventos) {meet} (= enlace de Google Meet); los vacíos se dejan tal cual para completarlos a mano.
 
 export const PLACEHOLDERS = ['{evento}', '{fecha}', '{hora}', '{lugar}', '{enlace}', '{meet}'];
@@ -30,7 +31,7 @@ export function fillTemplate(text, form) {
   const values = {
     evento: form.title?.trim(),
     fecha: date,
-    hora: form.time?.trim(),
+    hora: formatEventTime(form.time || form.timeLegacy),
     lugar: form.location?.trim(),
     enlace: `${window.location.origin}/eventos`,
     meet: form.meetLink?.trim() || '[agrega el enlace de Google Meet]',

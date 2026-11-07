@@ -141,7 +141,7 @@ export async function savePublicEvent(existing, form, imageFile) {
   const payload = {
     title,
     date: dateFromInput(form.date),
-    time: form.time.trim(),
+    time: (form.time || form.timeLegacy || '').trim(),
     location: form.location.trim(),
     category: form.category,
     categoryName: form.categoryName,

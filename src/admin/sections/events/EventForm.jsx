@@ -12,6 +12,7 @@ import FormBuilder from './FormBuilder';
 import AccessCode from './AccessCode';
 import TextTemplatePicker from './TextTemplatePicker';
 import AiAssist from './AiAssist';
+import { toTimeInput } from '../../../../functions/eventTime.js';
 import EmailComposer from './EmailComposer';
 
 // react-easy-crop solo se descarga al elegir una imagen.
@@ -23,7 +24,9 @@ export const publicFormFrom = (ev = {}, categories = []) => {
   return {
     title: ev.title || '',
     date: toDateInput(ev.date),
-    time: ev.time || '',
+    // Selector de hora (HH:mm). Una hora vieja en texto que no se reconoce se conserva si no se cambia.
+    time: toTimeInput(ev.time),
+    timeLegacy: toTimeInput(ev.time) ? '' : (ev.time || ''),
     location: ev.location || '',
     // Acepta clave o etiqueta ("Taller" → workshop), igual que el filtro de EventsPage.
     category: categories.find((c) => c.value === cat || normalize(c.label) === normalize(cat))?.value || cat || 'workshop',
@@ -111,7 +114,9 @@ export function PublicEventForm({ initial, onSubmit, submitting, submitLabel = '
           </Field>
           <div className="grid grid-cols-2 gap-3">
             <Field label="Fecha"><Input type="date" value={form.date} onChange={set('date')} required /></Field>
-            <Field label="Hora"><Input value={form.time} onChange={set('time')} placeholder="2:00 PM" /></Field>
+            <Field label="Hora" hint={form.timeLegacy && !form.time ? `Hora guardada como texto: «${form.timeLegacy}». Elígela aquí para que funcionen el calendario y las zonas horarias.` : 'Hora de Nicaragua.'}>
+              <Input type="time" value={form.time} onChange={set('time')} />
+            </Field>
           </div>
         </div>
         <div className="space-y-1.5">

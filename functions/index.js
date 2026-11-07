@@ -7,6 +7,8 @@ import { getStorage } from 'firebase-admin/storage';
 import { getAuth } from 'firebase-admin/auth';
 import { PDFDocument } from 'pdf-lib';
 import { certificateEmail, customEmail, registrationEmail, sendOnce } from './email.js';
+import Anthropic from '@anthropic-ai/sdk';
+import { buildAiPrompt } from './aiText.js';
 import {
   mergeLayout, renderCertificate, resolveRole, resolveModality, templateCandidates, formatCiudadFecha, normalizeTemplateSet,
 } from './certificate.js';

@@ -1,4 +1,5 @@
 // Detalle de un evento: inscritos/asistencia y edición de los datos del evento.
+import { formatEventTime } from '../../../../functions/eventTime.js';
 import React, { useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, Award, CalendarDays, Eye, EyeOff, MapPin, RefreshCw, Trash2, UserCheck, UserX, Users } from 'lucide-react';
@@ -107,7 +108,7 @@ export default function EventDetail() {
         title={g.name}
         description={(
           <span className="flex flex-wrap items-center gap-x-4 gap-y-1">
-            {g.date && <span className="inline-flex items-center gap-1"><CalendarDays className="h-3.5 w-3.5" aria-hidden="true" />{formatDate(g.date)}{meta.time ? ` · ${meta.time}` : ''}</span>}
+            {g.date && <span className="inline-flex items-center gap-1"><CalendarDays className="h-3.5 w-3.5" aria-hidden="true" />{formatDate(g.date)}{meta.time ? ` · ${formatEventTime(meta.time)}` : ''}</span>}
             {meta.location && <span className="inline-flex items-center gap-1"><MapPin className="h-3.5 w-3.5" aria-hidden="true" />{meta.location}</span>}
             {meta.createdAt && <span>Creado {formatDateTime(meta.createdAt)}{meta.createdBy ? ` por ${meta.createdBy}` : ''}</span>}
             {meta.updatedAt && <span>Editado {formatDateTime(meta.updatedAt)}{meta.updatedBy ? ` por ${meta.updatedBy}` : ''}</span>}

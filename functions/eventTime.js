@@ -15,6 +15,20 @@ export function parseTime(text) {
   return h < 24 && min < 60 ? { h, m: min } : null;
 }
 
+/** Texto de hora → "HH:mm" para <input type="time">; '' si no se reconoce. */
+export const toTimeInput = (text) => {
+  const t = parseTime(text);
+  return t ? `${String(t.h).padStart(2, '0')}:${String(t.m).padStart(2, '0')}` : '';
+};
+
+/** "14:00" o "2:00 PM" → "2:00 p. m." para mostrar; si no se reconoce, el texto tal cual. */
+export const formatEventTime = (text) => {
+  const t = parseTime(text);
+  if (!t) return String(text || '');
+  const h12 = t.h % 12 || 12;
+  return `${h12}:${String(t.m).padStart(2, '0')} ${t.h < 12 ? 'a. m.' : 'p. m.'}`;
+};
+
 const toDate = (v) => (v?.toDate ? v.toDate() : v ? new Date(v) : null);
 
 /** Día del evento en Nicaragua → { y, mo, d } (la fecha suele guardarse como medianoche local). */

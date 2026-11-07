@@ -1,6 +1,6 @@
 // Plantillas de correo PURAS (sin nodemailer): las usa functions/email.js para enviar y el panel admin
 // (src/admin) para la vista previa, así lo que ve el admin es exactamente lo que se envía.
-import { dualTime, eventStart } from './eventTime.js';
+import { dualTime, eventStart, formatEventTime } from './eventTime.js';
 
 export const SENDER = 'contacto@borealabs.org';
 const SITE = 'https://borealabs.org';
@@ -56,7 +56,7 @@ Recibiste este correo por tu participación en actividades de Boreal Labs.
 </table></td></tr></table></body></html>`;
 
 /** Hora del evento; si quien se inscribió está en otra zona horaria, ambas (Nicaragua y la suya). */
-export const eventTimeFor = (event, reg) => dualTime(eventStart(event?.date, event?.time), reg?.userTimeZone)?.text || event?.time || '';
+export const eventTimeFor = (event, reg) => dualTime(eventStart(event?.date, event?.time), reg?.userTimeZone)?.text || formatEventTime(event?.time);
 
 export const formatDate = (value) => {
   const d = value?.toDate ? value.toDate() : value ? new Date(value) : null;
