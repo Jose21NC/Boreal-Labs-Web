@@ -1,5 +1,7 @@
 // Plantillas de correo PURAS (sin nodemailer): las usa functions/email.js para enviar y el panel admin
 // (src/admin) para la vista previa, así lo que ve el admin es exactamente lo que se envía.
+import { dualTime, eventStart } from './eventTime.js';
+
 export const SENDER = 'contacto@borealabs.org';
 const SITE = 'https://borealabs.org';
 
@@ -53,6 +55,9 @@ Recibiste este correo por tu participación en actividades de Boreal Labs.
 </td></tr>
 </table></td></tr></table></body></html>`;
 
+/** Hora del evento; si quien se inscribió está en otra zona horaria, ambas (Nicaragua y la suya). */
+export const eventTimeFor = (event, reg) => dualTime(eventStart(event?.date, event?.time), reg?.userTimeZone)?.text || event?.time || '';
+
 export const formatDate = (value) => {
   const d = value?.toDate ? value.toDate() : value ? new Date(value) : null;
   return d && !Number.isNaN(d.getTime())
@@ -68,7 +73,7 @@ export function registrationEmail(reg, event) {
   const meet = virtual ? safeHttpsUrl(event?.meetLink) : null;
   const details = [
     ['Fecha', formatDate(event?.date)],
-    ['Hora', event?.time],
+    ['Hora', eventTimeFor(event, reg)],
     ['Lugar', virtual ? 'Virtual' : event?.location],
     ['Modalidad', reg.tipoAsistencia],
   ].filter(([, v]) => v);
@@ -124,7 +129,7 @@ export const placeholderVars = (reg, event) => ({
   nombre: reg?.userName || '',
   evento: event?.title || reg?.eventName || '',
   fecha: formatDate(event?.date) || '',
-  hora: event?.time || '',
+  hora: eventTimeFor(event, reg),
   lugar: isVirtual(reg) ? 'Virtual' : event?.location || '',
   modalidad: reg?.tipoAsistencia || '',
   meet: safeHttpsUrl(event?.meetLink) || '',

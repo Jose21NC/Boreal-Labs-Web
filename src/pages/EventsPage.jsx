@@ -2,7 +2,11 @@ import React, { useState, useEffect, useRef, useContext, useMemo } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { motion, AnimatePresence, MotionConfig } from 'framer-motion';
 import { Calendar, CalendarPlus, MapPin, Users, Clock, Share2, Copy, X as XIcon, CheckCircle } from 'lucide-react';
-import { calendarEvent, downloadIcs, findMeetLink, googleCalendarUrl } from '@/lib/calendar'; // Icono Share2 añadido
+import { calendarEvent, downloadIcs, findMeetLink, googleCalendarUrl } from '@/lib/calendar';
+import { dualTime, eventStart } from '../../functions/eventTime.js';
+
+// Zona horaria del navegador: define "tu hora" en la confirmación, el correo y el calendario.
+const browserTimeZone = () => { try { return Intl.DateTimeFormat().resolvedOptions().timeZone || ''; } catch { return ''; } }; // Icono Share2 añadido
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -171,6 +175,7 @@ const EventRegistrationForm = ({ event, onSuccess, onShowConfirmation }) => {
         tipoAsistencia,
         recaptchaTokenV2: recaptchaV2Token || null,
         registrationDate: serverTimestamp(),
+        ...(browserTimeZone() ? { userTimeZone: browserTimeZone().slice(0, 64) } : {}),
         ...(formFields.length ? { answers: cleanAnswers } : {}),
         // Mayúsculas y sin espacios, igual que lo guarda el admin en eventSecrets (ver normalizeCode).
         ...(event.requiresCode ? { accessCode: normalizeCode(accessCode) } : {}),
@@ -208,13 +213,17 @@ const EventRegistrationForm = ({ event, onSuccess, onShowConfirmation }) => {
       const virtualMsg = meet && (tipoAsistencia || '').toLowerCase().includes('virtual') && !extraMsg.includes(meet.trim())
         ? `📍 Asistencia virtual: entra aquí el día del evento: ${meet.trim()}`
         : '';
-      const finalMsg = [baseMsg + asistenciaMsg, extraMsg, virtualMsg].filter(Boolean).join("\n\n");
+      // Fuera de la hora de Nicaragua: mostrar ambas horas.
+      const times = dualTime(eventStart(event.date, event.time), browserTimeZone());
+      const timeMsg = times?.differs ? `🕒 Hora del evento: ${times.text}.` : '';
+      const finalMsg = [baseMsg + asistenciaMsg, timeMsg, extraMsg, virtualMsg].filter(Boolean).join("\n\n");
 
       const isVirtual = (tipoAsistencia || '').toLowerCase().includes('virtual');
       // Recordatorio de calendario: si hay enlace de Meet (del evento o escrito en el mensaje) se guarda en el evento.
       const cal = calendarEvent({
         title: event.title, date: event.date, time: event.time, location: event.location, virtual: isVirtual,
         meetLink: isVirtual ? (meet?.trim() || findMeetLink(finalMsg)) : findMeetLink(extraMsg),
+        timeZone: browserTimeZone(),
         details: extraMsg,
       });
       onShowConfirmation(finalMsg || baseMsg, cal);

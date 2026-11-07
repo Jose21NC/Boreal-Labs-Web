@@ -132,3 +132,26 @@ test('buildAiPrompt: datos del evento, indicaciones y tipo inválido', async () 
   assert.equal(p.maxChars, 300);
   assert.throws(() => buildAiPrompt('otro'), /Tipo no válido/);
 });
+
+test('dualTime: igual en Nicaragua, doble fuera, con día si cambia; zona inválida = solo Nicaragua', async () => {
+  const { eventStart, dualTime } = await import('./eventTime.js');
+  const start = eventStart(new Date('2026-11-18T06:00:00Z'), '2:00 PM');
+  assert.equal(start.toISOString(), '2026-11-18T20:00:00.000Z');
+  assert.equal(dualTime(start, 'America/Managua').differs, false);
+  assert.equal(dualTime(start, 'America/Costa_Rica').differs, false); // misma hora (UTC-6)
+  const mx = dualTime(start, 'America/Bogota');
+  assert.equal(mx.differs, true);
+  assert.match(mx.text, /hora de Nicaragua.*tu hora, Bogota/);
+  const late = dualTime(eventStart(new Date('2026-11-18T06:00:00Z'), '8:00 PM'), 'Europe/Madrid');
+  assert.match(late.text, /19 nov/); // ya es el día siguiente en Madrid
+  assert.equal(dualTime(start, 'No/Existe').differs, false);
+});
+
+test('correo: {hora} con ambas horas fuera de Nicaragua y una sola dentro', async () => {
+  const { customEmail } = await import('./emailTemplates.js');
+  const event = { title: 'T', date: new Date('2026-11-18T06:00:00Z'), time: '2:00 PM' };
+  const fuera = customEmail({ subject: 's', body: 'Hora: {hora}' }, { userEmail: 'a@example.com', userTimeZone: 'America/Bogota' }, event);
+  assert.match(fuera.text, /hora de Nicaragua.*tu hora, Bogota/);
+  const dentro = customEmail({ subject: 's', body: 'Hora: {hora}' }, { userEmail: 'a@example.com', userTimeZone: 'America/Managua' }, event);
+  assert.doesNotMatch(dentro.text, /tu hora/);
+});
