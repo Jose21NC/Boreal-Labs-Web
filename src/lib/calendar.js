@@ -1,21 +1,8 @@
 // "Agregar al calendario": enlace de Google Calendar y archivo .ics (Apple/Outlook) para un evento.
-// Hora de Nicaragua (UTC-6, sin horario de verano): los eventos guardan fecha + hora en texto ("2:00 PM").
-const NI_OFFSET_MIN = -6 * 60;
+import { dualTime, eventDay, eventStart, parseTime } from '../../functions/eventTime.js';
+
+export { parseTime };
 const DEFAULT_HOURS = 2; // shortcut: duración fija; agregar un campo de hora de fin al evento si hace falta precisión
-
-/** "2:00 PM", "9:00AM", "14:30", "9 am" → { h, m } en 24 h, o null. */
-export function parseTime(text) {
-  const m = String(text || '').trim().match(/^(\d{1,2})(?::(\d{2}))?\s*([ap])?\.?\s*m?\.?$/i);
-  if (!m) return null;
-  let h = Number(m[1]);
-  const min = Number(m[2] || 0);
-  const ap = m[3]?.toLowerCase();
-  if (ap === 'p' && h < 12) h += 12;
-  if (ap === 'a' && h === 12) h = 0;
-  return h < 24 && min < 60 ? { h, m: min } : null;
-}
-
-const toDate = (v) => (v?.toDate ? v.toDate() : v ? new Date(v) : null);
 
 /** Primer enlace de Google Meet dentro de un texto (p. ej. el mensaje de confirmación). */
 export const findMeetLink = (text) => String(text || '').match(/https:\/\/meet\.google\.com\/[a-z0-9-]+/i)?.[0] || null;
@@ -24,23 +11,22 @@ export const findMeetLink = (text) => String(text || '').match(/https:\/\/meet\.
  * @returns {{ title, start: Date, end: Date, allDay: boolean, location, details } | null}
  * `date` es la fecha del evento (Timestamp/Date), `time` su hora en texto. Sin fecha → null.
  */
-export function calendarEvent({ title, date, time, location, details, meetLink, virtual }) {
-  const day = toDate(date);
-  if (!day || Number.isNaN(day.getTime())) return null;
-  // Día calendario del evento en Nicaragua (la fecha suele guardarse como medianoche local).
-  const local = new Date(day.getTime() + NI_OFFSET_MIN * 60000);
-  const [y, mo, d] = [local.getUTCFullYear(), local.getUTCMonth(), local.getUTCDate()];
-  const t = parseTime(time);
-  const start = t ? new Date(Date.UTC(y, mo, d, t.h, t.m) - NI_OFFSET_MIN * 60000) : new Date(Date.UTC(y, mo, d));
-  const end = t ? new Date(start.getTime() + DEFAULT_HOURS * 3600000) : new Date(Date.UTC(y, mo, d + 1));
+export function calendarEvent({ title, date, time, location, details, meetLink, virtual, timeZone }) {
+  const day = eventDay(date);
+  if (!day) return null;
+  // Con hora: instante exacto en UTC, así cada calendario lo muestra en la hora local de quien lo guarda.
+  const timed = eventStart(date, time);
+  const start = timed || new Date(Date.UTC(day.y, day.mo, day.d));
+  const end = timed ? new Date(timed.getTime() + DEFAULT_HOURS * 3600000) : new Date(Date.UTC(day.y, day.mo, day.d + 1));
   const meet = meetLink || null;
+  const both = dualTime(timed, timeZone);
   return {
     title: title || 'Evento Boreal Labs',
     start,
     end,
-    allDay: !t,
+    allDay: !timed,
     location: virtual && meet ? meet : location || meet || '',
-    details: [details, meet ? `Google Meet: ${meet}` : '', 'Organiza: Boreal Labs · borealabs.org'].filter(Boolean).join('\n\n'),
+    details: [both?.differs ? `Hora: ${both.text}` : '', details, meet ? `Google Meet: ${meet}` : '', 'Organiza: Boreal Labs · borealabs.org'].filter(Boolean).join('\n\n'),
   };
 }
 

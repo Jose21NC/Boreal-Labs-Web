@@ -93,7 +93,7 @@ service cloud.firestore {
       allow create: if request.resource.data.keys().hasOnly([
           'eventName','eventId','userName','userEmail','userWhatsapp','userUniversity',
           'userCountry','userDepartment','isCommunityMember','tipoAsistencia',
-          'recaptchaTokenV2','registrationDate','answers','accessCode'])
+          'recaptchaTokenV2','registrationDate','answers','accessCode','userTimeZone'])
         && request.resource.data.eventId is string && request.resource.data.eventId.size() <= 200
         && validEmail(request.resource.data.userEmail)
         // ID = eventId_correo: impide registros duplicados (un create sobre un doc existente se rechaza).
@@ -101,7 +101,7 @@ service cloud.firestore {
         && exists(/databases/$(database)/documents/events/$(request.resource.data.eventId))
         && str('eventName', 300) && str('userName', 200) && str('userWhatsapp', 50)
         && str('userUniversity', 300) && str('userCountry', 100) && str('userDepartment', 100)
-        && str('tipoAsistencia', 100) && str('recaptchaTokenV2', 4000)
+        && str('tipoAsistencia', 100) && str('recaptchaTokenV2', 4000) && str('userTimeZone', 64)
         && request.resource.data.registrationDate == request.time
         // Respuestas a campos personalizados del evento: mapa acotado (el contenido lo valida el formulario).
         && (!('answers' in request.resource.data) || (request.resource.data.answers is map && request.resource.data.answers.size() <= 40))
