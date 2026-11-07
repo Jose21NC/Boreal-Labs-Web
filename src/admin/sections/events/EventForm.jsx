@@ -11,6 +11,7 @@ import CategoryPicker from './CategoryPicker';
 import FormBuilder from './FormBuilder';
 import AccessCode from './AccessCode';
 import TextTemplatePicker from './TextTemplatePicker';
+import AiAssist from './AiAssist';
 import EmailComposer from './EmailComposer';
 
 // react-easy-crop solo se descarga al elegir una imagen.
@@ -27,6 +28,7 @@ export const publicFormFrom = (ev = {}, categories = []) => {
     // Acepta clave o etiqueta ("Taller" → workshop), igual que el filtro de EventsPage.
     category: categories.find((c) => c.value === cat || normalize(c.label) === normalize(cat))?.value || cat || 'workshop',
     description: ev.description || '',
+    certificateDescription: ev.certificateDescription || '',
     capacity: ev.capacity ?? '',
     attendanceOptions: opts.filter(Boolean),
     confirmationMessage: String(ev.mensajeConfirmacion || ev.confirmMessage || ''),
@@ -145,8 +147,18 @@ export function PublicEventForm({ initial, onSubmit, submitting, submitLabel = '
       </div>
 
       <div className="relative">
-        <div className="absolute -top-1 right-0"><TextTemplatePicker kind="description" form={form} value={form.description} onInsert={(description) => patch({ description })} /></div>
+        <div className="absolute -top-1 right-0 flex gap-1">
+          <AiAssist kind="description" form={form} value={form.description} onInsert={(description) => patch({ description })} />
+          <TextTemplatePicker kind="description" form={form} value={form.description} onInsert={(description) => patch({ description })} />
+        </div>
         <Field label="Descripción"><Textarea rows={3} value={form.description} onChange={set('description')} /></Field>
+      </div>
+
+      <div className="relative">
+        <div className="absolute -top-1 right-0"><AiAssist kind="certificate" form={form} value={form.certificateDescription} onInsert={(certificateDescription) => patch({ certificateDescription })} /></div>
+        <Field label="Descripción para el certificado" hint="Opcional. Se imprime en el certificado si la plantilla incluye el campo «Descripción». Máx. 300 caracteres.">
+          <Textarea rows={2} value={form.certificateDescription} onChange={set('certificateDescription')} maxLength={300} placeholder="Por su participación en el taller de…" />
+        </Field>
       </div>
 
       <fieldset className="space-y-2">
@@ -170,7 +182,10 @@ export function PublicEventForm({ initial, onSubmit, submitting, submitLabel = '
       )}
 
       <div className="relative">
-        <div className="absolute -top-1 right-0"><TextTemplatePicker kind="confirmation" form={form} value={form.confirmationMessage} onInsert={(confirmationMessage) => patch({ confirmationMessage })} /></div>
+        <div className="absolute -top-1 right-0 flex gap-1">
+          <AiAssist kind="confirmation" form={form} value={form.confirmationMessage} onInsert={(confirmationMessage) => patch({ confirmationMessage })} />
+          <TextTemplatePicker kind="confirmation" form={form} value={form.confirmationMessage} onInsert={(confirmationMessage) => patch({ confirmationMessage })} />
+        </div>
         <Field label="Mensaje de confirmación" hint="Se muestra al inscrito después de registrarse.">
           <Textarea rows={2} value={form.confirmationMessage} onChange={set('confirmationMessage')} />
         </Field>

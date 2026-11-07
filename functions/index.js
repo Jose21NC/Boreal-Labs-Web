@@ -81,6 +81,7 @@ export const generateCertificates = onCall({ cors: true, region: 'us-central1', 
   // Intentar obtener metadata del evento desde 'events' o 'adminEvents'
   let eventDate = null;
   let inferredTemplateSet = null;
+  let certificateDescription = ''; // texto opcional del evento para el certificado (events.certificateDescription)
   try {
     let eventDocSnap = null;
     let eventDocData = null;
@@ -96,6 +97,7 @@ export const generateCertificates = onCall({ cors: true, region: 'us-central1', 
     }
     if (eventDocSnap && eventDocSnap.exists) {
       eventDocData = eventDocSnap.data() || {};
+      certificateDescription = String(eventDocData.certificateDescription || '').trim().slice(0, 600);
       const ed = eventDocSnap.get('date');
       // Puede ser Timestamp, Date o string
       if (ed?.toDate) eventDate = ed.toDate();
@@ -220,6 +222,7 @@ export const generateCertificates = onCall({ cors: true, region: 'us-central1', 
           idValidacion,
           validationUrl: `${base}${encodeURIComponent(idValidacion)}`,
           ciudadFecha: formatCiudadFecha(eventDate),
+          descripcion: certificateDescription,
         },
       });
 
@@ -456,4 +459,44 @@ export const sendSeatConfirmations = onCall({ cors: true, region: 'us-central1',
     }
   }
   return { confirmed, sent, skipped, errors };
+});
+
+// ---------------- Textos con IA (Claude) para eventos y certificados ----------------
+// La clave vive en Secret Manager: `firebase functions:secrets:set ANTHROPIC_API_KEY`. Nunca llega al navegador.
+const ANTHROPIC_API_KEY = defineSecret('ANTHROPIC_API_KEY');
+
+export const generateText = onCall({ cors: true, region: 'us-central1', secrets: [ANTHROPIC_API_KEY], timeoutSeconds: 120, maxInstances: 5 }, async (request) => {
+  await assertAdmin(request);
+  const { kind, context, instructions } = request.data || {};
+  let prompt;
+  try {
+    prompt = buildAiPrompt(kind, context && typeof context === 'object' ? context : {}, instructions);
+  } catch (err) {
+    throw new HttpsError('invalid-argument', err.message);
+  }
+  const client = new Anthropic({ apiKey: ANTHROPIC_API_KEY.value() });
+  let response;
+  try {
+    response = await client.beta.messages.create({
+      model: 'claude-opus-5-5',
+      max_tokens: 16000,
+      // Texto corto y creativo: esfuerzo bajo basta y responde más rápido.
+      output_config: { effort: 'low' },
+      // Si el modelo declina por política, la API reintenta con el modelo de respaldo recomendado.
+      betas: ['server-side-fallback-2026-07-01'],
+      fallbacks: 'default',
+      cache_control: { type: 'ephemeral' },
+      system: prompt.system,
+      messages: [{ role: 'user', content: prompt.user }],
+    });
+  } catch (err) {
+    if (err instanceof Anthropic.RateLimitError) throw new HttpsError('resource-exhausted', 'Demasiadas solicitudes a la IA; intenta en un minuto.');
+    if (err instanceof Anthropic.AuthenticationError) throw new HttpsError('failed-precondition', 'La clave de la API de Claude no es válida.');
+    if (err instanceof Anthropic.APIError) throw new HttpsError('unavailable', `La IA no respondió (${err.status ?? 'red'}). Intenta de nuevo.`);
+    throw err;
+  }
+  if (response.stop_reason === 'refusal') throw new HttpsError('failed-precondition', 'La IA no pudo generar este texto. Ajusta las indicaciones.');
+  const text = response.content.filter((b) => b.type === 'text').map((b) => b.text).join('').trim();
+  if (!text) throw new HttpsError('internal', 'La IA devolvió una respuesta vacía.');
+  return { text: text.slice(0, prompt.maxChars) };
 });

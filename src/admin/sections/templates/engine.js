@@ -77,6 +77,7 @@ export const sampleData = (overrides = {}) => ({
   rol: 'participante',
   idValidacion: '3f2a9c1e-7b4d-4e8a-9c21-5d6e7f8a9b0c',
   ciudadFecha: formatCiudadFecha(new Date()),
+  descripcion: 'Por completar 12 horas de formación práctica en inteligencia artificial generativa aplicada a proyectos de impacto social.',
   ...overrides,
 });
 

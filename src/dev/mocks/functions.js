@@ -31,6 +31,16 @@ async function eventMeta(eventName) {
 }
 
 const handlers = {
+  // Sin IA real en modo de prueba: devuelve un texto de ejemplo con los datos recibidos.
+  async generateText({ kind, context = {} }) {
+    const t = context.title || 'el evento';
+    const samples = {
+      description: `Únete a ${t}, un espacio práctico para aprender, crear y conectar con jóvenes que están transformando Nicaragua.`,
+      confirmation: 'Hola {nombre}, ¡tu inscripción a {evento} está confirmada! Te esperamos el {fecha} a las {hora} en {lugar}.',
+      certificate: `Por su participación activa en ${t}, organizado por Boreal Labs.`,
+    };
+    return { text: `${samples[kind] || samples.description} (texto de prueba)` };
+  },
   // Misma lógica que functions/index.js#generateCertificates (duplicados por correo|rol|evento, solo presentes).
   async generateCertificates({ eventName, templateSet, addPoints, points }) {
     if (!eventName) throw Object.assign(new Error('Falta eventName'), { code: 'functions/invalid-argument' });

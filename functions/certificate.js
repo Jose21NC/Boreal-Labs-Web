@@ -28,6 +28,11 @@ export const DEFAULT_LAYOUT = {
       rel: { x: 0.865, y: 0.93, width: 0.10, height: 0.03 },
       style: { fontFamily: 'Libre Franklin', fontSizePx: 18, fontWeight: 400, fontStyle: 'normal', color: '#373737', textAlign: 'center' },
     },
+    // Párrafo opcional (events.certificateDescription): solo se dibuja si el evento lo tiene.
+    descripcion: {
+      rel: { x: 0.15, y: 0.50, width: 0.70, height: 0.10 },
+      style: { fontFamily: 'Libre Franklin', fontSizePx: 22, fontWeight: 400, fontStyle: 'normal', color: '#373737', textAlign: 'center' },
+    },
     qrValidacion: {
       rel: { x: 0.865, y: 0.78, width: 0.10, height: 0.141 },
     },
@@ -106,7 +111,7 @@ const parseWeight = (raw) => {
  * @param {Uint8Array|ArrayBuffer|null} opts.templateBytes PDF base; sin él se usa A4 horizontal en blanco.
  * @param {object} opts.layout layout ya mezclado con mergeLayout().
  * @param {{bold?, regular?, italic?, boldItalic?}} [opts.fonts] bytes TTF de Libre Franklin (opcionales).
- * @param {object} opts.data { nombreUsuario, nombreEvento, modalidad, rol, idValidacion, validationUrl, ciudadFecha }
+ * @param {object} opts.data { nombreUsuario, nombreEvento, modalidad, rol, idValidacion, validationUrl, ciudadFecha, descripcion? }
  * @returns {Promise<Uint8Array>}
  */
 export async function renderCertificate({ templateBytes, layout, fonts = {}, data }) {
@@ -197,6 +202,37 @@ export async function renderCertificate({ templateBytes, layout, fonts = {}, dat
     page.drawText(content, opts);
   };
 
+  // Párrafo con ajuste de línea: reduce la letra (hasta 60%) hasta que todas las líneas quepan en la caja.
+  const drawParagraph = (text, boxRel, style) => {
+    const words = String(text || '').trim().split(/\s+/).filter(Boolean);
+    if (!words.length) return;
+    const font = pickFont(style);
+    const color = hexToRgb(style.color || '#000000');
+    const x = (boxRel.x || 0) * pageW;
+    const w = (boxRel.width || 1) * pageW;
+    const h = (boxRel.height || 0) * pageH;
+    const base = (style.fontSizePx || 20) * sx;
+    const wrap = (size) => words.reduce((lines, word) => {
+      const last = lines[lines.length - 1];
+      const candidate = last ? `${last} ${word}` : word;
+      if (last && font.widthOfTextAtSize(candidate, size) > w) lines.push(word);
+      else lines[lines.length - 1 || 0] = candidate;
+      return lines;
+    }, ['']);
+    let size = base;
+    let lines = wrap(size);
+    while (lines.length * size * 1.25 > h && size > base * 0.6) { size *= 0.92; lines = wrap(size); }
+    const lineH = size * 1.25;
+    let y = pageH - (boxRel.y || 0) * pageH - (h - lines.length * lineH) / 2 - size;
+    const align = (style.textAlign || 'left').toLowerCase();
+    lines.forEach((line) => {
+      const lw = font.widthOfTextAtSize(line, size);
+      const lx = align === 'center' ? x + (w - lw) / 2 : align === 'right' ? x + w - lw : x;
+      page.drawText(line, { x: lx, y, size, font, color });
+      y -= lineH;
+    });
+  };
+
   const L = layout.elements || {};
 
   // QR primero (mismo orden que la versión original)
@@ -220,6 +256,7 @@ export async function renderCertificate({ templateBytes, layout, fonts = {}, dat
   }
   if (L.idValidacion?.rel) drawTextBox(`${data.idValidacion}`, L.idValidacion.rel, L.idValidacion.style || {});
   if (L.ciudadFecha?.rel) drawTextBox(data.ciudadFecha, L.ciudadFecha.rel, L.ciudadFecha.style || {});
+  if (L.descripcion?.rel && data.descripcion) drawParagraph(data.descripcion, L.descripcion.rel, L.descripcion.style || {});
 
   return pdfDoc.save();
 }
