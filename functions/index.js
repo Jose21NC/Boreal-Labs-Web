@@ -461,7 +461,7 @@ export const sendSeatConfirmations = onCall({ cors: true, region: 'us-central1',
   return { confirmed, sent, skipped, errors };
 });
 
-// ---------------- Textos con IA (Claude) para eventos y certificados ----------------
+// ---------------- Textos con IA (Claude Haiku 5.5) para eventos y certificados ----------------
 // La clave vive en Secret Manager: `firebase functions:secrets:set ANTHROPIC_API_KEY`. Nunca llega al navegador.
 const ANTHROPIC_API_KEY = defineSecret('ANTHROPIC_API_KEY');
 
@@ -477,15 +477,11 @@ export const generateText = onCall({ cors: true, region: 'us-central1', secrets:
   const client = new Anthropic({ apiKey: ANTHROPIC_API_KEY.value() });
   let response;
   try {
-    response = await client.beta.messages.create({
-      model: 'claude-opus-5-5',
-      max_tokens: 16000,
-      // Texto corto y creativo: esfuerzo bajo basta y responde más rápido.
+    // Haiku 5.5: el modelo más económico; para textos cortos de eventos alcanza. (Sin respaldo server-side: no lo soporta.)
+    response = await client.messages.create({
+      model: 'claude-haiku-5-5',
+      max_tokens: 4000,
       output_config: { effort: 'low' },
-      // Si el modelo declina por política, la API reintenta con el modelo de respaldo recomendado.
-      betas: ['server-side-fallback-2026-07-01'],
-      fallbacks: 'default',
-      cache_control: { type: 'ephemeral' },
       system: prompt.system,
       messages: [{ role: 'user', content: prompt.user }],
     });
