@@ -16,7 +16,7 @@ import {
   Badge, Button, Card, CardBody, CardHeader, ConfirmProvider, EmptyState, Field, Input, Modal, PageHeader, SearchInput, Select, StatCard,
   Switch, TD, TH, THead, TR, Table, Tabs, Textarea, useConfirm,
 } from '@/admin/ui';
-import { DEFAULT_CONFIG, clientCycle, metrics, payDayOf, paymentPeriod, toMs } from '../../../../functions/billing.js';
+import { DEFAULT_CONFIG, clientCycle, cycleBounds, metrics, payDayOf, paymentPeriod, toMs } from '../../../../functions/billing.js';
 import { Requests } from './Requests';
 
 const nio = (n) => `C$ ${Number(n || 0).toLocaleString('es-NI', { maximumFractionDigits: 2 })}`;
@@ -89,7 +89,7 @@ function Manager() {
       ]} />
       {!ready ? <p className="text-sm text-adm-muted">Cargando…</p> : (
         <>
-          {tab === 'resumen' && <Summary m={m} config={config} onPay={setPayModal} now={now} />}
+          {tab === 'resumen' && <Summary m={m} config={config} onPay={setPayModal} now={now} payments={payments} />}
           {tab === 'solicitudes' && <Requests config={config} />}
           {tab === 'clientes' && <Clients clients={clients} payments={payments} config={config} now={now} onEdit={setClientModal} onPay={setPayModal} />}
           {tab === 'pagos' && <Payments payments={payments} byId={byId} onNew={() => setPayModal({})} />}
@@ -103,21 +103,112 @@ function Manager() {
 }
 
 // ---------- Resumen ----------
-function Summary({ m, config, onPay, now }) {
+/** Cobrado por ciclo del proveedor (últimos 6) frente al costo actual: barras CSS, sin librerías. */
+function CollectedChart({ payments, config, costNio, now }) {
+  const months = useMemo(() => {
+    const out = [];
+    let c = cycleBounds(now, config.cycleDay);
+    for (let i = 0; i < 6; i += 1) { out.unshift({ ...c, total: 0 }); c = cycleBounds(c.start - 1, config.cycleDay); }
+    payments.forEach((p) => { const t = toMs(p.paidAt); const m = out.find((x) => t >= x.start && t < x.end); if (m) m.total += Number(p.amount) || 0; });
+    return out;
+  }, [payments, config.cycleDay, now]);
+  const max = Math.max(costNio, ...months.map((m) => m.total), 1);
+  const label = (ms) => new Intl.DateTimeFormat('es-NI', { month: 'short', timeZone: 'America/Managua' }).format(ms);
+  return (
+    <Card>
+      <CardHeader title="Cobrado por mes" description={`Ciclos del ${config.cycleDay} al ${config.cycleDay} · la línea es la factura del proveedor (${nio(costNio)})`} />
+      <CardBody>
+        <div className="relative flex h-48 items-end gap-3" role="img" aria-label="Cobrado por mes">
+          <div className="pointer-events-none absolute inset-x-0 border-t-2 border-dashed border-adm-danger/60" style={{ bottom: `${(costNio / max) * 100}%` }} />
+          {months.map((m) => (
+            <div key={m.key} className="flex h-full flex-1 flex-col items-center justify-end gap-1">
+              <span className="text-[11px] tabular-nums text-adm-muted">{m.total ? nio(m.total) : ''}</span>
+              <div className={`w-full max-w-[56px] rounded-t-md transition-[height] duration-500 ${m.total >= costNio ? 'bg-adm-success/80' : 'bg-adm-warning/80'}`} style={{ height: `${(m.total / max) * 100}%`, minHeight: m.total ? 4 : 0 }} title={nio(m.total)} />
+              <span className="text-xs capitalize text-adm-muted">{label(m.start)}</span>
+            </div>
+          ))}
+        </div>
+      </CardBody>
+    </Card>
+  );
+}
+
+/** Próximos cobros (30 días): calendario unificado por fecha. */
+function UpcomingChart({ rows, now }) {
+  const items = rows.filter((r) => r.nextAmount > 0 && r.nextDate - now < 30 * 86400000).sort((a, b) => a.nextDate - b.nextDate);
+  const max = Math.max(...items.map((r) => r.nextAmount), 1);
+  return (
+    <Card>
+      <CardHeader title="Próximos cobros" description="Los próximos 30 días, por fecha de pago de cada cliente" />
+      <CardBody className="space-y-3">
+        {items.length === 0 ? <p className="text-sm text-adm-muted">Sin cobros en los próximos 30 días.</p> : items.map((r) => (
+          <div key={r.client.id} className="grid grid-cols-[88px_1fr_auto] items-center gap-3 text-sm">
+            <span className="tabular-nums text-adm-muted">{formatDate(r.nextDate)}</span>
+            <div className="h-6 overflow-hidden rounded-md bg-adm-surface-2"><div className="flex h-full items-center rounded-md bg-adm-accent/25 px-2 text-xs font-medium" style={{ width: `${(r.nextAmount / max) * 100}%` }}>{r.client.name}</div></div>
+            <span className="tabular-nums font-medium">{nio(r.nextAmount)}</span>
+          </div>
+        ))}
+      </CardBody>
+    </Card>
+  );
+}
+
+function CashModal({ open, onClose, config, m }) {
+  const { toast } = useToast();
+  const [v, setV] = useState('');
+  const [note, setNote] = useState('');
+  const [busy, setBusy] = useState(false);
+  useEffect(() => { if (open) { setV(String(m.available)); setNote(''); } }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
+  const save = async () => {
+    setBusy(true);
+    try {
+      await setDoc(doc(db, 'subsConfig', 'main'), { cashOnHand: Number(v), cashAt: new Date(), cashNote: note.trim() }, { merge: true });
+      logActivity('suscripciones.caja', `Registró dinero disponible: ${nio(v)}${note.trim() ? ` (${note.trim()})` : ''}`, { amount: Number(v), before: m.available });
+      onClose();
+    } catch (e) { toast({ title: 'No se pudo guardar', description: e?.message, variant: 'destructive' }); } finally { setBusy(false); }
+  };
+  return (
+    <Modal open={open} onClose={onClose} title="¿Con cuánto cuentas ahora?" footer={<Button variant="primary" loading={busy} disabled={!(Number(v) >= 0) || v === ''} onClick={save}>Guardar</Button>}>
+      <p className="mb-4 text-sm text-adm-muted">Si gastaste parte de lo cobrado, registra el monto real. Los pagos que entren después se suman solos.</p>
+      <div className="grid gap-4">
+        <Field label="Dinero disponible (C$)"><Input type="number" min="0" step="any" value={v} onChange={(e) => setV(e.target.value)} /></Field>
+        <Field label="Motivo (opcional)"><Input value={note} onChange={(e) => setNote(e.target.value)} placeholder="Ej.: imprevisto, gasté 200" /></Field>
+      </div>
+    </Modal>
+  );
+}
+
+function Summary({ m, config, onPay, now, payments }) {
+  const [cashOpen, setCashOpen] = useState(false);
   const liquidity = m.covered
-    ? { value: 'Cubierto', hint: `Cobrado ${nio(m.collected)} ≥ factura ${nio(m.costNio)}`, tone: 'success' }
-    : { value: `Te faltan ${nio(m.liquidityGapNio)}`, hint: `Cobrado ${usd(m.collectedUsd)} de ${usd(m.invoiceUsd)} (${nio(m.costNio)})`, tone: 'warning' };
+    ? { value: 'Cubierto', hint: `Disponible ${nio(m.available)} ≥ factura ${nio(m.costNio)}`, tone: 'success' }
+    : { value: `Te faltan ${nio(m.liquidityGapNio)}`, hint: `Disponible ${nio(m.available)} de ${nio(m.costNio)} (${usd(m.invoiceUsd)})`, tone: 'warning' };
   return (
     <div className="space-y-6">
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard label="Ingresos del mes" value={nio(m.revenue)} hint={`${m.activeCount} clientes activos`} icon={Banknote} tone="success" />
-        <StatCard label="Costo del proveedor" value={usd(m.costUsd)} hint={`${nio(m.costNio)} a ${config.exchangeRate} C$/US$`} icon={Receipt} tone="info" />
-        <StatCard label="Ganancia neta" value={nio(m.profit)} hint={`Margen ${pct(m.margin)}`} icon={Banknote} tone={m.profit >= 0 ? 'success' : 'danger'} />
-        <StatCard label="Cobrado vs esperado" value={`${nio(m.collected)} / ${nio(m.expected)}`} hint={m.pending > 0 ? `Faltan ${nio(m.pending)}` : 'Todo cobrado'} icon={Users} tone="accent" />
-        <StatCard label={`Liquidez para la factura del ${config.cycleDay}`} value={liquidity.value} hint={liquidity.hint} tone={liquidity.tone} icon={Receipt} />
-        <StatCard label="Próximo cobro" value={m.nextDue ? formatDate(m.nextDue) : '—'} hint="Cada cliente paga el día de su primer pago" icon={Receipt} tone="warning" />
-        <StatCard label="Proyección próximo ciclo" value={nio(m.projectedNext)} hint="Suma de precios activos" icon={Banknote} tone="accent" />
+      <div className="relative overflow-hidden rounded-2xl border border-adm-border bg-adm-surface p-6">
+        <div className="pointer-events-none absolute -right-10 -top-16 h-48 w-48 rounded-full bg-adm-accent/15 blur-3xl" />
+        <div className="relative grid gap-6 sm:grid-cols-3">
+          <div><p className="text-xs font-medium uppercase tracking-wide text-adm-muted">Ganancia neta del mes</p><p className={`mt-1 text-4xl font-bold tabular-nums ${m.profit >= 0 ? 'text-adm-success' : 'text-adm-danger'}`}>{nio(m.profit)}</p><p className="mt-1 text-sm text-adm-muted">Margen {pct(m.margin)} · {m.activeCount} clientes</p></div>
+          <div><p className="text-xs font-medium uppercase tracking-wide text-adm-muted">Ingresos del mes</p><p className="mt-1 text-2xl font-semibold tabular-nums">{nio(m.revenue)}</p><p className="mt-1 text-sm text-adm-muted">Costo {usd(m.costUsd)} = {nio(m.costNio)}</p></div>
+          <div>
+            <p className="text-xs font-medium uppercase tracking-wide text-adm-muted">Dinero disponible</p>
+            <p className="mt-1 text-2xl font-semibold tabular-nums">{nio(m.available)}</p>
+            <p className="mt-1 text-sm text-adm-muted">{m.manualCash && config.cashNote ? `Ajuste: ${config.cashNote}` : m.manualCash ? 'Ajustado a mano' : 'Cobrado este ciclo'}</p>
+            <Button size="sm" className="mt-2" onClick={() => setCashOpen(true)}><Pencil className="h-4 w-4" />Editar</Button>
+          </div>
+        </div>
       </div>
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <StatCard label={`Liquidez para la factura del ${config.cycleDay}`} value={liquidity.value} hint={liquidity.hint} tone={liquidity.tone} icon={Receipt} />
+        <StatCard label="Cobrado vs esperado" value={`${nio(m.collected)} / ${nio(m.expected)}`} hint={m.pending > 0 ? `Faltan ${nio(m.pending)}` : 'Todo cobrado'} icon={Users} tone="accent" />
+        <StatCard label="Próximo cobro" value={m.nextDue ? formatDate(m.nextDue) : '—'} hint="Cada cliente paga el día de su primer pago" icon={Receipt} tone="warning" />
+        <StatCard label="Proyección próximo mes" value={nio(m.projectedNext)} hint="Sin los que cancelan" icon={Banknote} tone="accent" />
+      </div>
+      <div className="grid gap-6 xl:grid-cols-2">
+        <CollectedChart payments={payments} config={config} costNio={m.costNio} now={now} />
+        <UpcomingChart rows={m.rows} now={now} />
+      </div>
+      <CashModal open={cashOpen} onClose={() => setCashOpen(false)} config={config} m={m} />
       <Card>
         <CardHeader title="Pendientes y vencidos" description="Deben su mes o les toca pagar pronto" />
         {m.unpaid.length === 0 ? <EmptyState icon={Users} title="Nadie debe nada" description="Todos los clientes activos están al día." /> : (
@@ -204,7 +295,7 @@ function Clients({ clients, payments, config, now, onEdit, onPay }) {
                 <TD className="text-adm-muted">{c.email}<br />{c.phone}</TD>
                 <TD className="whitespace-nowrap text-right tabular-nums">{nio(c.price)}</TD>
                 <TD className="whitespace-nowrap">{formatDate(c.joinedAt)}</TD>
-                <TD><StatusBadge status={cy.status} /></TD>
+                <TD><StatusBadge status={cy.status} />{cy.endsAt && cy.status !== 'cancelado' ? <span className="mt-1 block text-xs text-adm-danger">Termina {formatDate(cy.endsAt)}</span> : null}</TD>
                 <TD className="whitespace-nowrap tabular-nums">
                   {c.status === 'activo' ? <>{nio(cy.nextAmount)}<span className="block text-xs text-adm-muted">día {payDayOf(c)} · {formatDate(cy.nextDate)}</span></> : '—'}
                 </TD>
@@ -255,6 +346,18 @@ function ClientModal({ item, onClose, config }) {
       onClose();
     } catch (e) { toast({ title: 'No se pudo guardar', description: e?.message, variant: 'destructive' }); } finally { setBusy(false); }
   };
+  const cancelAtEnd = async () => {
+    const end = clientCycle(item, [], config, Date.now()).cycle.end;
+    if (!(await confirm({ title: '¿Cancelar al final del mes?', description: `${item.name} conserva el acceso hasta el ${formatDate(end)}; no se le cobra ni recuerda el próximo mes.`, confirmLabel: 'Cancelar al final del mes' }))) return;
+    await updateDoc(doc(db, 'subsClients', item.id), { cancelAt: new Date(end) });
+    logActivity('suscripciones.cliente_cancelacion', `Programó la cancelación de ${item.name} para el ${formatDate(end)}`, { id: item.id });
+    onClose();
+  };
+  const undoCancel = async () => {
+    await updateDoc(doc(db, 'subsClients', item.id), { cancelAt: null });
+    logActivity('suscripciones.cliente_cancelacion', `Quitó la cancelación de ${item.name}`, { id: item.id });
+    onClose();
+  };
   const setStatus = async (status, title) => {
     if (!(await confirm({ title, description: `${item.name} · el cambio queda en la bitácora.`, tone: status === 'cancelado' ? 'danger' : 'primary', confirmLabel: 'Confirmar' }))) return;
     await updateDoc(doc(db, 'subsClients', item.id), { status });
@@ -273,7 +376,9 @@ function ClientModal({ item, onClose, config }) {
       <>
         {!isNew && item.status === 'activo' && <Button variant="outline" onClick={() => setStatus('pausado', '¿Pausar cliente?')}>Pausar</Button>}
         {!isNew && item.status !== 'activo' && <Button variant="outline" onClick={() => setStatus('activo', '¿Reactivar cliente?')}>Reactivar</Button>}
-        {!isNew && item.status !== 'cancelado' && <Button variant="danger-ghost" onClick={() => setStatus('cancelado', '¿Cancelar suscripción?')}>Cancelar</Button>}
+        {!isNew && item.status === 'activo' && !item.cancelAt && <Button variant="outline" onClick={cancelAtEnd}>Cancelar al final del mes</Button>}
+        {!isNew && item.cancelAt && <Button variant="outline" onClick={undoCancel}>Seguir el próximo mes</Button>}
+        {!isNew && item.status !== 'cancelado' && <Button variant="danger-ghost" onClick={() => setStatus('cancelado', '¿Cancelar ya?')}>Cancelar ya</Button>}
         <Button variant="primary" loading={busy} disabled={!valid} onClick={save}>Guardar</Button>
       </>
     )}>

@@ -59,22 +59,26 @@ export function clientCycle(client, payments, cfg, now) {
   const paid = paidIn(mine, cycle.key);
   const nextPaid = paidIn(mine, keyOf(cycle.end));
   const soon = now >= cycle.end - c.reminderDaysBefore * DAY;
+  const cancelAt = toMs(client.cancelAt); // cancelado al final de su mes: no se le cobra el siguiente
+  const ending = cancelAt <= cycle.end;
   let status;
   if (client.status === 'pausado' || client.status === 'cancelado') status = client.status;
+  else if (now >= cancelAt) status = 'cancelado';
   else if (paid < due) status = startOfDay(now) > cycle.start ? 'vencido' : 'pendiente';
-  else status = soon && nextPaid < due ? 'pendiente' : 'al_dia';
+  else status = soon && !ending && nextPaid < due ? 'pendiente' : 'al_dia';
   // Lo que se muestra como "debe": el mes actual si falta, si no el próximo cuando ya se acerca.
-  const owing = paid < due ? { amount: due - paid, date: cycle.start } : { amount: Math.max(0, due - nextPaid), date: cycle.end };
-  return { cycle, status, due, paid, balance: paid - due, dueDate: owing.date, owed: owing.amount, nextDate: cycle.end, nextAmount: due };
+  const owing = paid < due ? { amount: due - paid, date: cycle.start } : { amount: ending ? 0 : Math.max(0, due - nextPaid), date: cycle.end };
+  return { cycle, status, due, paid, balance: paid - due, dueDate: owing.date, owed: owing.amount, nextDate: cycle.end, nextAmount: ending ? 0 : due, endsAt: cancelAt || null };
 }
 
 /** Qué aviso toca HOY (corrida diaria): 'reminder' N días antes de la fecha de pago, 'overdue' al día siguiente. */
 export function reminderFor(client, payments, cfg, now) {
   const c = cfgOf(cfg);
   const cy = clientCycle(client, payments, c, now);
+  if (cy.status === 'cancelado' || cy.status === 'pausado') return null;
   const today = startOfDay(now);
   const mine = payments.filter((p) => p.clientId === client.id);
-  if (today === cy.cycle.end - c.reminderDaysBefore * DAY && paidIn(mine, keyOf(cy.cycle.end)) < cy.due) {
+  if (!cy.endsAt && today === cy.cycle.end - c.reminderDaysBefore * DAY && paidIn(mine, keyOf(cy.cycle.end)) < cy.due) {
     return { phase: 'reminder', key: keyOf(cy.cycle.end), due: cy.due - paidIn(mine, keyOf(cy.cycle.end)), dueDate: cy.cycle.end };
   }
   if (today === cy.cycle.start + DAY && cy.paid < cy.due) return { phase: 'overdue', key: cy.cycle.key, due: cy.due - cy.paid, dueDate: cy.cycle.start };
@@ -85,22 +89,29 @@ export function reminderFor(client, payments, cfg, now) {
 export function metrics(clients, payments, cfg, now) {
   const c = cfgOf(cfg);
   const cycle = cycleBounds(now, c.cycleDay);
-  const active = clients.filter((x) => x.status === 'activo');
-  const rows = active.map((x) => ({ client: x, ...clientCycle(x, payments, c, now) }));
+  const rows = clients.filter((x) => x.status === 'activo').map((x) => ({ client: x, ...clientCycle(x, payments, c, now) })).filter((r) => r.status !== 'cancelado');
+  const active = rows.map((r) => r.client);
   const revenue = active.reduce((s, x) => s + (Number(x.price) || 0), 0);
   const costUsd = active.length * c.costPerSeatUsd;
   const costNio = costUsd * c.exchangeRate;
   const profit = revenue - costNio;
   const inCycle = (p) => { const t = toMs(p.paidAt); return t >= cycle.start && t < cycle.end; };
   const collected = payments.filter(inCycle).reduce((s, p) => s + (Number(p.amount) || 0), 0);
-  const upcoming = rows.map((r) => r.nextDate).filter((t) => t > now);
+  const upcoming = rows.filter((r) => r.nextAmount > 0).map((r) => r.nextDate).filter((t) => t > now);
+  // Dinero disponible: lo que registraste a mano (p. ej. tras un gasto imprevisto) + lo cobrado después; si no, lo cobrado.
+  const cashAt = toMs(c.cashAt);
+  const available = cashAt >= cycle.start && cashAt < cycle.end
+    ? Number(c.cashOnHand) + payments.filter((p) => toMs(p.paidAt) > cashAt && inCycle(p)).reduce((s, p) => s + (Number(p.amount) || 0), 0)
+    : collected;
   return {
     cycle, nextDue: upcoming.length ? Math.min(...upcoming) : null, activeCount: active.length, revenue, costUsd, costNio, profit,
     margin: revenue > 0 ? profit / revenue : 0,
     expected: revenue, collected, pending: Math.max(0, revenue - collected),
     collectedUsd: collected / c.exchangeRate, invoiceUsd: costUsd,
-    liquidityGapNio: Math.max(0, costNio - collected), covered: collected >= costNio,
-    projectedNext: revenue,
+    available, manualCash: available !== collected || cashAt >= cycle.start,
+    liquidityGapNio: Math.max(0, costNio - available), covered: available >= costNio,
+    projectedNext: rows.reduce((s, r) => s + r.nextAmount, 0),
+    rows,
     unpaid: rows.filter((r) => r.status === 'pendiente' || r.status === 'vencido').sort((a, b) => a.dueDate - b.dueDate),
   };
 }

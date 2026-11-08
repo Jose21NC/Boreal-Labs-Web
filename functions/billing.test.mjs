@@ -58,3 +58,22 @@ test('métricas: ingresos, costo y ganancia', () => {
   assert.equal(m.nextDue, day('2026-11-29'));
   assert.equal(m.unpaid.length, 0);
 });
+
+test('cancelar al final del mes: sin recordatorio ni cobro siguiente; luego sale de las métricas', () => {
+  const a = { ...clients[0], cancelAt: day('2026-11-29') };
+  const all = [a, ...clients.slice(1)];
+  assert.equal(reminderFor(a, pays, {}, at('2026-11-26', 9)), null);
+  assert.equal(clientCycle(a, pays, {}, at('2026-11-27')).status, 'al_dia');
+  assert.equal(clientCycle(a, pays, {}, at('2026-11-27')).nextAmount, 0);
+  assert.equal(clientCycle(a, pays, {}, at('2026-11-30')).status, 'cancelado');
+  assert.equal(metrics(all, pays, {}, at('2026-11-30')).activeCount, 3);
+  assert.equal(metrics(all, pays, {}, at('2026-11-10')).projectedNext, 770);
+});
+
+test('dinero disponible registrado a mano + cobros posteriores', () => {
+  const extra = [...pays, { clientId: 'a', amount: 300, paidAt: at('2026-11-20'), cycleKey: '2026-11' }];
+  const m = metrics(clients, extra, { cashOnHand: 200, cashAt: at('2026-11-15') }, at('2026-11-21'));
+  assert.equal(m.available, 500);
+  assert.equal(m.covered, true); // factura 439.2
+  assert.equal(metrics(clients, extra, { cashOnHand: 100, cashAt: at('2026-11-21', 13) }, at('2026-11-21', 14)).covered, false);
+});

@@ -5,7 +5,7 @@ import { Check, Inbox, X } from 'lucide-react';
 import { auth, db } from '@/firebase';
 import { useToast } from '@/components/ui/use-toast';
 import { formatDate, logActivity, toDate } from '@/admin/lib';
-import { Badge, Button, Card, CardHeader, EmptyState, TD, TH, THead, TR, Table, useConfirm } from '@/admin/ui';
+import { Badge, Button, Card, CardHeader, EmptyState, Modal, TD, TH, THead, TR, Table, useConfirm } from '@/admin/ui';
 import { paymentPeriod } from '../../../../functions/billing.js';
 
 const TONE = { pendiente: 'warning', aprobada: 'success', rechazada: 'neutral' };
@@ -15,6 +15,7 @@ export function Requests({ config }) {
   const confirm = useConfirm();
   const [rows, setRows] = useState(null);
   const [busy, setBusy] = useState(null);
+  const [zoom, setZoom] = useState(null);
   useEffect(() => onSnapshot(collection(db, 'subsRequests'), (s) => setRows(
     s.docs.map((d) => ({ id: d.id, ...d.data() })).sort((a, b) => (toDate(b.createdAt)?.getTime() || 0) - (toDate(a.createdAt)?.getTime() || 0)),
   )), []);
@@ -58,7 +59,7 @@ export function Requests({ config }) {
                 <TD className="whitespace-nowrap">{formatDate(r.createdAt)}</TD>
                 <TD className="font-medium">{r.name}</TD>
                 <TD className="text-adm-muted">{r.email}<br />{r.whatsapp}</TD>
-                <TD>{r.proofUrl ? <a href={r.proofUrl} target="_blank" rel="noreferrer"><img src={r.proofUrl} alt={`Comprobante de ${r.name}`} className="h-14 w-14 rounded-md border border-adm-border object-cover" /></a> : '—'}</TD>
+                <TD>{r.proofUrl ? <button type="button" onClick={() => setZoom(r)} className="rounded-md transition-transform hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-adm-accent" aria-label={`Ver comprobante de ${r.name}`}><img src={r.proofUrl} alt="" className="h-14 w-14 rounded-md border border-adm-border object-cover" /></button> : '—'}</TD>
                 <TD><Badge tone={TONE[r.status] || 'neutral'}>{r.status}</Badge></TD>
                 <TD className="whitespace-nowrap text-right">
                   {r.status === 'pendiente' && <>
@@ -71,6 +72,10 @@ export function Requests({ config }) {
           </tbody>
         </Table>
       )}
+      <Modal open={!!zoom} onClose={() => setZoom(null)} title={zoom ? `Comprobante de ${zoom.name}` : ''} size="lg"
+        footer={zoom?.status === 'pendiente' && <Button variant="primary" onClick={() => { const z = zoom; setZoom(null); approve(z); }}><Check className="h-4 w-4" />Aprobar</Button>}>
+        {zoom && <a href={zoom.proofUrl} target="_blank" rel="noreferrer"><img src={zoom.proofUrl} alt={`Comprobante de ${zoom.name}`} className="mx-auto max-h-[70vh] w-auto rounded-lg" /></a>}
+      </Modal>
     </Card>
   );
 }
