@@ -1,5 +1,5 @@
 // Correos de Suscripciones (puros, con el layout de marca). Nunca mencionan el costo del proveedor.
-import { escapeHtml, layout, textToHtml, stripMarkup } from './emailTemplates.js';
+import { SENDER, button, escapeHtml, layout, textToHtml, stripMarkup } from './emailTemplates.js';
 
 const money = (n) => `C$ ${Number(n).toLocaleString('es-NI', { maximumFractionDigits: 2 })}`;
 const dateFmt = new Intl.DateTimeFormat('es-NI', { timeZone: 'America/Managua', weekday: 'long', day: 'numeric', month: 'long' });
@@ -17,7 +17,11 @@ export function subscriptionEmail(kind, { client, due, dueDate, cfg }) {
     overdue: { subject: `Pago pendiente de tu suscripción (${money(due)})`, title: 'Tu pago está pendiente', intro: 'Aún no hemos registrado tu pago y la fecha límite ya pasó. Para mantener tu suscripción activa:', plain: 'Aún no hemos registrado tu pago y la fecha límite ya pasó:' },
   }[kind];
   if (!copy) throw new Error(`Tipo de correo desconocido: ${kind}`);
-  const html = layout(copy.title, `<p style="margin:0 0 16px">Hola ${name},</p><p style="margin:0 0 16px">${copy.intro}</p>${box}${how}<p style="margin:0 0 16px">Si ya pagaste, ignora este mensaje y gracias.</p>`);
-  const text = [`Hola ${String(client.name || '').split(' ')[0]},`, copy.plain, `Monto a pagar: ${money(due)}\nFecha límite: ${when}`, instructions && `¿Cómo pagar?\n${stripMarkup(instructions)}`, 'Si ya pagaste, ignora este mensaje y gracias.'].filter(Boolean).join('\n\n');
-  return { to: client.email, subject: copy.subject, html, text };
+  const digits = String(cfg.whatsapp || '').replace(/\D/g, '');
+  const wa = digits ? `https://wa.me/${digits.length === 8 ? `505${digits}` : digits}` : '';
+  const html = layout(copy.title, `<p style="margin:0 0 16px">Hola ${name},</p><p style="margin:0 0 16px">${copy.intro}</p>${box}${how}<p style="margin:0 0 16px">Si ya pagaste, ignora este mensaje y gracias.</p>${wa ? `<p style="margin:0 0 4px">¿Dudas o algún inconveniente? Escríbenos:</p>${button(wa, 'Escribir por WhatsApp')}` : ''}`);
+  const text = [`Hola ${String(client.name || '').split(' ')[0]},`, copy.plain, `Monto a pagar: ${money(due)}\nFecha límite: ${when}`, instructions && `¿Cómo pagar?\n${stripMarkup(instructions)}`, 'Si ya pagaste, ignora este mensaje y gracias.', wa && `¿Dudas? WhatsApp: ${wa}`].filter(Boolean).join('\n\n');
+  // Recordatorio y vencido: copia oculta al admin para que también se entere.
+  const bcc = kind === 'welcome' ? undefined : (cfg.notifyEmail || SENDER);
+  return { to: client.email, ...(bcc ? { bcc } : {}), subject: copy.subject, html, text };
 }

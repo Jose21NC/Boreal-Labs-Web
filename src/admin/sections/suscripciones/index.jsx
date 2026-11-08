@@ -30,7 +30,7 @@ const STATUS = {
 const StatusBadge = ({ status }) => <Badge tone={STATUS[status][0]}>{STATUS[status][1]}</Badge>;
 
 function useSubs() {
-  const [state, setState] = useState({ config: DEFAULT_CONFIG, clients: [], payments: [], ready: false });
+  const [state, setState] = useState({ config: DEFAULT_CONFIG, clients: [], payments: [], requests: [], ready: false });
   useEffect(() => {
     if (!db) return undefined;
     const rows = (s) => s.docs.map((d) => ({ id: d.id, ...d.data() }));
@@ -38,6 +38,7 @@ function useSubs() {
     const off = [
       onSnapshot(doc(db, 'subsConfig', 'main'), (s) => set({ config: { ...DEFAULT_CONFIG, ...(s.data() || {}) } })),
       onSnapshot(collection(db, 'subsClients'), (s) => set({ clients: rows(s) })),
+      onSnapshot(collection(db, 'subsRequests'), (s) => set({ requests: rows(s) })),
       onSnapshot(collection(db, 'subsPayments'), (s) => set({ payments: rows(s), ready: true })),
     ];
     return () => off.forEach((f) => f());
@@ -72,7 +73,7 @@ export default function SubscriptionsPage() {
 }
 
 function Manager() {
-  const { config, clients, payments, ready } = useSubs();
+  const { config, clients, payments, requests, ready } = useSubs();
   const [tab, setTab] = useState('resumen');
   const [clientModal, setClientModal] = useState(null); // {} = nuevo, cliente = editar
   const [payModal, setPayModal] = useState(null);
@@ -84,12 +85,12 @@ function Manager() {
     <>
       <PageHeader title="Suscripciones" description={`Factura del proveedor: ${formatDate(m.cycle.end)} · próximo cobro: ${m.nextDue ? formatDate(m.nextDue) : '—'}`} />
       <Tabs className="mb-6" value={tab} onChange={setTab} items={[
-        { value: 'resumen', label: 'Resumen' }, { value: 'solicitudes', label: 'Solicitudes' }, { value: 'clientes', label: 'Clientes', count: clients.length },
+        { value: 'resumen', label: 'Resumen' }, { value: 'solicitudes', label: 'Solicitudes', count: requests.filter((r) => r.status === 'pendiente').length || undefined }, { value: 'clientes', label: 'Clientes', count: clients.length },
         { value: 'pagos', label: 'Pagos', count: payments.length }, { value: 'config', label: 'Configuración' },
       ]} />
       {!ready ? <p className="text-sm text-adm-muted">Cargando…</p> : (
         <>
-          {tab === 'resumen' && <Summary m={m} config={config} onPay={setPayModal} now={now} payments={payments} />}
+          {tab === 'resumen' && <Summary m={m} config={config} onPay={setPayModal} now={now} payments={payments} requests={requests} go={setTab} />}
           {tab === 'solicitudes' && <Requests config={config} />}
           {tab === 'clientes' && <Clients clients={clients} payments={payments} config={config} now={now} onEdit={setClientModal} onPay={setPayModal} />}
           {tab === 'pagos' && <Payments payments={payments} byId={byId} onNew={() => setPayModal({})} />}
@@ -133,19 +134,63 @@ function CollectedChart({ payments, config, costNio, now }) {
   );
 }
 
-/** Próximos cobros (30 días): calendario unificado por fecha. */
+/** Calendario de cobros agrupado por día del mes (cada cliente paga siempre el mismo día). */
 function UpcomingChart({ rows, now }) {
-  const items = rows.filter((r) => r.nextAmount > 0 && r.nextDate - now < 30 * 86400000).sort((a, b) => a.nextDate - b.nextDate);
-  const max = Math.max(...items.map((r) => r.nextAmount), 1);
+  const groups = useMemo(() => {
+    const by = {};
+    rows.filter((r) => r.nextAmount > 0).forEach((r) => {
+      const d = payDayOf(r.client);
+      (by[d] ||= { day: d, next: r.nextDate, items: [] }).items.push(r);
+      by[d].next = Math.min(by[d].next, r.nextDate);
+    });
+    return Object.values(by).sort((x, y) => x.next - y.next);
+  }, [rows]);
+  const month = (ms) => new Intl.DateTimeFormat('es-NI', { month: 'short', timeZone: 'America/Managua' }).format(ms);
+  const inDays = (ms) => { const d = Math.ceil((ms - now) / 86400000); return d <= 0 ? 'hoy' : d === 1 ? 'mañana' : `en ${d} días`; };
   return (
     <Card>
-      <CardHeader title="Próximos cobros" description="Los próximos 30 días, por fecha de pago de cada cliente" />
+      <CardHeader title="Calendario de cobros" description="Cada cliente paga el mismo día todos los meses" />
       <CardBody className="space-y-3">
-        {items.length === 0 ? <p className="text-sm text-adm-muted">Sin cobros en los próximos 30 días.</p> : items.map((r) => (
-          <div key={r.client.id} className="grid grid-cols-[88px_1fr_auto] items-center gap-3 text-sm">
-            <span className="tabular-nums text-adm-muted">{formatDate(r.nextDate)}</span>
-            <div className="h-6 overflow-hidden rounded-md bg-adm-surface-2"><div className="flex h-full items-center rounded-md bg-adm-accent/25 px-2 text-xs font-medium" style={{ width: `${(r.nextAmount / max) * 100}%` }}>{r.client.name}</div></div>
-            <span className="tabular-nums font-medium">{nio(r.nextAmount)}</span>
+        {groups.length === 0 ? <p className="text-sm text-adm-muted">Sin cobros programados.</p> : groups.map((g) => (
+          <div key={g.day} className="flex items-stretch gap-4 rounded-xl border border-adm-border p-3">
+            <div className="flex w-16 shrink-0 flex-col items-center justify-center rounded-lg bg-adm-accent/10 py-2 text-adm-accent">
+              <span className="text-[10px] font-semibold uppercase tracking-wide">Día</span>
+              <span className="text-3xl font-bold leading-none tabular-nums">{g.day}</span>
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-xs text-adm-muted">Próximo: {formatDate(g.next)} · <span className="font-medium text-adm-text">{inDays(g.next)}</span></p>
+              <ul className="mt-1 space-y-0.5 text-sm">
+                {g.items.map((r) => <li key={r.client.id} className="flex justify-between gap-2"><span className="truncate">{r.client.name}</span><span className="tabular-nums">{nio(r.nextAmount)}</span></li>)}
+              </ul>
+            </div>
+            <div className="self-center text-right"><p className="text-[10px] uppercase text-adm-muted">Total</p><p className="font-semibold tabular-nums">{nio(g.items.reduce((t, r) => t + r.nextAmount, 0))}</p><p className="text-[10px] capitalize text-adm-muted">{month(g.next)}</p></div>
+          </div>
+        ))}
+      </CardBody>
+    </Card>
+  );
+}
+
+/** Lo que hay que hacer hoy, con un botón directo a cada cosa. */
+function TodoCard({ m, requests, now, go, onPay }) {
+  const pend = requests.filter((r) => r.status === 'pendiente').length;
+  const overdue = m.unpaid.filter((r) => r.status === 'vencido');
+  const soon = m.rows.filter((r) => r.nextAmount > 0 && r.nextDate - now <= 3 * 86400000 && r.nextDate > now);
+  const items = [
+    pend && { tone: 'accent', text: `${pend} solicitud${pend > 1 ? 'es' : ''} nueva${pend > 1 ? 's' : ''} por revisar`, action: 'Revisar', onClick: () => go('solicitudes') },
+    ...overdue.map((r) => ({ tone: 'danger', text: `${r.client.name} debe ${nio(r.owed)} (venció el ${formatDate(r.dueDate)})`, action: 'Registrar pago', onClick: () => onPay({ clientId: r.client.id }) })),
+    soon.length && { tone: 'warning', text: `${soon.length} cobro${soon.length > 1 ? 's' : ''} en los próximos 3 días (${nio(soon.reduce((t, r) => t + r.nextAmount, 0))})`, action: 'Ver clientes', onClick: () => go('clientes') },
+  ].filter(Boolean);
+  const dot = { accent: 'bg-adm-accent', danger: 'bg-adm-danger', warning: 'bg-adm-warning' };
+  return (
+    <Card>
+      <CardHeader title="Para hoy" description={items.length ? 'Toca un botón para resolverlo' : undefined} />
+      <CardBody className="space-y-2 pt-0">
+        {items.length === 0 ? <p className="text-sm text-adm-success">✓ Todo al día. No hay nada pendiente.</p> : items.map((it, i) => (
+          <div key={i} className="flex items-center gap-3 rounded-lg bg-adm-surface-2 px-3 py-2">
+            <span className={`h-2 w-2 shrink-0 rounded-full ${dot[it.tone]}`} aria-hidden="true" />
+            <span className="flex-1 text-sm">{it.text}</span>
+            <Button size="sm" onClick={it.onClick}>{it.action}</Button>
           </div>
         ))}
       </CardBody>
@@ -178,13 +223,14 @@ function CashModal({ open, onClose, config, m }) {
   );
 }
 
-function Summary({ m, config, onPay, now, payments }) {
+function Summary({ m, config, onPay, now, payments, requests, go }) {
   const [cashOpen, setCashOpen] = useState(false);
   const liquidity = m.covered
     ? { value: 'Cubierto', hint: `Disponible ${nio(m.available)} ≥ factura ${nio(m.costNio)}`, tone: 'success' }
     : { value: `Te faltan ${nio(m.liquidityGapNio)}`, hint: `Disponible ${nio(m.available)} de ${nio(m.costNio)} (${usd(m.invoiceUsd)})`, tone: 'warning' };
   return (
     <div className="space-y-6">
+      <TodoCard m={m} requests={requests} now={now} go={go} onPay={onPay} />
       <div className="relative overflow-hidden rounded-2xl border border-adm-border bg-adm-surface p-6">
         <div className="pointer-events-none absolute -right-10 -top-16 h-48 w-48 rounded-full bg-adm-accent/15 blur-3xl" />
         <div className="relative grid gap-6 sm:grid-cols-3">
@@ -497,7 +543,7 @@ function ConfigForm({ config }) {
     try {
       const data = {
         currency: 'NIO', businessName: String(f.businessName || '').trim() || DEFAULT_CONFIG.businessName, autoEmails: !!f.autoEmails,
-        paymentInstructions: String(f.paymentInstructions || '').trim(),
+        paymentInstructions: String(f.paymentInstructions || '').trim(), whatsapp: String(f.whatsapp || '').trim(),
         ...Object.fromEntries(['defaultPrice', 'costPerSeatUsd', 'exchangeRate', 'cycleDay', 'reminderDaysBefore'].map((k) => [k, Number(f[k])])),
       };
       if (Object.values(data).some((v) => typeof v === 'number' && !(v >= 0)) || data.exchangeRate <= 0 || data.cycleDay < 1 || data.cycleDay > 28 ) throw new Error('Revisa los números (días entre 1 y 28, tipo de cambio mayor que 0).');
@@ -517,6 +563,7 @@ function ConfigForm({ config }) {
         <Field label="Costo por cupo (US$)"><Input {...num('costPerSeatUsd')} /></Field>
         <Field label="Tipo de cambio (C$ por US$)"><Input {...num('exchangeRate')} /></Field>
         <Field label="Día de corte del ciclo" hint="Factura del proveedor"><Input {...num('cycleDay')} /></Field>
+        <Field label="Tu WhatsApp (botón en los correos)"><Input value={f.whatsapp || ''} onChange={(e) => setF((p) => ({ ...p, whatsapp: e.target.value }))} placeholder="+505 7679 6164" /></Field>
         <Field label="Recordar N días antes"><Input {...num('reminderDaysBefore')} /></Field>
         <div className="flex items-center gap-3 self-end pb-2"><Switch checked={!!f.autoEmails} onChange={(v) => setF((p) => ({ ...p, autoEmails: v }))} label="Correos automáticos" /><span className="text-sm">Correos automáticos</span></div>
         <Field label="Instrucciones de pago (correos y formulario público)" className="sm:col-span-2 lg:col-span-3"><Textarea rows={3} value={f.paymentInstructions || ''} onChange={(e) => setF((p) => ({ ...p, paymentInstructions: e.target.value }))} /></Field>

@@ -3,7 +3,7 @@
 // Hora de Nicaragua (UTC-6 fijo, sin horario de verano). Las fechas son ms.
 export const DEFAULT_CONFIG = {
   currency: 'NIO', defaultPrice: 300, costPerSeatUsd: 3, exchangeRate: 36.6, cycleDay: 24,
-  reminderDaysBefore: 3, autoEmails: true, businessName: 'Boreal Labs',
+  reminderDaysBefore: 3, autoEmails: true, businessName: 'Boreal Labs', whatsapp: '+505 7679 6164',
   paymentInstructions: 'Realiza tu pago por transferencia o en efectivo y envíanos el comprobante respondiendo este correo.',
 };
 
