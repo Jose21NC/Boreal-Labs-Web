@@ -1,6 +1,8 @@
 // Datos ficticios para el modo de prueba. Nombres y correos inventados (dominio example.com).
 // Fechas relativas a "hoy" para que siempre haya eventos pasados y próximos.
 
+import { DEFAULT_CONFIG, cycleBounds } from '../../functions/billing.js';
+
 const DAY = 24 * 60 * 60 * 1000;
 const at = (offsetDays, hour = 9) => {
   const d = new Date(Date.now() + offsetDays * DAY);
@@ -242,6 +244,8 @@ export function seed() {
       },
     },
     eventSecrets: { 'evt-design': { code: 'BOREAL24', updatedAt: at(-4), updatedBy: 'contacto@borealabs.org' } },
+    // Suscripciones (/claude): fechas relativas al ciclo actual (24 al 24) para reproducir el ejemplo del dueño.
+    ...subsSeed(),
     adminEvents: { 'adm-1': { name: 'Charla de Emprendimiento (manual)', createdAt: at(-8) } },
     eventTemplates: {},
     adminActivity: Object.fromEntries([
@@ -259,6 +263,24 @@ export function seed() {
       [-6.2, 'admin@borealabs.org', null, 'equipo.agregado', 'Agregó a un nuevo miembro al staff de Comunicación'],
     ].map(([days, actorEmail, actorName, action, summary], i) => [`act-${i}`, {
       action, summary, meta: {}, actorEmail, actorName, at: new Date(Date.now() + days * DAY),
+    }])),
+  };
+}
+
+function subsSeed() {
+  const start = cycleBounds(Date.now()).start;
+  const d = (n) => new Date(start + n * DAY + 6 * 3600000); // mediodía de Managua, n días después del corte
+  return {
+    subsConfig: { main: { ...DEFAULT_CONFIG } },
+    subsClients: {
+      'sub-1': { name: 'Ana López', email: 'ana.lopez@example.com', phone: '+505 8123 4567', price: 300, joinedAt: d(5), status: 'activo', notes: '', createdAt: d(5), createdBy: 'contacto@borealabs.org' },
+      'sub-2': { name: 'Luis Martínez', email: 'luis.martinez@example.com', phone: '+505 8234 5678', price: 300, joinedAt: d(5), status: 'activo', notes: '', createdAt: d(5), createdBy: 'contacto@borealabs.org' },
+      'sub-3': { name: 'María Rivera', email: 'maria.rivera@example.com', phone: '+505 8345 6789', price: 220, joinedAt: d(11), status: 'activo', notes: 'Precio especial', createdAt: d(11), createdBy: 'contacto@borealabs.org' },
+      'sub-4': { name: 'Carlos Rojas', email: 'carlos.rojas@example.com', phone: '+505 8456 7890', price: 250, joinedAt: d(14), status: 'activo', notes: '', createdAt: d(14), createdBy: 'contacto@borealabs.org' },
+    },
+    // Ana y Luis pagaron 300 por adelantado: cubiertos hasta 5 días después del próximo corte.
+    subsPayments: Object.fromEntries(['sub-1', 'sub-2'].map((id, i) => [`pay-${i}`, {
+      clientId: id, amount: 300, paidAt: d(5), cycleKey: cycleBounds(start).key, method: 'Transferencia', note: 'Pago adelantado', coversUntil: d(5 + 31), recordedBy: 'contacto@borealabs.org', createdAt: d(5),
     }])),
   };
 }
