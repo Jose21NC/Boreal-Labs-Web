@@ -286,6 +286,21 @@ service cloud.firestore {
     }
 
     // Todo lo demás (adminEvents, eventTemplates, adminActivity, etc.): solo admin.
+    // Suscripciones: datos públicos del formulario de /claude (precio e instrucciones, sin costos).
+    match /subsConfig/public {
+      allow read: if true;
+    }
+
+    // Solicitudes públicas desde /claude (OfferPage.jsx). Solo crear; el resto lo hace el admin.
+    match /subsRequests/{id} {
+      allow create: if request.resource.data.keys().hasOnly(['name','email','whatsapp','proofUrl','proofPath','status','createdAt'])
+        && request.resource.data.status == 'pendiente'
+        && request.resource.data.createdAt == request.time
+        && validEmail(request.resource.data.email)
+        && request.resource.data.name is string && request.resource.data.name.size() > 0
+        && str('name', 200) && str('whatsapp', 50) && str('proofUrl', 1000) && str('proofPath', 300);
+    }
+
     match /{document=**} {
       allow read, write: if isAdmin();
     }

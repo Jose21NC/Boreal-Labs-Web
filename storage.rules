@@ -24,6 +24,14 @@ service firebase.storage {
       allow list, update, delete: if isAdmin();
     }
 
+    // Comprobantes de pago del formulario de /claude.
+    match /subs-proofs/{file} {
+      allow create: if request.resource.size < 5 * 1024 * 1024
+        && request.resource.contentType.matches('image/(jpeg|png|webp|heic)');
+      allow get: if true;
+      allow list, update, delete: if isAdmin();
+    }
+
     // Imágenes que adjunta quien se inscribe a un evento (campos personalizados tipo imagen).
     match /registration-uploads/{eventId}/{file} {
       allow create: if request.resource.size < 5 * 1024 * 1024

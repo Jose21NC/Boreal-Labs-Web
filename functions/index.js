@@ -9,7 +9,7 @@ import { PDFDocument } from 'pdf-lib';
 import { certificateEmail, customEmail, registrationEmail, reminderEmail, sendOnce } from './email.js';
 import { onSchedule } from 'firebase-functions/v2/scheduler';
 import { LOOKAHEAD_MS, duePhases, isVirtualReg } from './reminders.js';
-import { DEFAULT_CONFIG, clientCycle, reminderPhase } from './billing.js';
+import { DEFAULT_CONFIG, clientCycle, reminderFor } from './billing.js';
 import { subscriptionEmail } from './subsEmails.js';
 import Anthropic from '@anthropic-ai/sdk';
 import { buildAiPrompt } from './aiText.js';
@@ -542,13 +542,14 @@ const subsId = (snap) => ({ id: snap.id, ...snap.data() });
 async function subsMessage(kind, client, cfg, now = Date.now()) {
   const pays = (await db.collection('subsPayments').where('clientId', '==', client.id).get()).docs.map(subsId);
   const c = clientCycle(client, pays, cfg, now);
-  return subscriptionEmail(kind, { client, due: Math.max(0, c.due - c.paid), dueDate: c.dueDate, cfg });
+  if (kind === 'welcome') return subscriptionEmail(kind, { client, due: c.due, dueDate: c.nextDate, cfg });
+  return subscriptionEmail(kind, { client, due: c.owed || c.due, dueDate: c.dueDate, cfg });
 }
 
 export const onSubsClientCreated = onDocumentCreated(emailTrigger('subsClients/{id}'), async (event) => {
   const cfg = await subsConfig();
   if (!cfg.autoEmails) return;
-  await sendOnce(db, event.data.ref, async (c) => (c.status === 'activo' ? subsMessage('welcome', subsId(event.data), cfg) : null), { password: SMTP_PASSWORD.value(), field: 'welcomeEmail' });
+  await sendOnce(db, event.data.ref, async (c) => (c.status === 'activo' && !c.skipWelcome && c.email ? subsMessage('welcome', subsId(event.data), cfg) : null), { password: SMTP_PASSWORD.value(), field: 'welcomeEmail' });
 });
 
 // Una vez al día: recordatorio N días antes del vencimiento y aviso de vencido al día siguiente.
@@ -565,11 +566,10 @@ export const sendSubscriptionReminders = onSchedule(
     const payments = pays.docs.map(subsId);
     for (const doc of clients.docs) { // secuencial: respeta el límite SMTP de Gmail
       const client = subsId(doc);
-      const c = clientCycle(client, payments.filter((p) => p.clientId === client.id), cfg, now);
-      const phase = c.status === 'al_dia' ? null : reminderPhase(c.dueDate, now, Number(cfg.reminderDaysBefore) || 3);
-      if (!phase) continue;
-      const field = `${phase === 'reminder' ? 'payReminder' : 'overdue'}_${c.cycle.key.replace('-', '_')}`;
-      await sendOnce(db, doc.ref, async () => subscriptionEmail(phase, { client, due: c.due - c.paid, dueDate: c.dueDate, cfg }), { password: SMTP_PASSWORD.value(), field });
+      const r = client.email ? reminderFor(client, payments, cfg, now) : null;
+      if (!r) continue;
+      const field = `${r.phase === 'reminder' ? 'payReminder' : 'overdue'}_${r.key.replace('-', '_')}`;
+      await sendOnce(db, doc.ref, async () => subscriptionEmail(r.phase, { client, due: r.due, dueDate: r.dueDate, cfg }), { password: SMTP_PASSWORD.value(), field });
     }
   },
 );

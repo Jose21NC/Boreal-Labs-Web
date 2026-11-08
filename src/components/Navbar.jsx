@@ -19,7 +19,7 @@ const Navbar = () => {
     return () => window.removeEventListener('scroll', onScroll);
   }, []);
 
-  if (location.pathname.toLowerCase() === '/voxlab' || location.pathname.startsWith('/admin') || location.pathname === '/claude') {
+  if (location.pathname.toLowerCase() === '/voxlab' || location.pathname.startsWith('/admin') || location.pathname.startsWith('/claude')) {
     return null;
   }
 

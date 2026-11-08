@@ -21,6 +21,7 @@ const PaginaValidacion = lazy(() => import('@/pages/PaginaValidacion'));
 const AdminGate = lazy(() => import('@/components/AdminGate'));
 const AdminApp = lazy(() => import('@/admin/AdminApp'));
 const SubscriptionsPage = lazy(() => import('@/admin/sections/suscripciones'));
+const OfferPage = lazy(() => import('@/pages/OfferPage'));
 const VoxlabPage = lazy(() => import('@/pages/VoxlabPage'));
 
 // Se importa el proveedor de reCAPTCHA
@@ -76,7 +77,8 @@ function App() {
 
 
                     {/* Oculta: gestor de suscripciones (no está en el menú del admin ni en el sitemap) */}
-                    <Route path="/claude" element={<AdminGate><SubscriptionsPage /></AdminGate>} />
+                    <Route path="/claude" element={<OfferPage />} />
+                    <Route path="/claude/admin" element={<AdminGate><SubscriptionsPage /></AdminGate>} />
 
                     {/* Voxlab */}
                     <Route path="/voxlab" element={<VoxlabPage />} />
@@ -112,7 +114,7 @@ function ConditionalFooter() {
   const location = useLocation();
   const path = location.pathname || '';
   
-  if (path.toLowerCase() === '/voxlab' || path.startsWith('/admin') || path === '/claude') {
+  if (path.toLowerCase() === '/voxlab' || path.startsWith('/admin') || path.startsWith('/claude')) {
     return null;
   }
   

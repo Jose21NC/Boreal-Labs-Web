@@ -1,7 +1,7 @@
 // Datos ficticios para el modo de prueba. Nombres y correos inventados (dominio example.com).
 // Fechas relativas a "hoy" para que siempre haya eventos pasados y próximos.
 
-import { DEFAULT_CONFIG, cycleBounds } from '../../functions/billing.js';
+import { DEFAULT_CONFIG, paymentPeriod } from '../../functions/billing.js';
 
 const DAY = 24 * 60 * 60 * 1000;
 const at = (offsetDays, hour = 9) => {
@@ -268,19 +268,15 @@ export function seed() {
 }
 
 function subsSeed() {
-  const start = cycleBounds(Date.now()).start;
-  const d = (n) => new Date(start + n * DAY + 6 * 3600000); // mediodía de Managua, n días después del corte
+  const d = (n) => new Date(Date.now() - n * DAY); // hace n días
+  const c = (name, email, price, n, notes = '') => ({ name, email, phone: '+505 8123 4567', price, joinedAt: d(n), status: 'activo', notes, createdAt: d(n), createdBy: 'contacto@borealabs.org' });
+  const clients = { 'sub-1': c('Ana López', 'ana.lopez@example.com', 300, 9), 'sub-2': c('Luis Martínez', 'luis.martinez@example.com', 300, 9), 'sub-3': c('María Rivera', 'maria.rivera@example.com', 220, 3, 'Precio especial'), 'sub-4': c('Carlos Rojas', 'carlos.rojas@example.com', 250, 0) };
   return {
-    subsConfig: { main: { ...DEFAULT_CONFIG } },
-    subsClients: {
-      'sub-1': { name: 'Ana López', email: 'ana.lopez@example.com', phone: '+505 8123 4567', price: 300, joinedAt: d(5), status: 'activo', notes: '', createdAt: d(5), createdBy: 'contacto@borealabs.org' },
-      'sub-2': { name: 'Luis Martínez', email: 'luis.martinez@example.com', phone: '+505 8234 5678', price: 300, joinedAt: d(5), status: 'activo', notes: '', createdAt: d(5), createdBy: 'contacto@borealabs.org' },
-      'sub-3': { name: 'María Rivera', email: 'maria.rivera@example.com', phone: '+505 8345 6789', price: 220, joinedAt: d(11), status: 'activo', notes: 'Precio especial', createdAt: d(11), createdBy: 'contacto@borealabs.org' },
-      'sub-4': { name: 'Carlos Rojas', email: 'carlos.rojas@example.com', phone: '+505 8456 7890', price: 250, joinedAt: d(14), status: 'activo', notes: '', createdAt: d(14), createdBy: 'contacto@borealabs.org' },
-    },
-    // Ana y Luis pagaron 300 por adelantado: cubiertos hasta 5 días después del próximo corte.
-    subsPayments: Object.fromEntries(['sub-1', 'sub-2'].map((id, i) => [`pay-${i}`, {
-      clientId: id, amount: 300, paidAt: d(5), cycleKey: cycleBounds(start).key, method: 'Transferencia', note: 'Pago adelantado', coversUntil: d(5 + 31), recordedBy: 'contacto@borealabs.org', createdAt: d(5),
+    subsConfig: { main: { ...DEFAULT_CONFIG }, public: { price: DEFAULT_CONFIG.defaultPrice, paymentInstructions: DEFAULT_CONFIG.paymentInstructions, businessName: DEFAULT_CONFIG.businessName } },
+    subsClients: clients,
+    subsPayments: Object.fromEntries(Object.entries(clients).map(([id, x], i) => [`pay-${i}`, {
+      clientId: id, amount: x.price, paidAt: x.joinedAt, cycleKey: paymentPeriod(x, x.joinedAt.getTime()).key, method: 'Transferencia', note: '', recordedBy: 'contacto@borealabs.org', createdAt: x.joinedAt,
     }])),
+    subsRequests: { 'req-1': { name: 'Sofía Pérez', email: 'sofia.perez@example.com', whatsapp: '+505 8765 4321', proofUrl: proofImage('Sofía Pérez', 1), proofPath: '', status: 'pendiente', createdAt: d(0) } },
   };
 }

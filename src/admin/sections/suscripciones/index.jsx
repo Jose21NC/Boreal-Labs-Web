@@ -4,7 +4,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { MotionConfig } from 'framer-motion';
-import { addDoc, collection, doc, onSnapshot, serverTimestamp, setDoc, updateDoc } from 'firebase/firestore';
+import { addDoc, collection, doc, onSnapshot, serverTimestamp, setDoc, updateDoc, writeBatch } from 'firebase/firestore';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { Banknote, Download, Mail, Pencil, Plus, Receipt, Users } from 'lucide-react';
 import { auth, db } from '@/firebase';
@@ -16,7 +16,8 @@ import {
   Badge, Button, Card, CardBody, CardHeader, ConfirmProvider, EmptyState, Field, Input, Modal, PageHeader, SearchInput, Select, StatCard,
   Switch, TD, TH, THead, TR, Table, Tabs, Textarea, useConfirm,
 } from '@/admin/ui';
-import { DEFAULT_CONFIG, amountDue, clientCycle, cycleBounds, metrics, prorate, toMs } from '../../../../functions/billing.js';
+import { DEFAULT_CONFIG, clientCycle, metrics, payDayOf, paymentPeriod, toMs } from '../../../../functions/billing.js';
+import { Requests } from './Requests';
 
 const nio = (n) => `C$ ${Number(n || 0).toLocaleString('es-NI', { maximumFractionDigits: 2 })}`;
 const usd = (n) => `US$ ${Number(n || 0).toLocaleString('es-NI', { maximumFractionDigits: 2 })}`;
@@ -81,14 +82,15 @@ function Manager() {
 
   return (
     <>
-      <PageHeader title="Suscripciones" description={`Ciclo del ${formatDate(m.cycle.start)} al ${formatDate(m.cycle.end)} · vence el ${formatDate(m.nextDue)}`} />
+      <PageHeader title="Suscripciones" description={`Factura del proveedor: ${formatDate(m.cycle.end)} · próximo cobro: ${m.nextDue ? formatDate(m.nextDue) : '—'}`} />
       <Tabs className="mb-6" value={tab} onChange={setTab} items={[
-        { value: 'resumen', label: 'Resumen' }, { value: 'clientes', label: 'Clientes', count: clients.length },
+        { value: 'resumen', label: 'Resumen' }, { value: 'solicitudes', label: 'Solicitudes' }, { value: 'clientes', label: 'Clientes', count: clients.length },
         { value: 'pagos', label: 'Pagos', count: payments.length }, { value: 'config', label: 'Configuración' },
       ]} />
       {!ready ? <p className="text-sm text-adm-muted">Cargando…</p> : (
         <>
           {tab === 'resumen' && <Summary m={m} config={config} onPay={setPayModal} now={now} />}
+          {tab === 'solicitudes' && <Requests config={config} />}
           {tab === 'clientes' && <Clients clients={clients} payments={payments} config={config} now={now} onEdit={setClientModal} onPay={setPayModal} />}
           {tab === 'pagos' && <Payments payments={payments} byId={byId} onNew={() => setPayModal({})} />}
           {tab === 'config' && <ConfigForm config={config} />}
@@ -113,11 +115,11 @@ function Summary({ m, config, onPay, now }) {
         <StatCard label="Ganancia neta" value={nio(m.profit)} hint={`Margen ${pct(m.margin)}`} icon={Banknote} tone={m.profit >= 0 ? 'success' : 'danger'} />
         <StatCard label="Cobrado vs esperado" value={`${nio(m.collected)} / ${nio(m.expected)}`} hint={m.pending > 0 ? `Faltan ${nio(m.pending)}` : 'Todo cobrado'} icon={Users} tone="accent" />
         <StatCard label={`Liquidez para la factura del ${config.cycleDay}`} value={liquidity.value} hint={liquidity.hint} tone={liquidity.tone} icon={Receipt} />
-        <StatCard label="Próximo vencimiento" value={formatDate(m.nextDue)} hint={`Día ${config.dueDay} de cada mes`} icon={Receipt} tone="warning" />
-        <StatCard label="Proyección próximo ciclo" value={nio(m.projectedNext)} hint="Con créditos aplicados" icon={Banknote} tone="accent" />
+        <StatCard label="Próximo cobro" value={m.nextDue ? formatDate(m.nextDue) : '—'} hint="Cada cliente paga el día de su primer pago" icon={Receipt} tone="warning" />
+        <StatCard label="Proyección próximo ciclo" value={nio(m.projectedNext)} hint="Suma de precios activos" icon={Banknote} tone="accent" />
       </div>
       <Card>
-        <CardHeader title="Pendientes y vencidos" description="Clientes activos que aún no cubren este ciclo" />
+        <CardHeader title="Pendientes y vencidos" description="Deben su mes o les toca pagar pronto" />
         {m.unpaid.length === 0 ? <EmptyState icon={Users} title="Nadie debe nada" description="Todos los clientes activos están al día." /> : (
           <Table>
             <THead><tr><TH>Cliente</TH><TH>Estado</TH><TH>Vence</TH><TH className="text-right">Debe</TH><TH /></tr></THead>
@@ -127,7 +129,7 @@ function Summary({ m, config, onPay, now }) {
                   <TD className="font-medium">{r.client.name}</TD>
                   <TD><StatusBadge status={r.status} /></TD>
                   <TD>{formatDate(r.dueDate)}</TD>
-                  <TD className="text-right tabular-nums">{nio(r.due - r.paid)}</TD>
+                  <TD className="text-right tabular-nums">{nio(r.owed)}</TD>
                   <TD className="text-right"><Button size="sm" onClick={() => onPay({ clientId: r.client.id })}>Registrar pago</Button></TD>
                 </TR>
               ))}
@@ -151,6 +153,21 @@ function Clients({ clients, payments, config, now, onEdit, onPay }) {
       const last = mine.reduce((a, p) => (toMs(p.paidAt) > toMs(a?.paidAt || 0) ? p : a), null);
       return { c, cy: clientCycle(c, payments, config, now), last };
     }).sort((a, b) => String(a.c.name).localeCompare(String(b.c.name))), [clients, payments, config, q, now]);
+
+  // Una sola vez: los 4 clientes que ya pagaron (fecha de primer pago = su día de cobro). Sin correo de bienvenida.
+  const loadInitial = async () => {
+    try {
+      const batch = writeBatch(db);
+      [['Cliente 1', 300, '2026-10-29'], ['Cliente 2', 300, '2026-10-29'], ['Cliente 3', 220, '2026-11-04'], ['Cliente 4', 250, '2026-11-07']].forEach(([name, price, iso]) => {
+        const ref = doc(collection(db, 'subsClients'));
+        const client = { name, email: '', phone: '', price, joinedAt: fromIso(iso), notes: 'Cliente inicial: completa nombre, correo y WhatsApp', status: 'activo', skipWelcome: true, createdAt: serverTimestamp(), createdBy: who() };
+        batch.set(ref, client);
+        batch.set(doc(collection(db, 'subsPayments')), { clientId: ref.id, amount: price, paidAt: client.joinedAt, cycleKey: paymentPeriod(client, client.joinedAt.getTime()).key, method: 'Transferencia', note: 'Primer pago', recordedBy: who(), createdAt: serverTimestamp() });
+      });
+      await batch.commit();
+      logActivity('suscripciones.cliente_nuevo', 'Cargó los 4 clientes iniciales', { count: 4 });
+    } catch (e) { toast({ title: 'No se pudo cargar', description: e?.message, variant: 'destructive' }); }
+  };
 
   const remind = async (c, cy) => {
     setSending(c.id);
@@ -177,7 +194,7 @@ function Clients({ clients, payments, config, now, onEdit, onPay }) {
           <Button size="sm" variant="primary" onClick={() => onEdit({})}><Plus className="h-4 w-4" />Nuevo cliente</Button>
         </>
       )} />
-      {rows.length === 0 ? <EmptyState icon={Users} title="Sin clientes" description="Agrega el primero con «Nuevo cliente»." /> : (
+      {rows.length === 0 ? <EmptyState icon={Users} title="Sin clientes" description="Agrega el primero con «Nuevo cliente» o carga los 4 actuales." action={clients.length === 0 && <Button onClick={loadInitial}>Cargar mis 4 clientes</Button>} /> : (
         <Table>
           <THead><tr><TH>Nombre</TH><TH>Contacto</TH><TH className="text-right">Precio</TH><TH>Alta</TH><TH>Estado</TH><TH>Próximo cobro</TH><TH>Último pago</TH><TH /></tr></THead>
           <tbody>
@@ -189,7 +206,7 @@ function Clients({ clients, payments, config, now, onEdit, onPay }) {
                 <TD className="whitespace-nowrap">{formatDate(c.joinedAt)}</TD>
                 <TD><StatusBadge status={cy.status} /></TD>
                 <TD className="whitespace-nowrap tabular-nums">
-                  {c.status === 'activo' ? <>{nio(cy.nextAmount)}<span className="block text-xs text-adm-muted">{cy.nextCredit > 0 ? `crédito −${nio(cy.nextCredit)} · ` : ''}{formatDate(cy.cycle.end)}</span></> : '—'}
+                  {c.status === 'activo' ? <>{nio(cy.nextAmount)}<span className="block text-xs text-adm-muted">día {payDayOf(c)} · {formatDate(cy.nextDate)}</span></> : '—'}
                 </TD>
                 <TD className="whitespace-nowrap tabular-nums">{last ? <>{nio(last.amount)}<span className="block text-xs text-adm-muted">{formatDate(last.paidAt)}</span></> : '—'}</TD>
                 <TD className="whitespace-nowrap text-right">
@@ -222,7 +239,6 @@ function ClientModal({ item, onClose, config }) {
   }, [item]); // eslint-disable-line react-hooks/exhaustive-deps
   const set = (k) => (e) => setF((p) => ({ ...p, [k]: e.target.value }));
   const joined = f.joinedAt ? fromIso(f.joinedAt) : null;
-  const preview = joined && Number(f.price) > 0 ? prorate(Number(f.price), joined.getTime(), config.cycleDay) : null;
   const valid = f.name?.trim() && Number(f.price) > 0 && joined;
 
   const save = async () => {
@@ -266,14 +282,9 @@ function ClientModal({ item, onClose, config }) {
         <Field label="Correo"><Input type="email" value={f.email || ''} onChange={set('email')} /></Field>
         <Field label="Teléfono"><Input value={f.phone || ''} onChange={set('phone')} /></Field>
         <Field label="Precio mensual (C$)"><Input type="number" min="0" value={f.price ?? ''} onChange={set('price')} /></Field>
-        <Field label="Fecha de alta"><Input type="date" value={f.joinedAt || ''} onChange={set('joinedAt')} /></Field>
+        <Field label="Fecha del primer pago" hint="Define su día de pago mensual"><Input type="date" value={f.joinedAt || ''} onChange={set('joinedAt')} /></Field>
         <Field label="Notas" className="sm:col-span-2"><Textarea value={f.notes || ''} onChange={set('notes')} /></Field>
       </div>
-      {isNew && preview != null && (
-        <p className="mt-4 rounded-lg border border-adm-accent/30 bg-adm-accent/10 p-3 text-sm">
-          Primer cobro prorrateado: <strong>{nio(preview)}</strong>; después {nio(f.price)} por ciclo.
-        </p>
-      )}
       {!isNew && item.email && <Button className="mt-4" size="sm" onClick={sendWelcome}><Mail className="h-4 w-4" />Reenviar bienvenida</Button>}
     </Modal>
   );
@@ -316,20 +327,19 @@ function PaymentModal({ item, onClose, clients, payments, config, now }) {
   const [f, setF] = useState({});
   const [busy, setBusy] = useState(false);
   const active = clients.filter((c) => c.status !== 'cancelado');
-  const cycleOf = (iso) => cycleBounds(iso ? fromIso(iso).getTime() : now, config.cycleDay);
-  // Monto sugerido: lo que falta por cubrir el ciclo de la fecha de pago.
+  const cycleOf = (clientId, iso) => { const c = clients.find((x) => x.id === clientId); return c ? paymentPeriod(c, iso ? fromIso(iso).getTime() : now) : null; };
+  // Monto sugerido: lo que falta por cubrir el mes al que corresponde la fecha de pago.
   const suggest = (clientId, iso) => {
     const c = clients.find((x) => x.id === clientId);
     if (!c) return '';
-    const cy = cycleOf(iso);
-    const mine = payments.filter((p) => p.clientId === clientId);
-    const paid = mine.filter((p) => p.cycleKey === cy.key).reduce((s, p) => s + (Number(p.amount) || 0), 0);
-    return Math.max(0, amountDue(c, cy, mine, config) - paid);
+    const key = cycleOf(clientId, iso).key;
+    const paid = payments.filter((p) => p.clientId === clientId && p.cycleKey === key).reduce((s, p) => s + (Number(p.amount) || 0), 0);
+    return Math.max(0, (Number(c.price) || 0) - paid);
   };
   useEffect(() => {
     if (!item) return;
     const paidAt = isoDay(now);
-    setF({ clientId: item.clientId || '', amount: item.clientId ? suggest(item.clientId, paidAt) : '', paidAt, method: 'Transferencia', note: '', coversUntil: '' });
+    setF({ clientId: item.clientId || '', amount: item.clientId ? suggest(item.clientId, paidAt) : '', paidAt, method: 'Transferencia', note: '' });
   }, [item]); // eslint-disable-line react-hooks/exhaustive-deps
   const set = (k) => (e) => setF((p) => ({ ...p, [k]: e.target.value }));
   const pick = (k) => (e) => {
@@ -342,10 +352,10 @@ function PaymentModal({ item, onClose, clients, payments, config, now }) {
   const save = async () => {
     setBusy(true);
     try {
-      const cy = cycleOf(f.paidAt);
+      const cy = cycleOf(f.clientId, f.paidAt);
       await addDoc(collection(db, 'subsPayments'), {
         clientId: f.clientId, amount: Number(f.amount), paidAt: fromIso(f.paidAt), cycleKey: cy.key, method: f.method, note: f.note.trim(),
-        ...(f.coversUntil ? { coversUntil: fromIso(f.coversUntil) } : {}), recordedBy: who(), createdAt: serverTimestamp(),
+        recordedBy: who(), createdAt: serverTimestamp(),
       });
       logActivity('suscripciones.pago', `Registró pago de ${nio(f.amount)} de ${client.name} (ciclo ${cy.key})`, { clientId: f.clientId, amount: Number(f.amount) });
       onClose();
@@ -362,9 +372,8 @@ function PaymentModal({ item, onClose, clients, payments, config, now }) {
           </Select>
         </Field>
         <Field label="Fecha de pago"><Input type="date" value={f.paidAt || ''} onChange={pick('paidAt')} /></Field>
-        <Field label="Monto (C$)" hint={client ? `Ciclo ${cycleOf(f.paidAt).key}` : undefined}><Input type="number" min="0" value={f.amount ?? ''} onChange={set('amount')} /></Field>
+        <Field label="Monto (C$)" hint={client ? `Mes ${cycleOf(f.clientId, f.paidAt).key}` : undefined}><Input type="number" min="0" value={f.amount ?? ''} onChange={set('amount')} /></Field>
         <Field label="Método"><Select value={f.method || ''} onChange={set('method')}><option>Transferencia</option><option>Efectivo</option><option>Depósito</option><option>Otro</option></Select></Field>
-        <Field label="Cubre hasta" hint="Solo si pagó por adelantado: se descuenta del próximo cobro."><Input type="date" value={f.coversUntil || ''} onChange={set('coversUntil')} /></Field>
         <Field label="Nota" className="sm:col-span-2"><Input value={f.note || ''} onChange={set('note')} /></Field>
       </div>
     </Modal>
@@ -384,10 +393,12 @@ function ConfigForm({ config }) {
       const data = {
         currency: 'NIO', businessName: String(f.businessName || '').trim() || DEFAULT_CONFIG.businessName, autoEmails: !!f.autoEmails,
         paymentInstructions: String(f.paymentInstructions || '').trim(),
-        ...Object.fromEntries(['defaultPrice', 'costPerSeatUsd', 'exchangeRate', 'cycleDay', 'dueDay', 'reminderDaysBefore'].map((k) => [k, Number(f[k])])),
+        ...Object.fromEntries(['defaultPrice', 'costPerSeatUsd', 'exchangeRate', 'cycleDay', 'reminderDaysBefore'].map((k) => [k, Number(f[k])])),
       };
-      if (Object.values(data).some((v) => typeof v === 'number' && !(v >= 0)) || data.exchangeRate <= 0 || data.cycleDay < 1 || data.cycleDay > 28 || data.dueDay < 1 || data.dueDay > 28) throw new Error('Revisa los números (días entre 1 y 28, tipo de cambio mayor que 0).');
+      if (Object.values(data).some((v) => typeof v === 'number' && !(v >= 0)) || data.exchangeRate <= 0 || data.cycleDay < 1 || data.cycleDay > 28 ) throw new Error('Revisa los números (días entre 1 y 28, tipo de cambio mayor que 0).');
       await setDoc(doc(db, 'subsConfig', 'main'), data, { merge: true });
+      // Copia pública (sin costos) para el formulario de /claude.
+      await setDoc(doc(db, 'subsConfig', 'public'), { price: data.defaultPrice, paymentInstructions: data.paymentInstructions, businessName: data.businessName });
       logActivity('suscripciones.config', 'Actualizó la configuración de suscripciones', { exchangeRate: data.exchangeRate, defaultPrice: data.defaultPrice });
       toast({ title: 'Configuración guardada' });
     } catch (e) { toast({ title: 'No se pudo guardar', description: e?.message, variant: 'destructive' }); } finally { setBusy(false); }
@@ -401,10 +412,9 @@ function ConfigForm({ config }) {
         <Field label="Costo por cupo (US$)"><Input {...num('costPerSeatUsd')} /></Field>
         <Field label="Tipo de cambio (C$ por US$)"><Input {...num('exchangeRate')} /></Field>
         <Field label="Día de corte del ciclo" hint="Factura del proveedor"><Input {...num('cycleDay')} /></Field>
-        <Field label="Día límite de pago"><Input {...num('dueDay')} /></Field>
         <Field label="Recordar N días antes"><Input {...num('reminderDaysBefore')} /></Field>
         <div className="flex items-center gap-3 self-end pb-2"><Switch checked={!!f.autoEmails} onChange={(v) => setF((p) => ({ ...p, autoEmails: v }))} label="Correos automáticos" /><span className="text-sm">Correos automáticos</span></div>
-        <Field label="Instrucciones de pago (van en los correos)" className="sm:col-span-2 lg:col-span-3"><Textarea rows={3} value={f.paymentInstructions || ''} onChange={(e) => setF((p) => ({ ...p, paymentInstructions: e.target.value }))} /></Field>
+        <Field label="Instrucciones de pago (correos y formulario público)" className="sm:col-span-2 lg:col-span-3"><Textarea rows={3} value={f.paymentInstructions || ''} onChange={(e) => setF((p) => ({ ...p, paymentInstructions: e.target.value }))} /></Field>
         <div className="sm:col-span-2 lg:col-span-3"><Button variant="primary" loading={busy} onClick={save}>Guardar configuración</Button></div>
       </CardBody>
     </Card>
