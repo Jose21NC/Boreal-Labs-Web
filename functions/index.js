@@ -9,6 +9,8 @@ import { PDFDocument } from 'pdf-lib';
 import { certificateEmail, customEmail, registrationEmail, reminderEmail, sendOnce } from './email.js';
 import { onSchedule } from 'firebase-functions/v2/scheduler';
 import { LOOKAHEAD_MS, duePhases, isVirtualReg } from './reminders.js';
+import { DEFAULT_CONFIG, clientCycle, reminderPhase } from './billing.js';
+import { subscriptionEmail } from './subsEmails.js';
 import Anthropic from '@anthropic-ai/sdk';
 import { buildAiPrompt } from './aiText.js';
 import {
@@ -531,3 +533,56 @@ export const sendEventReminders = onSchedule(
     }
   },
 );
+
+// ---------------- Suscripciones (ver functions/billing.js y subsEmails.js) ----------------
+const subsConfig = async () => ({ ...DEFAULT_CONFIG, ...((await db.collection('subsConfig').doc('main').get()).data() || {}) });
+const subsId = (snap) => ({ id: snap.id, ...snap.data() });
+
+/** Cliente + monto del ciclo actual para armar el correo. */
+async function subsMessage(kind, client, cfg, now = Date.now()) {
+  const pays = (await db.collection('subsPayments').where('clientId', '==', client.id).get()).docs.map(subsId);
+  const c = clientCycle(client, pays, cfg, now);
+  return subscriptionEmail(kind, { client, due: Math.max(0, c.due - c.paid), dueDate: c.dueDate, cfg });
+}
+
+export const onSubsClientCreated = onDocumentCreated(emailTrigger('subsClients/{id}'), async (event) => {
+  const cfg = await subsConfig();
+  if (!cfg.autoEmails) return;
+  await sendOnce(db, event.data.ref, async (c) => (c.status === 'activo' ? subsMessage('welcome', subsId(event.data), cfg) : null), { password: SMTP_PASSWORD.value(), field: 'welcomeEmail' });
+});
+
+// Una vez al día: recordatorio N días antes del vencimiento y aviso de vencido al día siguiente.
+export const sendSubscriptionReminders = onSchedule(
+  { schedule: '0 9 * * *', timeZone: 'America/Managua', region: 'us-central1', secrets: [SMTP_PASSWORD], timeoutSeconds: 300, maxInstances: 1, retryCount: 0 },
+  async () => {
+    const cfg = await subsConfig();
+    if (!cfg.autoEmails) return;
+    const now = Date.now();
+    const [clients, pays] = await Promise.all([
+      db.collection('subsClients').where('status', '==', 'activo').get(),
+      db.collection('subsPayments').get(),
+    ]);
+    const payments = pays.docs.map(subsId);
+    for (const doc of clients.docs) { // secuencial: respeta el límite SMTP de Gmail
+      const client = subsId(doc);
+      const c = clientCycle(client, payments.filter((p) => p.clientId === client.id), cfg, now);
+      const phase = c.status === 'al_dia' ? null : reminderPhase(c.dueDate, now, Number(cfg.reminderDaysBefore) || 3);
+      if (!phase) continue;
+      const field = `${phase === 'reminder' ? 'payReminder' : 'overdue'}_${c.cycle.key.replace('-', '_')}`;
+      await sendOnce(db, doc.ref, async () => subscriptionEmail(phase, { client, due: c.due - c.paid, dueDate: c.dueDate, cfg }), { password: SMTP_PASSWORD.value(), field });
+    }
+  },
+);
+
+// Envío manual desde el panel (bienvenida, recordatorio o vencido). Permite repetirlo.
+export const sendSubscriptionEmail = onCall({ cors: true, region: 'us-central1', secrets: [SMTP_PASSWORD], timeoutSeconds: 60 }, async (request) => {
+  await assertAdmin(request);
+  const { clientId, kind } = request.data || {};
+  if (!['welcome', 'reminder', 'overdue'].includes(kind) || !clientId) throw new HttpsError('invalid-argument', 'Datos inválidos');
+  const ref = db.collection('subsClients').doc(String(clientId));
+  const snap = await ref.get();
+  if (!snap.exists) throw new HttpsError('not-found', 'Cliente no encontrado');
+  const cfg = await subsConfig();
+  const result = await sendOnce(db, ref, () => subsMessage(kind, subsId(snap), cfg), { password: SMTP_PASSWORD.value(), field: 'manualEmail', resend: true });
+  return { result };
+});

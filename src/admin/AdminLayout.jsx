@@ -45,7 +45,7 @@ const ALL_ITEMS = NAV.flatMap((g) => g.items);
 const THEME_KEY = 'admin:theme';
 const IS_DEMO = import.meta.env.MODE === 'demo';
 
-function useAdminTheme() {
+export function useAdminTheme() {
   const [pref, setPref] = useState(() => {
     try { return localStorage.getItem(THEME_KEY) || 'system'; } catch { return 'system'; }
   });
@@ -69,7 +69,7 @@ function useAdminTheme() {
   return { pref, resolved, setPref: update };
 }
 
-function ThemeToggle({ pref, setPref }) {
+export function ThemeToggle({ pref, setPref }) {
   const options = [
     { value: 'light', label: 'Claro', icon: Sun },
     { value: 'dark', label: 'Oscuro', icon: Moon },

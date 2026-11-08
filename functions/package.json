@@ -11,7 +11,7 @@
     "serve": "firebase emulators:start --only functions",
     "deploy": "firebase deploy --only functions",
     "lint": "eslint . || true",
-    "test": "node --test email.test.mjs"
+    "test": "node --test email.test.mjs billing.test.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^1.6.0",

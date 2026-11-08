@@ -31,6 +31,11 @@ async function eventMeta(eventName) {
 }
 
 const handlers = {
+  // Sin correo real en modo de prueba.
+  async sendSubscriptionEmail({ clientId, kind }) {
+    if (!clientId || !kind) throw Object.assign(new Error('Datos inválidos'), { code: 'functions/invalid-argument' });
+    return { result: 'sent' };
+  },
   // Sin IA real en modo de prueba: devuelve un texto de ejemplo con los datos recibidos.
   async generateText({ kind, context = {} }) {
     const t = context.title || 'el evento';

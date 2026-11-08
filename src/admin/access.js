@@ -18,6 +18,7 @@ export const SECTIONS = [
   { key: 'voluntariado', label: 'Voluntariado' },
   { key: 'equipo', label: 'Equipo' },
   { key: 'sitio', label: 'Contenido del sitio' },
+  { key: 'suscripciones', label: 'Suscripciones (/claude)' },
 ];
 
 export const AccessContext = createContext({ email: null, isSuper: false, permissions: 'all' });
