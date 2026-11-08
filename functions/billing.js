@@ -59,8 +59,8 @@ export function coveredUntil(payments, cycle, cycleDay = 24) {
 /** Crédito por días ya pagados más allá del inicio del ciclo: precio × días ÷ días del ciclo. */
 export function creditFor(price, coveredMs, cycle) {
   if (!(coveredMs > cycle.start)) return 0;
-  const days = Math.round((coveredMs - cycle.start) / DAY);
-  return Math.min(price, Math.round((price * days) / cycle.days));
+  const days = Math.round((startOfDay(coveredMs) - cycle.start) / DAY);
+  return Math.min(price, price - Math.round((price * (cycle.days - days)) / cycle.days / 10) * 10); // cobro final redondeado a 10 C$
 }
 
 /** Monto a cobrar a un cliente en un ciclo: prorrateo si entró en él, si no precio − crédito. */
